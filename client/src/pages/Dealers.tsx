@@ -11,7 +11,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { trpc } from "@/lib/trpc";
-import { Plus, Users, CreditCard, History } from "lucide-react";
+import { Plus, Users, CreditCard, History, LogIn } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import {
@@ -245,14 +245,27 @@ export default function Dealers() {
                             </span>
                           </TableCell>
                           <TableCell className="text-right">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => openCreditDialog(dealer)}
-                            >
-                              <CreditCard className="h-4 w-4 mr-2" />
-                              Kredi Yükle
-                            </Button>
+                            <div className="flex gap-2 justify-end">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => openCreditDialog(dealer)}
+                              >
+                                <CreditCard className="h-4 w-4 mr-2" />
+                                Kredi Yükle
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                onClick={() => {
+                                  toast.info(`${dealer.name} bayisinin ekranına geçiş yapılıyor...`);
+                                  // TODO: Implement dealer impersonation
+                                }}
+                              >
+                                <LogIn className="h-4 w-4 mr-2" />
+                                Giriş Yap
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))}

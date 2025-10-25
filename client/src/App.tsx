@@ -10,6 +10,10 @@ import SmsCampaigns from "./pages/SmsCampaigns";
 import EmailCampaigns from "./pages/EmailCampaigns";
 import Dealers from "./pages/Dealers";
 import ImportNumbers from "./pages/ImportNumbers";
+import AllNumbers from "./pages/AllNumbers";
+import AllSmsCampaigns from "./pages/AllSmsCampaigns";
+import AllEmailCampaigns from "./pages/AllEmailCampaigns";
+import Settings from "./pages/Settings";
 
 function Router() {
   // make sure to consider if you need authentication for certain routes
@@ -21,6 +25,10 @@ function Router() {
       <Route path={"/email-campaigns"} component={EmailCampaigns} />
       <Route path={"/dealers"} component={Dealers} />
       <Route path={"/import-numbers"} component={ImportNumbers} />
+      <Route path={"/all-numbers"} component={AllNumbers} />
+      <Route path={"/all-sms"} component={AllSmsCampaigns} />
+      <Route path={"/all-emails"} component={AllEmailCampaigns} />
+      <Route path={"/settings"} component={Settings} />
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}
       <Route component={NotFound} />

@@ -179,3 +179,21 @@ export const numberImports = mysqlTable("numberImports", {
 
 export type NumberImport = typeof numberImports.$inferSelect;
 export type InsertNumberImport = typeof numberImports.$inferInsert;
+
+/**
+ * Activity Logs - Track all user activities and system events
+ */
+export const activityLogs = mysqlTable("activityLogs", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  action: varchar("action", { length: 100 }).notNull(),
+  entity: varchar("entity", { length: 50 }),
+  entityId: int("entityId"),
+  details: text("details"),
+  ipAddress: varchar("ipAddress", { length: 45 }),
+  userAgent: text("userAgent"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type ActivityLog = typeof activityLogs.$inferSelect;
+export type InsertActivityLog = typeof activityLogs.$inferInsert;

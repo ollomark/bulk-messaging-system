@@ -387,3 +387,48 @@ export async function getImportHistory(userId: number) {
     .where(eq(numberImports.userId, userId))
     .orderBy(desc(numberImports.createdAt));
 }
+
+// Activity Logging
+export async function logActivity(data: {
+  userId: number;
+  action: string;
+  entity?: string;
+  entityId?: number;
+  details?: string;
+  ipAddress?: string;
+  userAgent?: string;
+}) {
+  const db = await getDb();
+  if (!db) return;
+  
+  const { activityLogs } = await import("../drizzle/schema");
+  
+  try {
+    await db.insert(activityLogs).values(data);
+  } catch (error) {
+    console.error("Failed to log activity:", error);
+  }
+}
+
+export async function getUserActivityLogs(userId: number, limit: number = 50) {
+  const db = await getDb();
+  if (!db) return [];
+  const { activityLogs } = await import("../drizzle/schema");
+  const { desc } = await import("drizzle-orm");
+  
+  return db.select().from(activityLogs)
+    .where(eq(activityLogs.userId, userId))
+    .orderBy(desc(activityLogs.createdAt))
+    .limit(limit);
+}
+
+export async function getAllActivityLogs(limit: number = 100) {
+  const db = await getDb();
+  if (!db) return [];
+  const { activityLogs } = await import("../drizzle/schema");
+  const { desc } = await import("drizzle-orm");
+  
+  return db.select().from(activityLogs)
+    .orderBy(desc(activityLogs.createdAt))
+    .limit(limit);
+}

@@ -29,6 +29,13 @@
       "when": 1761411491337,
       "tag": "0003_workable_ken_ellis",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1761412368619,
+      "tag": "0004_wealthy_invaders",
+      "breakpoints": true
     }
   ]
 }

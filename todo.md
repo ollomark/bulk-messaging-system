@@ -82,3 +82,32 @@
 - [ ] SMS gönderimi sırasında kredi kontrolü
 - [ ] Gerçek SMS API entegrasyonu
 
+
+
+
+## Yeni Özellikler - Loglama ve Master Panel İyileştirmeleri
+
+### Loglama Sistemi
+- [x] Activity logs tablosu oluştur
+- [x] Kullanıcı aktivitelerini loglama fonksiyonları
+- [x] Sistem event loglarını kaydetme
+- [x] Log görüntüleme sayfası (Ayarlar > Aktivite Logları)
+
+### Bayi Yönetimi İyileştirmeleri
+- [x] Bayi ekranına giriş yapabilme butonu
+- [ ] "Bayi olarak görüntüle" backend implementasyonu
+- [ ] Oturum değiştirme mekanizması
+
+### Master Panel Görüntüleme Sayfaları
+- [x] Tüm numaralar sayfası (frontend)
+- [x] Tüm SMS kampanyaları sayfası (frontend)
+- [x] Tüm Email kampanyaları sayfası (frontend)
+
+### Ayarlar Sayfası
+- [x] Profil bilgileri görüntüleme
+- [x] Güvenlik ayarları sayfası
+- [x] Bildirim tercihleri sayfası
+- [x] Aktivite logları görüntüleme
+- [ ] Profil bilgileri güncelleme backend
+- [ ] Şifre değiştirme backend
+

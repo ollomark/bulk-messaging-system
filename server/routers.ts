@@ -161,6 +161,13 @@ export const appRouter = router({
     }),
   }),
 
+  activityLogs: router({
+    list: protectedProcedure.query(async ({ ctx }) => {
+      const { getUserActivityLogs } = await import("./db");
+      return getUserActivityLogs(ctx.user.id);
+    }),
+  }),
+
   importNumbers: router({
     upload: protectedProcedure
       .input((val: unknown) => {
