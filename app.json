@@ -1,0 +1,45 @@
+{
+  "name": "Toplu SMS ve Mail Gönderim Sistemi",
+  "description": "Modern, çok seviyeli toplu SMS ve email gönderim platformu",
+  "repository": "https://github.com/ollomark/bulk-messaging-system",
+  "logo": "https://cdn-icons-png.flaticon.com/512/732/732200.png",
+  "keywords": ["sms", "email", "messaging", "bulk", "campaign", "nodejs", "react", "trpc"],
+  "success_url": "/",
+  "env": {
+    "NODE_ENV": {
+      "description": "Node environment",
+      "value": "production"
+    },
+    "JWT_SECRET": {
+      "description": "Secret key for JWT token signing (minimum 32 characters)",
+      "generator": "secret"
+    },
+    "VITE_APP_TITLE": {
+      "description": "Application title",
+      "value": "Toplu SMS ve Mail Sistemi"
+    },
+    "VITE_APP_LOGO": {
+      "description": "Application logo URL",
+      "value": "https://cdn-icons-png.flaticon.com/512/732/732200.png"
+    }
+  },
+  "formation": {
+    "web": {
+      "quantity": 1,
+      "size": "basic"
+    }
+  },
+  "addons": [
+    {
+      "plan": "jawsdb:kitefin",
+      "as": "DATABASE"
+    }
+  ],
+  "buildpacks": [
+    {
+      "url": "heroku/nodejs"
+    }
+  ],
+  "stack": "heroku-22"
+}
+

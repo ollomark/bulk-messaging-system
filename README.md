@@ -2,6 +2,12 @@
 
 Modern, çok seviyeli toplu SMS ve email gönderim platformu.
 
+## 🚀 Hızlı Deploy
+
+[![Deploy to Heroku](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy?template=https://github.com/ollomark/bulk-messaging-system)
+
+**Not:** Heroku'da MySQL database için JawsDB eklentisi otomatik olarak eklenecektir.
+
 ## 🚀 Özellikler
 
 ### Master Panel
