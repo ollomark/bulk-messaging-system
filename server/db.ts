@@ -89,4 +89,128 @@ export async function getUserByOpenId(openId: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
-// TODO: add feature queries here as your schema grows.
+// Contact Groups
+export async function getUserContactGroups(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const { contactGroups } = await import("../drizzle/schema");
+  return db.select().from(contactGroups).where(eq(contactGroups.userId, userId));
+}
+
+export async function createContactGroup(data: { userId: number; name: string; description?: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const { contactGroups } = await import("../drizzle/schema");
+  const result = await db.insert(contactGroups).values(data);
+  return result;
+}
+
+export async function deleteContactGroup(groupId: number, userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const { contactGroups, contacts } = await import("../drizzle/schema");
+  const { and } = await import("drizzle-orm");
+  
+  // Delete contacts first
+  await db.delete(contacts).where(eq(contacts.groupId, groupId));
+  // Delete group
+  await db.delete(contactGroups).where(and(eq(contactGroups.id, groupId), eq(contactGroups.userId, userId)));
+}
+
+// Contacts
+export async function getGroupContacts(groupId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const { contacts } = await import("../drizzle/schema");
+  return db.select().from(contacts).where(eq(contacts.groupId, groupId));
+}
+
+export async function createContact(data: any) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const { contacts } = await import("../drizzle/schema");
+  const result = await db.insert(contacts).values(data);
+  return result;
+}
+
+export async function bulkCreateContacts(contactsData: any[]) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const { contacts } = await import("../drizzle/schema");
+  const result = await db.insert(contacts).values(contactsData);
+  return result;
+}
+
+// SMS Campaigns
+export async function getUserSmsCampaigns(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const { smsCampaigns } = await import("../drizzle/schema");
+  const { desc } = await import("drizzle-orm");
+  return db.select().from(smsCampaigns).where(eq(smsCampaigns.userId, userId)).orderBy(desc(smsCampaigns.createdAt));
+}
+
+export async function createSmsCampaign(data: any) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const { smsCampaigns } = await import("../drizzle/schema");
+  const result = await db.insert(smsCampaigns).values(data);
+  return result;
+}
+
+export async function getSmsCampaignById(campaignId: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const { smsCampaigns } = await import("../drizzle/schema");
+  const result = await db.select().from(smsCampaigns).where(eq(smsCampaigns.id, campaignId)).limit(1);
+  return result[0];
+}
+
+// Email Campaigns
+export async function getUserEmailCampaigns(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const { emailCampaigns } = await import("../drizzle/schema");
+  const { desc } = await import("drizzle-orm");
+  return db.select().from(emailCampaigns).where(eq(emailCampaigns.userId, userId)).orderBy(desc(emailCampaigns.createdAt));
+}
+
+export async function createEmailCampaign(data: any) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const { emailCampaigns } = await import("../drizzle/schema");
+  const result = await db.insert(emailCampaigns).values(data);
+  return result;
+}
+
+// Dashboard Stats
+export async function getUserDashboardStats(userId: number) {
+  const db = await getDb();
+  if (!db) return null;
+  
+  const user = await getUserByOpenId((await db.select().from(users).where(eq(users.id, userId)).limit(1))[0]?.openId || "");
+  
+  const { smsCampaigns, emailCampaigns, smsLogs, emailLogs } = await import("../drizzle/schema");
+  const { sql } = await import("drizzle-orm");
+  
+  // Get SMS stats
+  const smsStats = await db.select({
+    totalSent: sql<number>`COALESCE(SUM(${smsCampaigns.sentCount}), 0)`,
+    totalDelivered: sql<number>`COALESCE(SUM(${smsCampaigns.deliveredCount}), 0)`,
+    totalFailed: sql<number>`COALESCE(SUM(${smsCampaigns.failedCount}), 0)`,
+  }).from(smsCampaigns).where(eq(smsCampaigns.userId, userId));
+  
+  // Get Email stats
+  const emailStats = await db.select({
+    totalSent: sql<number>`COALESCE(SUM(${emailCampaigns.sentCount}), 0)`,
+    totalDelivered: sql<number>`COALESCE(SUM(${emailCampaigns.deliveredCount}), 0)`,
+    totalFailed: sql<number>`COALESCE(SUM(${emailCampaigns.failedCount}), 0)`,
+  }).from(emailCampaigns).where(eq(emailCampaigns.userId, userId));
+  
+  return {
+    smsBalance: user?.smsBalance || 0,
+    emailBalance: user?.emailBalance || 0,
+    smsStats: smsStats[0] || { totalSent: 0, totalDelivered: 0, totalFailed: 0 },
+    emailStats: emailStats[0] || { totalSent: 0, totalDelivered: 0, totalFailed: 0 },
+  };
+}

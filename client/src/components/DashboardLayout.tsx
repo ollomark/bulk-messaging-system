@@ -27,9 +27,14 @@ import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
 import { Button } from "./ui/button";
 
+import { MessageSquare, Mail, Settings } from "lucide-react";
+
 const menuItems = [
-  { icon: LayoutDashboard, label: "Page 1", path: "/" },
-  { icon: Users, label: "Page 2", path: "/some-path" },
+  { icon: LayoutDashboard, label: "Dashboard", path: "/" },
+  { icon: Users, label: "Grup Yönetimi", path: "/groups" },
+  { icon: MessageSquare, label: "SMS Kampanyaları", path: "/sms-campaigns" },
+  { icon: Mail, label: "Email Kampanyaları", path: "/email-campaigns" },
+  { icon: Settings, label: "Ayarlar", path: "/settings" },
 ];
 
 const SIDEBAR_WIDTH_KEY = "sidebar-width";
