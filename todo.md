@@ -50,3 +50,35 @@
 - [ ] Tüm özellikleri test et
 - [ ] Checkpoint oluştur
 
+
+
+
+## Yeni Özellikler - Çok Seviyeli Sistem
+
+### Master Panel (Bayi Yönetimi)
+- [x] Kullanıcı rollerini güncelle (master, bayi, kullanıcı)
+- [x] Bayi oluşturma sayfası
+- [x] Bayi listesi ve yönetim sayfası
+- [x] Bayilere kredi yükleme özelliği
+- [x] Kredi transfer geçmişi
+- [x] Tüm bayilerin numaralarını görüntüleme (API hazır)
+- [x] Tüm bayilerin SMS gönderimlerini görüntüleme (API hazır)
+
+### Bayi Paneli Özellikleri
+- [x] Excel/CSV dosya yükleme özelliği
+- [x] Otomatik duplicate numara temizleme
+- [x] Toplu numara import işlemi
+- [x] Kendi kredi limitini görüntüleme
+- [ ] Kredi limiti kontrolü ile SMS gönderimi
+
+### Veritabanı Güncellemeleri
+- [x] User tablosuna parentId ekle (bayi-master ilişkisi)
+- [x] Kredi transfer tablosu oluştur
+- [x] Numara import geçmişi tablosu
+
+### Gelecek Geliştirmeler
+- [ ] Master paneli için tüm numaralar sayfası (frontend)
+- [ ] Master paneli için tüm kampanyalar sayfası (frontend)
+- [ ] SMS gönderimi sırasında kredi kontrolü
+- [ ] Gerçek SMS API entegrasyonu
+

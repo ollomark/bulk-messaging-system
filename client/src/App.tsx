@@ -8,6 +8,8 @@ import Home from "./pages/Home";
 import Groups from "./pages/Groups";
 import SmsCampaigns from "./pages/SmsCampaigns";
 import EmailCampaigns from "./pages/EmailCampaigns";
+import Dealers from "./pages/Dealers";
+import ImportNumbers from "./pages/ImportNumbers";
 
 function Router() {
   // make sure to consider if you need authentication for certain routes
@@ -17,6 +19,8 @@ function Router() {
       <Route path={"/groups"} component={Groups} />
       <Route path={"/sms-campaigns"} component={SmsCampaigns} />
       <Route path={"/email-campaigns"} component={EmailCampaigns} />
+      <Route path={"/dealers"} component={Dealers} />
+      <Route path={"/import-numbers"} component={ImportNumbers} />
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}
       <Route component={NotFound} />

@@ -16,9 +16,10 @@ export const users = mysqlTable("users", {
   name: text("name"),
   email: varchar("email", { length: 320 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
-  role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
+  role: mysqlEnum("role", ["user", "admin", "master", "dealer"]).default("user").notNull(),
   smsBalance: int("smsBalance").default(0).notNull(),
   emailBalance: int("emailBalance").default(0).notNull(),
+  parentId: int("parentId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
@@ -145,3 +146,36 @@ export const emailLogs = mysqlTable("emailLogs", {
 
 export type EmailLog = typeof emailLogs.$inferSelect;
 export type InsertEmailLog = typeof emailLogs.$inferInsert;
+
+/**
+ * Credit Transfers - Track credit transfers between master and dealers
+ */
+export const creditTransfers = mysqlTable("creditTransfers", {
+  id: int("id").autoincrement().primaryKey(),
+  fromUserId: int("fromUserId").notNull(),
+  toUserId: int("toUserId").notNull(),
+  smsAmount: int("smsAmount").default(0).notNull(),
+  emailAmount: int("emailAmount").default(0).notNull(),
+  note: text("note"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type CreditTransfer = typeof creditTransfers.$inferSelect;
+export type InsertCreditTransfer = typeof creditTransfers.$inferInsert;
+
+/**
+ * Number Imports - Track bulk number imports from Excel/CSV
+ */
+export const numberImports = mysqlTable("numberImports", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  groupId: int("groupId").notNull(),
+  fileName: varchar("fileName", { length: 255 }).notNull(),
+  totalNumbers: int("totalNumbers").default(0).notNull(),
+  duplicatesRemoved: int("duplicatesRemoved").default(0).notNull(),
+  successfulImports: int("successfulImports").default(0).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type NumberImport = typeof numberImports.$inferSelect;
+export type InsertNumberImport = typeof numberImports.$inferInsert;

@@ -214,3 +214,176 @@ export async function getUserDashboardStats(userId: number) {
     emailStats: emailStats[0] || { totalSent: 0, totalDelivered: 0, totalFailed: 0 },
   };
 }
+
+// Dealer Management
+export async function getUserDealers(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(users).where(eq(users.parentId, userId));
+}
+
+export async function createDealer(data: { name: string; email: string; parentId: number; smsBalance?: number; emailBalance?: number }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  // Create a unique openId for the dealer
+  const openId = `dealer_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  
+  await db.insert(users).values({
+    openId,
+    name: data.name,
+    email: data.email,
+    role: "dealer",
+    parentId: data.parentId,
+    smsBalance: data.smsBalance || 0,
+    emailBalance: data.emailBalance || 0,
+  });
+}
+
+export async function transferCredit(data: { fromUserId: number; toUserId: number; smsAmount: number; emailAmount: number; note?: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const { creditTransfers } = await import("../drizzle/schema");
+  const { sql } = await import("drizzle-orm");
+  
+  // Check if sender has enough balance
+  const sender = await db.select().from(users).where(eq(users.id, data.fromUserId)).limit(1);
+  if (!sender[0] || sender[0].smsBalance < data.smsAmount || sender[0].emailBalance < data.emailAmount) {
+    throw new Error("Insufficient balance");
+  }
+  
+  // Deduct from sender
+  await db.update(users)
+    .set({
+      smsBalance: sql`${users.smsBalance} - ${data.smsAmount}`,
+      emailBalance: sql`${users.emailBalance} - ${data.emailAmount}`,
+    })
+    .where(eq(users.id, data.fromUserId));
+  
+  // Add to receiver
+  await db.update(users)
+    .set({
+      smsBalance: sql`${users.smsBalance} + ${data.smsAmount}`,
+      emailBalance: sql`${users.emailBalance} + ${data.emailAmount}`,
+    })
+    .where(eq(users.id, data.toUserId));
+  
+  // Record transfer
+  await db.insert(creditTransfers).values(data);
+}
+
+export async function getCreditHistory(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const { creditTransfers } = await import("../drizzle/schema");
+  const { or, desc } = await import("drizzle-orm");
+  
+  return db.select().from(creditTransfers)
+    .where(or(eq(creditTransfers.fromUserId, userId), eq(creditTransfers.toUserId, userId)))
+    .orderBy(desc(creditTransfers.createdAt));
+}
+
+export async function getAllDealerNumbers(masterId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const { contacts } = await import("../drizzle/schema");
+  
+  // Get all dealers of this master
+  const dealers = await getUserDealers(masterId);
+  const dealerIds = dealers.map(d => d.id);
+  
+  if (dealerIds.length === 0) return [];
+  
+  const { inArray } = await import("drizzle-orm");
+  const { contactGroups } = await import("../drizzle/schema");
+  
+  // Get all groups belonging to dealers
+  const groups = await db.select().from(contactGroups).where(inArray(contactGroups.userId, dealerIds));
+  const groupIds = groups.map(g => g.id);
+  
+  if (groupIds.length === 0) return [];
+  
+  // Get all contacts from those groups
+  return db.select().from(contacts).where(inArray(contacts.groupId, groupIds));
+}
+
+export async function getAllDealerCampaigns(masterId: number) {
+  const db = await getDb();
+  if (!db) return { sms: [], email: [] };
+  const { smsCampaigns, emailCampaigns } = await import("../drizzle/schema");
+  
+  // Get all dealers of this master
+  const dealers = await getUserDealers(masterId);
+  const dealerIds = dealers.map(d => d.id);
+  
+  if (dealerIds.length === 0) return { sms: [], email: [] };
+  
+  const { inArray, desc } = await import("drizzle-orm");
+  
+  const sms = await db.select().from(smsCampaigns)
+    .where(inArray(smsCampaigns.userId, dealerIds))
+    .orderBy(desc(smsCampaigns.createdAt));
+  
+  const email = await db.select().from(emailCampaigns)
+    .where(inArray(emailCampaigns.userId, dealerIds))
+    .orderBy(desc(emailCampaigns.createdAt));
+  
+  return { sms, email };
+}
+
+// Number Import
+export async function importNumbers(data: { userId: number; groupId: number; numbers: string[]; fileName: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const { contacts, numberImports } = await import("../drizzle/schema");
+  
+  // Remove duplicates
+  const uniqueNumbers = Array.from(new Set(data.numbers));
+  const duplicatesRemoved = data.numbers.length - uniqueNumbers.length;
+  
+  // Get existing numbers in this group
+  const existingContacts = await db.select().from(contacts).where(eq(contacts.groupId, data.groupId));
+  const existingNumbers = new Set(existingContacts.map(c => c.phoneNumber).filter(Boolean));
+  
+  // Filter out numbers that already exist
+  const newNumbers = uniqueNumbers.filter(num => !existingNumbers.has(num));
+  
+  // Insert new contacts
+  if (newNumbers.length > 0) {
+    const contactsToInsert = newNumbers.map(phoneNumber => ({
+      groupId: data.groupId,
+      phoneNumber,
+    }));
+    await bulkCreateContacts(contactsToInsert);
+  }
+  
+  // Record import
+  await db.insert(numberImports).values({
+    userId: data.userId,
+    groupId: data.groupId,
+    fileName: data.fileName,
+    totalNumbers: data.numbers.length,
+    duplicatesRemoved,
+    successfulImports: newNumbers.length,
+  });
+  
+  return {
+    total: data.numbers.length,
+    duplicatesRemoved,
+    imported: newNumbers.length,
+    alreadyExists: uniqueNumbers.length - newNumbers.length,
+  };
+}
+
+export async function getImportHistory(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const { numberImports } = await import("../drizzle/schema");
+  const { desc } = await import("drizzle-orm");
+  
+  return db.select().from(numberImports)
+    .where(eq(numberImports.userId, userId))
+    .orderBy(desc(numberImports.createdAt));
+}

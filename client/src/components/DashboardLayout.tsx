@@ -27,15 +27,32 @@ import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
 import { Button } from "./ui/button";
 
-import { MessageSquare, Mail, Settings } from "lucide-react";
+import { MessageSquare, Mail, Settings, Building2, Upload } from "lucide-react";
 
-const menuItems = [
+const getMasterMenuItems = () => [
+  { icon: LayoutDashboard, label: "Dashboard", path: "/" },
+  { icon: Building2, label: "Bayi Yönetimi", path: "/dealers" },
+  { icon: Users, label: "Tüm Numaralar", path: "/all-numbers" },
+  { icon: MessageSquare, label: "Tüm SMS Kampanyaları", path: "/all-sms" },
+  { icon: Mail, label: "Tüm Email Kampanyaları", path: "/all-emails" },
+  { icon: Settings, label: "Ayarlar", path: "/settings" },
+];
+
+const getDealerMenuItems = () => [
   { icon: LayoutDashboard, label: "Dashboard", path: "/" },
   { icon: Users, label: "Grup Yönetimi", path: "/groups" },
+  { icon: Upload, label: "Numara İçe Aktar", path: "/import-numbers" },
   { icon: MessageSquare, label: "SMS Kampanyaları", path: "/sms-campaigns" },
   { icon: Mail, label: "Email Kampanyaları", path: "/email-campaigns" },
   { icon: Settings, label: "Ayarlar", path: "/settings" },
 ];
+
+const getMenuItems = (userRole?: string) => {
+  if (userRole === "master" || userRole === "admin") {
+    return getMasterMenuItems();
+  }
+  return getDealerMenuItems();
+};
 
 const SIDEBAR_WIDTH_KEY = "sidebar-width";
 const DEFAULT_WIDTH = 280;
@@ -124,6 +141,7 @@ function DashboardLayoutContent({
   const [location, setLocation] = useLocation();
   const { state, toggleSidebar } = useSidebar();
   const isCollapsed = state === "collapsed";
+  const menuItems = getMenuItems(user?.role);
   const [isResizing, setIsResizing] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const activeMenuItem = menuItems.find(item => item.path === location);

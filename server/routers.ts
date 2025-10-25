@@ -112,6 +112,79 @@ export const appRouter = router({
       }),
   }),
 
+  dealers: router({
+    list: protectedProcedure.query(async ({ ctx }) => {
+      const { getUserDealers } = await import("./db");
+      return getUserDealers(ctx.user.id);
+    }),
+    create: protectedProcedure
+      .input((val: unknown) => {
+        if (typeof val === "object" && val !== null && "name" in val && "email" in val) {
+          return val as { name: string; email: string; smsBalance?: number; emailBalance?: number };
+        }
+        throw new Error("Invalid input");
+      })
+      .mutation(async ({ ctx, input }) => {
+        const { createDealer } = await import("./db");
+        await createDealer({ ...input, parentId: ctx.user.id });
+        return { success: true };
+      }),
+    transferCredit: protectedProcedure
+      .input((val: unknown) => {
+        if (typeof val === "object" && val !== null && "dealerId" in val) {
+          return val as { dealerId: number; smsAmount: number; emailAmount: number; note?: string };
+        }
+        throw new Error("Invalid input");
+      })
+      .mutation(async ({ ctx, input }) => {
+        const { transferCredit } = await import("./db");
+        await transferCredit({
+          fromUserId: ctx.user.id,
+          toUserId: input.dealerId,
+          smsAmount: input.smsAmount,
+          emailAmount: input.emailAmount,
+          note: input.note,
+        });
+        return { success: true };
+      }),
+    creditHistory: protectedProcedure.query(async ({ ctx }) => {
+      const { getCreditHistory } = await import("./db");
+      return getCreditHistory(ctx.user.id);
+    }),
+    allNumbers: protectedProcedure.query(async ({ ctx }) => {
+      const { getAllDealerNumbers } = await import("./db");
+      return getAllDealerNumbers(ctx.user.id);
+    }),
+    allCampaigns: protectedProcedure.query(async ({ ctx }) => {
+      const { getAllDealerCampaigns } = await import("./db");
+      return getAllDealerCampaigns(ctx.user.id);
+    }),
+  }),
+
+  importNumbers: router({
+    upload: protectedProcedure
+      .input((val: unknown) => {
+        if (typeof val === "object" && val !== null && "groupId" in val && "numbers" in val) {
+          return val as { groupId: number; numbers: string[]; fileName: string };
+        }
+        throw new Error("Invalid input");
+      })
+      .mutation(async ({ ctx, input }) => {
+        const { importNumbers } = await import("./db");
+        const result = await importNumbers({
+          userId: ctx.user.id,
+          groupId: input.groupId,
+          numbers: input.numbers,
+          fileName: input.fileName,
+        });
+        return result;
+      }),
+    history: protectedProcedure.query(async ({ ctx }) => {
+      const { getImportHistory } = await import("./db");
+      return getImportHistory(ctx.user.id);
+    }),
+  }),
+
   emailCampaigns: router({
     list: protectedProcedure.query(async ({ ctx }) => {
       const { getUserEmailCampaigns } = await import("./db");
