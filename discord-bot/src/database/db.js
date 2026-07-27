@@ -37,7 +37,9 @@ db.exec(`
     anti_invite INTEGER DEFAULT 1,
     anti_raid INTEGER DEFAULT 1,
     anti_caps INTEGER DEFAULT 0,
-    mod_mode INTEGER DEFAULT 0
+    mod_mode INTEGER DEFAULT 0,
+    voice_channel_id TEXT,
+    voice_24_7 INTEGER DEFAULT 0
   );
 
   CREATE TABLE IF NOT EXISTS warnings (

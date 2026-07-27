@@ -128,6 +128,7 @@ export default {
               `**Destek rolü:** ${s.ticket_support_role_id ? `<@&${s.ticket_support_role_id}>` : "Yok"}`,
               `**Koruma:** spam=${s.anti_spam} invite=${s.anti_invite} link=${s.anti_link} raid=${s.anti_raid} caps=${s.anti_caps}`,
               `**Mod modu:** ${s.mod_mode ? "AÇIK" : "Kapalı"}`,
+              `**Ses 7/24:** ${s.voice_24_7 ? "Açık" : "Kapalı"} ${s.voice_channel_id ? `<#${s.voice_channel_id}>` : ""}`,
             ].join("\n"),
             "Sunucu Ayarları",
           ),
