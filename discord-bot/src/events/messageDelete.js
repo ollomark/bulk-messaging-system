@@ -5,7 +5,23 @@ import { setSnipe } from "../systems/snipe.js";
 export default {
   name: Events.MessageDelete,
   async execute(message) {
-    if (!message.guild || message.author?.bot) return;
+    if (!message.guild) return;
+
+    // Cache'de olmayan silinen mesajları da yakala
+    if (message.partial) {
+      try {
+        await message.fetch();
+      } catch {
+        await sendLog(message.guild, {
+          title: "🗑️ Mesaj Silindi",
+          description: `Kanal: ${message.channel}\nYazar: Bilinmiyor (önbellekte yok)\nMesaj ID: \`${message.id}\``,
+          color: 0xed4245,
+        });
+        return;
+      }
+    }
+
+    if (message.author?.bot) return;
 
     if (message.author) {
       setSnipe(message.channel.id, {
@@ -16,11 +32,20 @@ export default {
       });
     }
 
+    const attachments =
+      message.attachments?.size > 0
+        ? [...message.attachments.values()].map((a) => a.url).join("\n")
+        : null;
+
     await sendLog(message.guild, {
       title: "🗑️ Mesaj Silindi",
-      description: `Kanal: ${message.channel}\nYazar: ${message.author || "Bilinmiyor"}`,
+      description: `Kanal: ${message.channel}\nYazar: ${message.author || "Bilinmiyor"} (\`${message.author?.id || "?"}\`)`,
       color: 0xed4245,
-      fields: [{ name: "İçerik", value: (message.content || "*embed/ek*").slice(0, 1000) }],
+      fields: [
+        { name: "İçerik", value: (message.content || "*embed/ek/boş*").slice(0, 1000) },
+        ...(attachments ? [{ name: "Ekler", value: attachments.slice(0, 1000) }] : []),
+      ],
+      thumbnail: message.author?.displayAvatarURL?.() || null,
     });
   },
 };
