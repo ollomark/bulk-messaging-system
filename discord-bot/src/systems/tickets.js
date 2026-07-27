@@ -133,6 +133,19 @@ export async function claimTicket(interaction) {
   });
 }
 
+async function buildTranscript(channel) {
+  const messages = await channel.messages.fetch({ limit: 100 }).catch(() => null);
+  if (!messages) return "Transcript alınamadı.";
+  const lines = [...messages.values()]
+    .reverse()
+    .map((msg) => {
+      const time = new Date(msg.createdTimestamp).toISOString();
+      const content = msg.content || (msg.embeds.length ? "[embed]" : "[ek/boş]");
+      return `[${time}] ${msg.author?.tag || "?"}: ${content}`;
+    });
+  return lines.join("\n").slice(0, 1800) || "Boş ticket.";
+}
+
 export async function closeTicket(interaction) {
   const ticket = db.prepare("SELECT * FROM tickets WHERE channel_id = ?").get(interaction.channel.id);
   if (!ticket) {
@@ -140,27 +153,29 @@ export async function closeTicket(interaction) {
   }
 
   db.prepare("UPDATE tickets SET status = 'closed' WHERE channel_id = ?").run(interaction.channel.id);
+  await interaction.deferReply();
 
+  const transcript = await buildTranscript(interaction.channel);
   const settings = getSettings(interaction.guild.id);
-  if (settings.ticket_log_channel_id) {
-    const logChannel = await interaction.guild.channels
-      .fetch(settings.ticket_log_channel_id)
-      .catch(() => null);
+  const logChannelId = settings.ticket_log_channel_id || settings.log_channel_id;
+
+  if (logChannelId) {
+    const logChannel = await interaction.guild.channels.fetch(logChannelId).catch(() => null);
     if (logChannel?.isTextBased()) {
       await logChannel.send({
         embeds: [
           baseEmbed(
-            "Ticket Kapatıldı",
+            "🧾 Ticket Transcript",
             `Kanal: \`${interaction.channel.name}\`\nAçan: <@${ticket.opener_id}>\nKapatan: ${interaction.user}\nÜstlenen: ${
               ticket.claimed_by ? `<@${ticket.claimed_by}>` : "Yok"
-            }`,
+            }\n\n\`\`\`\n${transcript}\n\`\`\``,
           ),
         ],
       });
     }
   }
 
-  await interaction.reply({ embeds: [successEmbed("Ticket 5 saniye içinde silinecek.")] });
+  await interaction.editReply({ embeds: [successEmbed("Transcript alındı. Ticket 5 sn içinde silinecek.")] });
   setTimeout(() => {
     interaction.channel.delete("Ticket kapatıldı").catch(() => null);
   }, 5000);

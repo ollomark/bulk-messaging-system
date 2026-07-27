@@ -9,27 +9,28 @@ import { config } from "../config.js";
 
 export const brand = {
   name: "Lexyxzon",
-  tagline: "Premium Discord Guard & Engagement Suite",
-  color: config.embedColor || 0x5865f2,
+  tagline: "Ultra Premium Discord Operating System",
+  color: config.embedColor || 0x7c3aed,
   colors: {
-    primary: 0x5865f2,
-    success: 0x3ba55d,
-    danger: 0xed4245,
-    warn: 0xfaa81a,
-    info: 0x00b0f4,
-    dark: 0x2b2d31,
-    premium: 0x9b59b6,
+    primary: 0x7c3aed,
+    success: 0x22c55e,
+    danger: 0xef4444,
+    warn: 0xf59e0b,
+    info: 0x38bdf8,
+    dark: 0x0f172a,
+    premium: 0xa855f7,
+    gold: 0xfbbf24,
   },
 };
 
 export function premiumEmbed({
   title,
   description,
-  color = brand.colors.primary,
+  color = brand.colors.premium,
   fields = [],
   thumbnail,
   image,
-  footer = `${brand.name} · Professional Suite`,
+  footer = `${brand.name} · Ultra Premium`,
   author,
 }) {
   const embed = new EmbedBuilder().setColor(color).setTimestamp();
@@ -45,41 +46,36 @@ export function premiumEmbed({
 
 export function hqPanelPayload(guild) {
   const embed = premiumEmbed({
-    title: `${brand.name} Control Center`,
+    title: `${brand.name} Ultra Control`,
     description: [
-      `**${guild.name}** için profesyonel yönetim paneli.`,
+      `✦ **${guild.name}** için ultra premium operasyon merkezi`,
       "",
-      "Aşağıdan modül seç → anında kurulum / yönetim.",
-      "Sıradan bot komutları değil; **tek merkezden** operasyon.",
+      "Tek panel · tüm sistemler · kurumsal kalite",
       "",
-      "**Modüller**",
-      "🛡️ Koruma & Moderasyon",
-      "✅ Doğrulama Kapısı",
-      "📨 Davet Takibi",
-      "⭐ Starboard",
-      "💡 Öneri Sistemi",
-      "🔊 Geçici Ses Odaları",
-      "🤖 Oto Yanıt",
-      "🎭 Buton Rol",
-      "📊 Sunucu Analitiği",
+      "**Aktif Suite**",
+      "🛡️ Smart Guard · ✅ Verify · 📨 Invites",
+      "⭐ Starboard · 💡 Suggestions · 🔊 Temp Voice",
+      "🎭 Button Roles · 📋 Applications · 🚨 Reports",
+      "⏰ Reminders · 💤 AFK · 🎨 Embed Studio",
+      "📁 Case System · 📊 Analytics · 🧾 Transcripts",
     ].join("\n"),
-    color: brand.colors.premium,
+    color: brand.colors.gold,
     thumbnail: guild.iconURL({ size: 256 }),
     author: { name: brand.tagline },
   });
 
   const menu = new StringSelectMenuBuilder()
     .setCustomId("hq_module")
-    .setPlaceholder("Yönetmek istediğin modülü seç")
+    .setPlaceholder("Ultra modül seç")
     .addOptions(
-      { label: "Koruma Durumu", value: "protection", emoji: "🛡️" },
-      { label: "Doğrulama Paneli Kur", value: "verify", emoji: "✅" },
-      { label: "Davet Liderliği", value: "invites", emoji: "📨" },
-      { label: "Starboard Bilgi", value: "starboard", emoji: "⭐" },
-      { label: "Öneri Sistemi", value: "suggest", emoji: "💡" },
-      { label: "Geçici Ses", value: "tempvoice", emoji: "🔊" },
-      { label: "Oto Yanıtlar", value: "autorespond", emoji: "🤖" },
-      { label: "Analitik", value: "stats", emoji: "📊" },
+      { label: "Smart Guard", value: "protection", emoji: "🛡️" },
+      { label: "Verify Gate", value: "verify", emoji: "✅" },
+      { label: "Invite Engine", value: "invites", emoji: "📨" },
+      { label: "Starboard", value: "starboard", emoji: "⭐" },
+      { label: "Suggestions", value: "suggest", emoji: "💡" },
+      { label: "Temp Voice", value: "tempvoice", emoji: "🔊" },
+      { label: "Applications", value: "apply", emoji: "📋" },
+      { label: "Analytics", value: "stats", emoji: "📊" },
     );
 
   const buttons = new ActionRowBuilder().addComponents(
@@ -88,9 +84,9 @@ export function hqPanelPayload(guild) {
       .setLabel("Yenile")
       .setStyle(ButtonStyle.Secondary),
     new ButtonBuilder()
-      .setLabel("Destek")
-      .setStyle(ButtonStyle.Link)
-      .setURL("https://discord.com"),
+      .setCustomId("hq_status")
+      .setLabel("Sistem Durumu")
+      .setStyle(ButtonStyle.Primary),
   );
 
   return {

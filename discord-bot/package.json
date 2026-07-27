@@ -1,7 +1,7 @@
 {
   "name": "lexyxzon-suite",
-  "version": "2.0.0",
-  "description": "Lexyxzon Professional Suite — premium Discord guard, growth and engagement bot",
+  "version": "3.0.0",
+  "description": "Lexyxzon Ultra Premium — Discord operating system for elite communities",
   "type": "module",
   "main": "src/index.js",
   "scripts": {

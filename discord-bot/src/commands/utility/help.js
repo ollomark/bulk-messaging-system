@@ -4,34 +4,31 @@ import { premiumEmbed, brand } from "../../utils/brand.js";
 export default {
   data: new SlashCommandBuilder()
     .setName("yardim")
-    .setDescription("Lexyxzon Professional Suite komutları"),
+    .setDescription("Lexyxzon Ultra Premium komutları"),
   async execute(interaction) {
     return interaction.reply({
       embeds: [
         premiumEmbed({
-          title: `${brand.name} · Komut Merkezi`,
+          title: `${brand.name} · Ultra Command Deck`,
           description: brand.tagline,
-          color: brand.colors.premium,
+          color: brand.colors.gold,
           fields: [
+            { name: "🎛️ HQ", value: "`/panel` `/istatistik` `/embed`" },
             {
-              name: "🎛️ Kontrol",
-              value: "`/panel` tek merkezden tüm modüller",
+              name: "🛡️ Security",
+              value: "`/koruma` `/dogrulama` `/rapor` `/case` + moderasyon",
             },
             {
-              name: "🛡️ Güvenlik",
-              value: "`/koruma` `/dogrulama` `/ayarlar` moderasyon komutları + `/case`",
+              name: "📈 Growth",
+              value: "`/davetler` `/duyuru` `/dm` `/oneri` `/starboard` `/basvuru`",
             },
             {
-              name: "📣 Büyüme",
-              value: "`/davetler` `/duyuru` `/dm` `/oneri` `/starboard`",
-            },
-            {
-              name: "🎧 Deneyim",
+              name: "🎧 Experience",
               value: "`/ses` `/gecicises` `/ticket` `/cekilis` `/seviye` `/emojirol` `/butonrol`",
             },
             {
-              name: "⚙️ Otomasyon",
-              value: "`/otoyanit` `/istatistik` `/anket`",
+              name: "✨ Lifestyle",
+              value: "`/afk` `/hatirlat` `/anket`",
             },
           ],
         }),

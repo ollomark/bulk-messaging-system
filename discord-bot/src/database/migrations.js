@@ -20,6 +20,11 @@ export function runMigrations() {
   addColumn("guild_settings", "temp_voice_channel_id", "TEXT");
   addColumn("guild_settings", "temp_voice_category_id", "TEXT");
   addColumn("guild_settings", "brand_footer", "TEXT");
+  addColumn("guild_settings", "report_channel_id", "TEXT");
+  addColumn("guild_settings", "apply_channel_id", "TEXT");
+
+  // Oto yanıt tamamen kaldırıldı
+  db.exec("DROP TABLE IF EXISTS autoresponders;");
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS mod_cases (
@@ -74,14 +79,6 @@ export function runMigrations() {
       guild_id TEXT NOT NULL,
       owner_id TEXT NOT NULL,
       created_at INTEGER NOT NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS autoresponders (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      guild_id TEXT NOT NULL,
-      trigger_text TEXT NOT NULL,
-      response_text TEXT NOT NULL,
-      match_mode TEXT DEFAULT 'includes'
     );
 
     CREATE TABLE IF NOT EXISTS button_roles (
