@@ -3,9 +3,11 @@ import { baseEmbed, errorEmbed, successEmbed, infoEmbed } from "../../utils/embe
 import {
   addReactionRole,
   buildPanelDescription,
+  getLatestPanel,
   listByMessage,
   listReactionRoles,
   normalizeEmojiInput,
+  parseMessageId,
   removeReactionRole,
 } from "../../systems/reactionRoles.js";
 
@@ -52,9 +54,6 @@ export default {
         .setName("ekle")
         .setDescription("Bir panele emoji + rol ekler")
         .addStringOption((opt) =>
-          opt.setName("mesaj_id").setDescription("Panel mesaj ID").setRequired(true),
-        )
-        .addStringOption((opt) =>
           opt
             .setName("emoji")
             .setDescription("Emoji (ör: ✅ veya :ozel: )")
@@ -62,6 +61,11 @@ export default {
         )
         .addRoleOption((opt) =>
           opt.setName("rol").setDescription("Verilecek rol").setRequired(true),
+        )
+        .addStringOption((opt) =>
+          opt
+            .setName("mesaj_id")
+            .setDescription("Opsiyonel: mesaj ID veya mesaj linki (boşsa son panel)"),
         )
         .addChannelOption((opt) =>
           opt
@@ -99,10 +103,12 @@ export default {
         .setName("kaldir")
         .setDescription("Emoji-rol eşleşmesini siler")
         .addStringOption((opt) =>
-          opt.setName("mesaj_id").setDescription("Mesaj ID").setRequired(true),
+          opt.setName("emoji").setDescription("Emoji").setRequired(true),
         )
         .addStringOption((opt) =>
-          opt.setName("emoji").setDescription("Emoji").setRequired(true),
+          opt
+            .setName("mesaj_id")
+            .setDescription("Opsiyonel: mesaj ID / link (boşsa son panel)"),
         ),
     )
     .addSubcommand((sub) =>
@@ -218,11 +224,16 @@ export default {
     }
 
     if (sub === "ekle") {
-      const messageId = interaction.options.getString("mesaj_id", true);
       const emojiInput = interaction.options.getString("emoji", true);
       const role = interaction.options.getRole("rol", true);
       const channel =
         interaction.options.getChannel("kanal") || interaction.channel;
+      let messageId = parseMessageId(interaction.options.getString("mesaj_id"));
+
+      if (!messageId) {
+        const latest = getLatestPanel(interaction.guild.id, channel.id) || getLatestPanel(interaction.guild.id);
+        messageId = latest?.message_id || null;
+      }
 
       const parsed = normalizeEmojiInput(emojiInput, interaction.guild);
       if (!parsed) {
@@ -239,12 +250,32 @@ export default {
         });
       }
 
+      if (!messageId) {
+        return interaction.reply({
+          embeds: [
+            errorEmbed(
+              "Panel bulunamadı.\nEn kolayı: `/emojirol kur` (mesaj ID istemez)\nveya önce `/emojirol panel` oluştur.",
+            ),
+          ],
+          ephemeral: true,
+        });
+      }
+
       await interaction.deferReply({ ephemeral: true });
 
-      const message = await channel.messages.fetch(messageId).catch(() => null);
+      let message = await channel.messages.fetch(messageId).catch(() => null);
+      if (!message) {
+        const latest = getLatestPanel(interaction.guild.id);
+        if (latest) {
+          const other = await interaction.guild.channels.fetch(latest.channel_id).catch(() => null);
+          if (other?.isTextBased()) {
+            message = await other.messages.fetch(messageId).catch(() => null);
+          }
+        }
+      }
       if (!message) {
         return interaction.editReply({
-          embeds: [errorEmbed("Mesaj bulunamadı. Doğru kanalı seçtiğinden emin ol.")],
+          embeds: [errorEmbed("Mesaj bulunamadı. `/emojirol kur` kullanman daha kolay.")],
         });
       }
 
@@ -273,12 +304,23 @@ export default {
     }
 
     if (sub === "kaldir") {
-      const messageId = interaction.options.getString("mesaj_id", true);
       const emojiInput = interaction.options.getString("emoji", true);
+      let messageId = parseMessageId(interaction.options.getString("mesaj_id"));
+      if (!messageId) {
+        messageId = getLatestPanel(interaction.guild.id)?.message_id || null;
+      }
+
       const parsed = normalizeEmojiInput(emojiInput, interaction.guild);
       if (!parsed) {
         return interaction.reply({
           embeds: [errorEmbed("Geçersiz emoji.")],
+          ephemeral: true,
+        });
+      }
+
+      if (!messageId) {
+        return interaction.reply({
+          embeds: [errorEmbed("Silinecek panel bulunamadı.")],
           ephemeral: true,
         });
       }

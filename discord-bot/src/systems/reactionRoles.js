@@ -88,6 +88,35 @@ export function listByMessage(messageId) {
   return db.prepare("SELECT * FROM reaction_roles WHERE message_id = ?").all(messageId);
 }
 
+export function getLatestPanel(guildId, channelId = null) {
+  if (channelId) {
+    return db
+      .prepare(
+        `SELECT * FROM reaction_roles
+         WHERE guild_id = ? AND channel_id = ?
+         ORDER BY id DESC LIMIT 1`,
+      )
+      .get(guildId, channelId);
+  }
+  return db
+    .prepare(
+      `SELECT * FROM reaction_roles
+       WHERE guild_id = ?
+       ORDER BY id DESC LIMIT 1`,
+    )
+    .get(guildId);
+}
+
+/** Mesaj ID veya Discord mesaj linkinden ID çıkarır */
+export function parseMessageId(input) {
+  if (!input) return null;
+  const raw = String(input).trim();
+  const link = raw.match(/channels\/\d+\/\d+\/(\d{15,22})/);
+  if (link) return link[1];
+  if (/^\d{15,22}$/.test(raw)) return raw;
+  return null;
+}
+
 export function buildPanelDescription(rows) {
   if (!rows.length) {
     return "Bu mesaja tepki eklenince roller burada listelenecek.";
