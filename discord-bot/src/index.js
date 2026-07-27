@@ -20,7 +20,7 @@ const client = new Client({
     GatewayIntentBits.DirectMessages,
     GatewayIntentBits.GuildVoiceStates,
   ],
-  partials: [Partials.Channel, Partials.Message, Partials.Reaction],
+  partials: [Partials.Channel, Partials.Message, Partials.Reaction, Partials.User],
 });
 
 client.commands = new Collection();

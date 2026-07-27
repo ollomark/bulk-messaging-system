@@ -18,6 +18,7 @@ export default {
             "**🎉 Çekiliş:** `/cekilis baslat` `/cekilis bitir`",
             "**📈 Seviye:** `/seviye` `/liderlik`",
             "**🔊 Ses 7/24:** `/ses katil` `/ses ayarla` `/ses ayril` `/ses durum`",
+            "**🎭 Emoji Rol:** `/emojirol kur` `/emojirol panel` `/emojirol ekle` `/emojirol kaldir` `/emojirol liste`",
             "**🧰 Diğer:** `/sunucu` `/kullanici` `/avatar` `/ping` `/say` `/anket` `/snipe`",
           ].join("\n"),
           "Guardian Bot — Yardım",

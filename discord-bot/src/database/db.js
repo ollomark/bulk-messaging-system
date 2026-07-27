@@ -100,6 +100,17 @@ db.exec(`
     last_message INTEGER DEFAULT 0,
     PRIMARY KEY (guild_id, user_id)
   );
+
+  CREATE TABLE IF NOT EXISTS reaction_roles (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    guild_id TEXT NOT NULL,
+    channel_id TEXT NOT NULL,
+    message_id TEXT NOT NULL,
+    emoji_key TEXT NOT NULL,
+    emoji_raw TEXT NOT NULL,
+    role_id TEXT NOT NULL,
+    UNIQUE(message_id, emoji_key)
+  );
 `);
 
 export default db;
