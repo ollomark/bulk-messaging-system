@@ -11,15 +11,24 @@ async function main() {
 
   const commands = await loadCommands(path.join(__dirname, "commands"));
   const body = [...commands.values()].map((cmd) => cmd.data.toJSON());
-
   const rest = new REST({ version: "10" }).setToken(config.token);
 
-  if (config.guildId) {
-    await rest.put(Routes.applicationGuildCommands(config.clientId, config.guildId), { body });
-    console.log(`${body.length} komut guild'e kaydedildi.`);
-  } else {
-    await rest.put(Routes.applicationCommands(config.clientId), { body });
-    console.log(`${body.length} komut global olarak kaydedildi (yayılması birkaç dakika sürebilir).`);
+  // Global kayıt (tüm sunucular — yayılması biraz sürebilir)
+  await rest.put(Routes.applicationCommands(config.clientId), { body });
+  console.log(`${body.length} komut global olarak kaydedildi.`);
+
+  // Botun bulunduğu her sunucuya anında kayıt
+  const guilds = await rest.get(Routes.userGuilds());
+  const guildIds = new Set((guilds || []).map((g) => g.id));
+  if (config.guildId) guildIds.add(config.guildId);
+
+  for (const guildId of guildIds) {
+    try {
+      await rest.put(Routes.applicationGuildCommands(config.clientId, guildId), { body });
+      console.log(`${body.length} komut guild'e kaydedildi: ${guildId}`);
+    } catch (error) {
+      console.error(`Guild komut kaydı başarısız (${guildId}):`, error.message);
+    }
   }
 }
 
