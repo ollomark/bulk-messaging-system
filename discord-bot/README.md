@@ -1,111 +1,45 @@
-# Guardian Discord Bot
+# Lexyxzon Professional Suite v2
 
-Profesyonel Discord sunucu botu: koruma, log, moderasyon, duyuru/DM, hoş geldin, ticket, çekiliş ve seviye sistemi.
+Sıradan “herkesin yaptığı” bot paketlerinin üstünde: tek merkezden yönetim, büyüme ve engagement odaklı premium Discord suite.
 
-## Özellikler
+## Neyi farklı kılıyor?
 
-- **Koruma:** Anti-spam, anti-invite, anti-link, anti-raid, anti-caps, mod modu
-- **Loglar:** Mesaj silme/düzenleme, giriş-çıkış, moderasyon aksiyonları
-- **Moderasyon:** ban, unban, kick, timeout, warn, temizle, kilit, yavaş mod, rol
-- **Duyuru & DM:** kanal duyurusu, tekil DM, toplu DM (hız sınırlı)
-- **Hoş geldin:** kanal mesajı + isteğe bağlı otomatik silme + oto rol
-- **Ticket:** panel, aç/üstlen/kapat, destek rolü, ticket log
-- **Çekiliş:** butonlu katılım, otomatik bitiş, kazanan seçimi
-- **Seviye:** XP, seviye atlama, liderlik tablosu
-- **7/24:** PM2 / Docker / Railway / Render ile sürekli çalışma
+- **`/panel` Control Center** — menüden tüm modülleri yönet
+- **Doğrulama kapısı** — butonla verify
+- **Davet takibi** — kim kimi getirdi + liderlik
+- **Starboard** — yıldızlanan içerik vitrini
+- **Öneri sistemi** — 👍/👎 oylamalı
+- **Geçici ses odaları** — join-to-create
+- **Buton-rol** — emoji yerine modern panel
+- **Oto yanıt** — tetikleyici → cevap
+- **Mod Case sistemi** — Case #ID ile profesyonel kayıt
+- **Analitik** — `/istatistik`
+- Klasik suite: koruma, log, ticket, çekiliş, seviye, 7/24 ses, emoji-rol
+
+## Hızlı başlangıç (sunucuda)
+
+```text
+/panel
+/dogrulama kur kanal:#dogrulama rol:@Üye
+/starboard ayarla kanal:#starboard limit:3
+/oneri kanal kanal:#oneriler
+/gecicises kur kanal:#Oda-Olustur
+/butonrol kanal:#roller rol1:@Duyuru yazi1:Duyurular
+/otoyanit ekle tetikleyici:fiyat cevap:Fiyat için ticket açın.
+```
 
 ## Kurulum
-
-### 1) Discord uygulaması
-
-1. [Discord Developer Portal](https://discord.com/developers/applications) → New Application
-2. **Bot** sekmesinden token al
-3. Privileged Intents aç:
-   - Server Members Intent
-   - Message Content Intent
-4. OAuth2 → URL Generator:
-   - Scopes: `bot`, `applications.commands`
-   - Permissions: Administrator (veya Manage Channels/Roles/Messages, Ban, Kick, Moderate Members, Send Messages, Embed Links)
-5. Oluşan link ile botu sunucuya ekle
-
-### 2) Projeyi çalıştır
 
 ```bash
 cd discord-bot
 cp .env.example .env
-# .env dosyasını doldur
 npm install
 npm run deploy-commands
 npm start
 ```
 
-### 3) Ortam değişkenleri
+Gerekli privileged intents: **Server Members**, **Message Content**.
 
-| Değişken | Açıklama |
-|---|---|
-| `DISCORD_TOKEN` | Bot token |
-| `CLIENT_ID` | Application ID |
-| `GUILD_ID` | (Opsiyonel) Komutları anında kaydetmek için sunucu ID |
-| `OWNER_ID` | (Opsiyonel) Bot sahibi kullanıcı ID |
-| `WELCOME_DELETE_AFTER` | Hoş geldin mesajı silme süresi (sn) |
+## 7/24
 
-## İlk kurulum komutları
-
-```text
-/ayarlar log kanal:#logs
-/ayarlar hosgeldin kanal:#hos-geldin sil_saniye:30
-/ayarlar ticket kategori:#Tickets destek_rolu:@Destek log:#ticket-log
-/ayarlar duyuru-kanal kanal:#duyurular
-/ayarlar seviye-kanal kanal:#seviye
-/koruma ayarla modul:Anti-Spam aktif:True
-/ticket panel
-```
-
-## 7/24 aktif tutma
-
-### PM2 (VPS)
-
-```bash
-npm i -g pm2
-npm run pm2:start
-pm2 save
-pm2 startup
-```
-
-### Docker
-
-```bash
-docker build -t guardian-bot .
-docker run -d --name guardian-bot --env-file .env -v $(pwd)/data:/app/data guardian-bot
-```
-
-### Railway / Render / Heroku
-
-- Start command: `node src/index.js`
-- Worker/background dyno kullan (web değil)
-- `DISCORD_TOKEN`, `CLIENT_ID` secret olarak ekle
-
-## Komut listesi
-
-| Komut | İşlev |
-|---|---|
-| `/yardim` | Tüm komutlar |
-| `/koruma` | Koruma modülleri |
-| `/ayarlar` | Sunucu ayarları |
-| `/duyuru` | Duyuru at |
-| `/dm gonder` | Tekil DM |
-| `/dm herkes` | Toplu DM |
-| `/ticket` | Ticket paneli / kapat |
-| `/cekilis` | Çekiliş başlat / bitir |
-| `/seviye` `/liderlik` | Seviye sistemi |
-| `/ban` `/kick` `/timeout` `/warn` `/temizle` ... | Moderasyon |
-
-## Notlar
-
-- Toplu DM Discord limitlerine takılabilir; bot kasıtlı olarak yavaş gönderir.
-- Bazı kullanıcıların DM’leri kapalı olabilir — bu normaldir.
-- Veriler `discord-bot/data/guardian.db` (SQLite) içinde tutulur; kalıcılık için bu klasörü yedekle.
-
-## Lisans
-
-MIT
+Railway / Docker / PM2. Bu projede Railway üzerinde canlı çalışıyor.
