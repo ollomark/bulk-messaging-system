@@ -2,6 +2,8 @@ import { ActivityType, Events } from "discord.js";
 import { config } from "../config.js";
 import { ensureLogChannelFromEnv, sendLog } from "../systems/logger.js";
 import { startVoiceKeepAlive } from "../systems/voice.js";
+import { cacheAllInvites } from "../systems/invites.js";
+import { brand } from "../utils/brand.js";
 
 export default {
   name: Events.ClientReady,
@@ -9,7 +11,7 @@ export default {
   async execute(client) {
     console.log(`✅ ${client.user.tag} olarak giriş yapıldı. ${client.guilds.cache.size} sunucu.`);
     client.user.setPresence({
-      activities: [{ name: "/yardim | Guardian Bot", type: ActivityType.Watching }],
+      activities: [{ name: `${brand.name} · /panel`, type: ActivityType.Watching }],
       status: "online",
     });
 
@@ -18,14 +20,15 @@ export default {
     }
     if (config.guildId) ensureLogChannelFromEnv(config.guildId);
 
+    await cacheAllInvites(client);
     await startVoiceKeepAlive(client);
 
     if (config.guildId) {
       const guild = client.guilds.cache.get(config.guildId);
       if (guild) {
         await sendLog(guild, {
-          title: "🟢 Bot Aktif",
-          description: "Guardian Bot çevrimiçi. Log sistemi çalışıyor.",
+          title: `🟢 ${brand.name} Online`,
+          description: "Professional Suite aktif · log / ses / davet / koruma çalışıyor.",
           color: 0x57f287,
         });
       }

@@ -5,9 +5,12 @@ import { assertRuntimeConfig, config } from "./config.js";
 import { loadCommands } from "./handlers/loadCommands.js";
 import { loadEvents } from "./handlers/loadEvents.js";
 import { startGiveawayScheduler } from "./systems/giveaways.js";
+import { runMigrations } from "./database/migrations.js";
 import "./database/db.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+runMigrations();
 
 const client = new Client({
   intents: [
@@ -19,6 +22,7 @@ const client = new Client({
     GatewayIntentBits.MessageContent,
     GatewayIntentBits.DirectMessages,
     GatewayIntentBits.GuildVoiceStates,
+    GatewayIntentBits.GuildInvites,
   ],
   partials: [Partials.Channel, Partials.Message, Partials.Reaction, Partials.User],
 });

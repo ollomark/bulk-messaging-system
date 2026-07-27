@@ -1,11 +1,13 @@
 import { Events } from "discord.js";
 import { getSettings } from "../database/settings.js";
 import { sendLog } from "../systems/logger.js";
-import { baseEmbed } from "../utils/embeds.js";
+import { premiumEmbed, brand } from "../utils/brand.js";
+import { markInviteLeft } from "../systems/invites.js";
 
 export default {
   name: Events.GuildMemberRemove,
   async execute(member) {
+    markInviteLeft(member.guild.id, member.id);
     const settings = getSettings(member.guild.id);
 
     if (settings.goodbye_channel_id) {
@@ -16,7 +18,17 @@ export default {
           .replaceAll("{username}", member.user.username)
           .replaceAll("{server}", member.guild.name)
           .replaceAll("{memberCount}", String(member.guild.memberCount));
-        await channel.send({ embeds: [baseEmbed("Görüşürüz", text)] }).catch(() => null);
+        await channel
+          .send({
+            embeds: [
+              premiumEmbed({
+                title: "Görüşürüz",
+                description: text,
+                color: brand.colors.danger,
+              }),
+            ],
+          })
+          .catch(() => null);
       }
     }
 

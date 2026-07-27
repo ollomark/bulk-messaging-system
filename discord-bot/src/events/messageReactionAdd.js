@@ -1,10 +1,11 @@
 import { Events } from "discord.js";
 import { emojiKeyFromReaction, getReactionRole } from "../systems/reactionRoles.js";
 import { sendLog } from "../systems/logger.js";
+import { handleStarReaction } from "../systems/starboard.js";
 
 export default {
   name: Events.MessageReactionAdd,
-  async execute(reaction, user, client) {
+  async execute(reaction, user) {
     if (user.bot) return;
 
     try {
@@ -16,6 +17,8 @@ export default {
 
     const message = reaction.message;
     if (!message.guild) return;
+
+    await handleStarReaction(reaction).catch(() => null);
 
     const row = getReactionRole(message.id, emojiKeyFromReaction(reaction));
     if (!row) return;

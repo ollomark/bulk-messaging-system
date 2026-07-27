@@ -1,12 +1,12 @@
 import { PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
 import db from "../../database/db.js";
 import { successEmbed } from "../../utils/embeds.js";
-import { sendLog } from "../../systems/logger.js";
+import { createCase, logCase } from "../../systems/cases.js";
 
 export default {
   data: new SlashCommandBuilder()
     .setName("warn")
-    .setDescription("Üyeye uyarı verir")
+    .setDescription("Üyeye uyarı verir (case kayıtlı)")
     .addUserOption((opt) => opt.setName("uye").setDescription("Üye").setRequired(true))
     .addStringOption((opt) => opt.setName("sebep").setDescription("Sebep").setRequired(true))
     .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers),
@@ -19,27 +19,38 @@ export default {
        VALUES (?, ?, ?, ?, ?)`,
     ).run(interaction.guild.id, user.id, interaction.user.id, reason, Date.now());
 
+    const caseNumber = createCase({
+      guildId: interaction.guild.id,
+      type: "WARN",
+      userId: user.id,
+      moderatorId: interaction.user.id,
+      reason,
+    });
+
     const count = db
       .prepare("SELECT COUNT(*) AS c FROM warnings WHERE guild_id = ? AND user_id = ?")
       .get(interaction.guild.id, user.id).c;
 
     await user
-      .send(`**${interaction.guild.name}** sunucusunda uyarı aldın.\nSebep: ${reason}\nToplam uyarı: ${count}`)
+      .send(
+        `**${interaction.guild.name}** · Case #${caseNumber}\nUyarı aldın.\nSebep: ${reason}\nToplam uyarı: ${count}`,
+      )
       .catch(() => null);
 
-    await sendLog(interaction.guild, {
-      title: "⚠️ Uyarı",
-      description: `${user} uyarıldı.`,
-      color: 0xfee75c,
-      fields: [
-        { name: "Moderatör", value: `${interaction.user}`, inline: true },
-        { name: "Toplam", value: String(count), inline: true },
-        { name: "Sebep", value: reason },
-      ],
+    await logCase(interaction.guild, {
+      caseNumber,
+      type: "WARN",
+      user,
+      moderator: interaction.user,
+      reason,
     });
 
     return interaction.reply({
-      embeds: [successEmbed(`${user} uyarıldı. Toplam uyarı: **${count}**\nSebep: ${reason}`)],
+      embeds: [
+        successEmbed(
+          `${user} uyarıldı.\n**Case #${caseNumber}** · Toplam uyarı: **${count}**\nSebep: ${reason}`,
+        ),
+      ],
     });
   },
 };
