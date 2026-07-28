@@ -4,6 +4,10 @@ import { isOwner } from "../../utils/permissions.js";
 import { errorEmbed, successEmbed } from "../../utils/embeds.js";
 import { premiumEmbed, brand } from "../../utils/brand.js";
 
+const ANON_WEBHOOK_NAME = "Anonim";
+const ANON_AVATAR =
+  "https://cdn.discordapp.com/embed/avatars/1.png";
+
 db.exec(`
   CREATE TABLE IF NOT EXISTS anonymous_messages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -16,6 +20,19 @@ db.exec(`
   );
 `);
 
+async function getAnonWebhook(channel) {
+  const hooks = await channel.fetchWebhooks();
+  let hook = hooks.find((h) => h.name === ANON_WEBHOOK_NAME && h.owner?.id === channel.client.user.id);
+  if (!hook) {
+    hook = await channel.createWebhook({
+      name: ANON_WEBHOOK_NAME,
+      avatar: ANON_AVATAR,
+      reason: "Anonim mesaj sistemi",
+    });
+  }
+  return hook;
+}
+
 export default {
   data: new SlashCommandBuilder()
     .setName("anonim")
@@ -23,7 +40,7 @@ export default {
     .addSubcommand((sub) =>
       sub
         .setName("gonder")
-        .setDescription("Kanala anonim mesaj atar")
+        .setDescription("Kanala anonim mesaj atar (webhook ile, bot görünmez)")
         .addStringOption((opt) =>
           opt.setName("mesaj").setDescription("Gönderilecek metin").setRequired(true),
         )
@@ -33,8 +50,14 @@ export default {
             .setDescription("Hedef kanal (boşsa bu kanal)")
             .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement),
         )
+        .addStringOption((opt) =>
+          opt
+            .setName("isim")
+            .setDescription("Görünecek isim (varsayılan: Anonim)")
+            .setMaxLength(80),
+        )
         .addBooleanOption((opt) =>
-          opt.setName("embed").setDescription("Embed olarak mı gitsin? (varsayılan: evet)"),
+          opt.setName("embed").setDescription("Embed olarak mı gitsin? (varsayılan: hayır)"),
         ),
     )
     .addSubcommand((sub) =>
@@ -88,36 +111,57 @@ export default {
       });
     }
 
-    const content = interaction.options.getString("mesaj", true);
+    const content = interaction.options.getString("mesaj", true).replaceAll("\\n", "\n");
     const channel = interaction.options.getChannel("kanal") || interaction.channel;
-    const asEmbed = interaction.options.getBoolean("embed");
-    const useEmbed = asEmbed !== false;
+    const displayName = interaction.options.getString("isim") || ANON_WEBHOOK_NAME;
+    const useEmbed = interaction.options.getBoolean("embed") === true;
 
-    if (!channel?.isTextBased()) {
+    if (!channel?.isTextBased?.() || typeof channel.fetchWebhooks !== "function") {
       return interaction.reply({
-        embeds: [errorEmbed("Geçersiz kanal.")],
+        embeds: [errorEmbed("Bu kanalda webhook ile anonim mesaj atılamaz.")],
         ephemeral: true,
       });
     }
 
     await interaction.deferReply({ ephemeral: true });
 
-    let sent;
-    if (useEmbed) {
-      sent = await channel.send({
+    let webhook;
+    try {
+      webhook = await getAnonWebhook(channel);
+    } catch (error) {
+      return interaction.editReply({
         embeds: [
-          premiumEmbed({
-            title: "🕵️ Anonim Mesaj",
-            description: content.replaceAll("\\n", "\n"),
-            color: brand.colors.dark,
-            footer: "Gönderen gizli",
-          }),
+          errorEmbed(
+            `Webhook oluşturulamadı: ${error.message}\nBota **Webhook Yönet** izni ver.`,
+          ),
         ],
       });
+    }
+
+    const payload = {
+      username: displayName.slice(0, 80),
+      avatarURL: ANON_AVATAR,
+      allowedMentions: { parse: [] },
+    };
+
+    if (useEmbed) {
+      payload.embeds = [
+        premiumEmbed({
+          description: content,
+          color: brand.colors.dark,
+          footer: null,
+        }).setFooter(null).setTimestamp(null),
+      ];
     } else {
-      sent = await channel.send({
-        content: `🕵️ **Anonim Mesaj**\n${content.replaceAll("\\n", "\n")}`,
-        allowedMentions: { parse: [] },
+      payload.content = content;
+    }
+
+    let sent;
+    try {
+      sent = await webhook.send(payload);
+    } catch (error) {
+      return interaction.editReply({
+        embeds: [errorEmbed(`Mesaj gönderilemedi: ${error.message}`)],
       });
     }
 
@@ -137,7 +181,7 @@ export default {
     return interaction.editReply({
       embeds: [
         successEmbed(
-          `Anonim mesaj gönderildi.\nKanal: ${channel}\n[Mesaja git](${sent.url})\n\nKimse senin gönderdiğini görmez.`,
+          `Anonim mesaj **webhook** ile gitti (Lexyxzon görünmez).\nGörünen isim: **${displayName}**\nKanal: ${channel}\n[Mesaja git](${sent.url})`,
         ),
       ],
     });
