@@ -5,6 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { ChannelType, EmbedBuilder, PermissionFlagsBits } from "discord.js";
 import { config } from "../config.js";
+import { mountChatRoutes } from "./chatRoutes.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const sessions = new Map();
@@ -45,6 +46,18 @@ export function startPanelServer(client) {
 
   app.use(express.json({ limit: "1mb" }));
   app.use(cookieParser());
+
+  // Ultra pro live chat client (public)
+  const xzonDir = path.join(__dirname, "xzon");
+  mountChatRoutes(app);
+  app.get("/xzon", (_req, res) => {
+    res.sendFile(path.join(xzonDir, "index.html"));
+  });
+  app.get("/xzon/", (_req, res) => {
+    res.sendFile(path.join(xzonDir, "index.html"));
+  });
+  app.use("/xzon", express.static(xzonDir, { index: false, redirect: false }));
+
   app.use(express.static(path.join(__dirname, "public")));
 
   app.post("/api/login", (req, res) => {
@@ -189,13 +202,16 @@ export function startPanelServer(client) {
     res.sendFile(path.join(__dirname, "public", "index.html"));
   });
 
-  // Express 5 uyumlu SPA fallback
+  // Express 5 uyumlu SPA fallback (panel only)
   app.use((req, res, next) => {
-    if (req.method !== "GET" || req.path.startsWith("/api/")) return next();
+    if (req.method !== "GET" || req.path.startsWith("/api/") || req.path.startsWith("/xzon")) {
+      return next();
+    }
     return res.sendFile(path.join(__dirname, "public", "index.html"));
   });
 
   app.listen(port, "0.0.0.0", () => {
     console.log(`🖥️  Kontrol paneli: http://0.0.0.0:${port}`);
+    console.log(`💬 XZON Live Chat: http://0.0.0.0:${port}/xzon`);
   });
 }
