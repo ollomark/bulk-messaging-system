@@ -1,0 +1,337 @@
+:root {
+  --bg: #0b1020;
+  --panel: rgba(18, 24, 42, 0.88);
+  --line: rgba(255, 255, 255, 0.08);
+  --text: #eef2ff;
+  --muted: #9aa6c3;
+  --gold: #f5c16c;
+  --accent: #6ee7b7;
+  --danger: #fb7185;
+  --input: #111827;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  font-family: "Manrope", sans-serif;
+  color: var(--text);
+  background: var(--bg);
+}
+
+h1,
+h2,
+h3,
+.brand strong,
+.eyebrow {
+  font-family: "Syne", sans-serif;
+}
+
+.bg-glow {
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(900px 500px at 10% -10%, rgba(245, 193, 108, 0.18), transparent 55%),
+    radial-gradient(700px 420px at 90% 0%, rgba(110, 231, 183, 0.12), transparent 50%),
+    linear-gradient(180deg, #0b1020 0%, #070b16 100%);
+  z-index: -1;
+}
+
+.hidden {
+  display: none !important;
+}
+
+.login-wrap {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.login-card,
+.card,
+.stat,
+.bot-chip {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  backdrop-filter: blur(16px);
+}
+
+.login-card {
+  width: min(420px, 100%);
+  padding: 32px;
+  border-radius: 24px;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.35);
+}
+
+.eyebrow {
+  color: var(--gold);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-size: 12px;
+  margin: 0 0 8px;
+}
+
+.login-card h1 {
+  margin: 0;
+  font-size: 40px;
+}
+
+.sub,
+.hint,
+label,
+.status,
+.error,
+.brand small,
+.top p {
+  color: var(--muted);
+}
+
+.sub {
+  margin: 8px 0 24px;
+}
+
+label {
+  display: grid;
+  gap: 8px;
+  font-size: 13px;
+  margin-bottom: 14px;
+}
+
+input,
+select,
+textarea,
+button {
+  font: inherit;
+}
+
+input,
+select,
+textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  background: var(--input);
+  color: var(--text);
+  border-radius: 12px;
+  padding: 12px 14px;
+  outline: none;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: rgba(245, 193, 108, 0.55);
+}
+
+button {
+  border: 0;
+  cursor: pointer;
+}
+
+.login-card button,
+.primary {
+  width: 100%;
+  margin-top: 6px;
+  padding: 13px 16px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #f5c16c, #d9a24a);
+  color: #1a1205;
+  font-weight: 700;
+}
+
+.primary.danger {
+  background: linear-gradient(135deg, #fb7185, #e11d48);
+  color: white;
+}
+
+.error {
+  color: var(--danger);
+  min-height: 20px;
+}
+
+.app {
+  display: grid;
+  grid-template-columns: 250px 1fr;
+  min-height: 100vh;
+}
+
+.sidebar {
+  padding: 22px 16px;
+  border-right: 1px solid var(--line);
+  background: rgba(8, 12, 24, 0.7);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.brand {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 8px;
+}
+
+.brand .dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 18px var(--accent);
+}
+
+.brand strong {
+  display: block;
+}
+
+.brand small {
+  font-size: 12px;
+}
+
+nav {
+  display: grid;
+  gap: 8px;
+}
+
+.nav,
+.logout {
+  text-align: left;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--muted);
+}
+
+.nav.active,
+.nav:hover {
+  background: rgba(245, 193, 108, 0.12);
+  color: var(--text);
+}
+
+.logout {
+  margin-top: auto;
+  border: 1px solid var(--line);
+}
+
+.main {
+  padding: 28px;
+}
+
+.top {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  margin-bottom: 22px;
+}
+
+.top h2 {
+  margin: 0;
+  font-size: 30px;
+}
+
+.top p {
+  margin: 4px 0 0;
+}
+
+.bot-chip {
+  padding: 10px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.stat,
+.card {
+  border-radius: 18px;
+  padding: 18px;
+}
+
+.stat span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.stat strong {
+  display: block;
+  margin-top: 8px;
+  font-size: 22px;
+  font-family: "Syne", sans-serif;
+}
+
+.guild-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.guild-item {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--line);
+}
+
+.guild-item img {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  object-fit: cover;
+  background: #222;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.status {
+  min-height: 20px;
+  margin-top: 10px;
+}
+
+.status.ok {
+  color: var(--accent);
+}
+
+.status.bad {
+  color: var(--danger);
+}
+
+@media (max-width: 960px) {
+  .app {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .stat-grid,
+  .row {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .stat-grid,
+  .row,
+  .top {
+    grid-template-columns: 1fr;
+    display: grid;
+  }
+}

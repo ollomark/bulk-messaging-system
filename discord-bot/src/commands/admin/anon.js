@@ -149,8 +149,8 @@ export default {
         premiumEmbed({
           description: content,
           color: brand.colors.dark,
-          footer: null,
-        }).setFooter(null).setTimestamp(null),
+          footer: "Anonim",
+        }),
       ];
     } else {
       payload.content = content;
