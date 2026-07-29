@@ -4,132 +4,156 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#1e1f22" />
+    <meta name="description" content="XZON — canlı topluluk sohbeti" />
     <title>XZON</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="css/app.css" />
   </head>
   <body>
     <div id="boot" class="boot">
-      <div class="boot-card">
-        <div class="boot-mark">XZ</div>
-        <h1>XZON</h1>
-        <p>Discord tarzı canlı istemci</p>
-        <form id="joinForm" class="join-form" autocomplete="off">
-          <label for="displayName">Görünen ad</label>
-          <input id="displayName" maxlength="24" minlength="2" placeholder="Örn. Shadow" required autofocus />
-          <button type="submit" id="joinBtn">Giriş Yap</button>
+      <div class="boot-shell">
+        <aside class="boot-art" aria-hidden="true">
+          <div class="boot-orb"></div>
+          <h2>XZON</h2>
+          <p>Topluluğun canlı sohbet alanı. Hızlı, temiz, herkes bir arada.</p>
+        </aside>
+        <form id="joinForm" class="boot-card" autocomplete="nickname">
+          <h1>Tekrar hoş geldin!</h1>
+          <p class="sub">Sohbete katılmak için bir görünen ad seç.</p>
+          <label>
+            Görünen ad
+            <input id="displayName" name="displayName" maxlength="24" minlength="2" placeholder="Örn. Shadow" required autofocus />
+          </label>
+          <button type="submit" id="joinBtn">Devam Et</button>
           <p class="boot-error hidden" id="bootError"></p>
-          <p class="boot-hint">DM · tepki · yanıt · ses odaları · sabitleme · arama</p>
+          <p class="hint">Kurallar: saygı · spam yok · reklam yasak</p>
         </form>
       </div>
     </div>
 
     <div id="app" class="app hidden">
-      <aside class="rail">
-        <button class="pill dm-pill" id="dmHomeBtn" type="button" title="Direkt Mesajlar">
-          <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M12 2C6.48 2 2 6.15 2 11.25c0 2.94 1.5 5.56 3.84 7.28L5 22l4.08-1.63c.94.26 1.93.4 2.92.4 5.52 0 10-4.15 10-9.25S17.52 2 12 2z"/></svg>
+      <div id="netBanner" class="net-banner hidden">Bağlantı koptu — yeniden bağlanılıyor…</div>
+
+      <nav class="rail" aria-label="Sunucular">
+        <button class="guild-btn dm" id="dmHomeBtn" type="button" title="Direkt Mesajlar" aria-label="Direkt Mesajlar">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H5.2L4 17.2V4h16v12z"/></svg>
         </button>
         <div class="rail-sep"></div>
-        <div id="guildRail"></div>
-      </aside>
+        <div id="guildRail" class="guild-stack"></div>
+      </nav>
 
       <aside class="sidebar">
-        <header class="guild-head" id="sidebarHead"></header>
-        <nav class="channel-nav" id="channelNav"></nav>
-
-        <div class="voice-panel hidden" id="voicePanel">
-          <div>
-            <strong id="voiceTitle">Ses Bağlantısı</strong>
-            <small id="voiceName">Lobby</small>
+        <header class="sidebar-head" id="sidebarHead"></header>
+        <div class="sidebar-scroll" id="channelNav"></div>
+        <div class="voice-dock hidden" id="voicePanel">
+          <div class="voice-meta">
+            <strong>Ses bağlı</strong>
+            <span id="voiceName">Lobby</span>
           </div>
-          <div class="voice-btns">
-            <button type="button" id="camBtn" title="Kamera">캠</button>
-            <button type="button" id="shareBtn" title="Ekran">▣</button>
-            <button type="button" class="danger" id="leaveVoiceBtn" title="Ayrıl">✕</button>
-          </div>
+          <button type="button" class="icon danger" id="leaveVoiceBtn" title="Bağlantıyı kes" aria-label="Bağlantıyı kes">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 9c-1.6 0-3.15.25-4.6.72v3.1c0 .39-.23.74-.56.9-.98.49-1.87 1.12-2.66 1.85-.18.18-.43.28-.7.28-.28 0-.53-.11-.71-.29L.29 13.08a.996.996 0 010-1.41C3.34 8.6 7.46 7 12 7s8.66 1.6 11.71 4.67c.39.39.39 1.02 0 1.41l-2.48 2.48c-.18.18-.43.29-.71.29-.27 0-.52-.11-.7-.28a11.3 11.3 0 01-2.66-1.85c-.33-.16-.56-.5-.56-.9v-3.1C15.15 9.25 13.6 9 12 9z"/></svg>
+          </button>
         </div>
-
-        <footer class="me-bar">
-          <button class="me" type="button" id="statusBtn">
-            <div class="avatar online" id="meAvatar">?</div>
-            <div class="me-text">
+        <footer class="user-dock">
+          <button type="button" class="user-chip" id="statusBtn">
+            <div class="av online" id="meAvatar">?</div>
+            <div class="user-meta">
               <strong id="meName">—</strong>
               <small id="meSub">Çevrimiçi</small>
             </div>
           </button>
-          <div class="me-actions">
-            <button type="button" class="icon-btn on" id="micBtn" title="Mikrofon">🎙</button>
-            <button type="button" class="icon-btn on" id="deafBtn" title="Kulaklık">🎧</button>
-            <button type="button" class="icon-btn" id="settingsBtn" title="Ayarlar">⚙</button>
+          <div class="user-tools">
+            <button type="button" class="icon" id="micBtn" title="Mikrofon" aria-label="Mikrofon">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 14a3 3 0 003-3V5a3 3 0 10-6 0v6a3 3 0 003 3zm5-3a5 5 0 01-10 0H5a7 7 0 006 6.92V21h2v-3.08A7 7 0 0019 11h-2z"/></svg>
+            </button>
+            <button type="button" class="icon" id="deafBtn" title="Kulaklık" aria-label="Kulaklık">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3a9 9 0 00-9 9v7a2 2 0 002 2h3v-8H5v-1a7 7 0 0114 0v1h-3v8h3a2 2 0 002-2v-7a9 9 0 00-9-9z"/></svg>
+            </button>
+            <button type="button" class="icon" id="settingsBtn" title="Ayarlar" aria-label="Ayarlar">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58a.5.5 0 00.12-.64l-1.92-3.32a.5.5 0 00-.61-.22l-2.39.96a7.2 7.2 0 00-1.62-.94l-.36-2.54A.5.5 0 0013.9 2h-3.8a.5.5 0 00-.5.42l-.36 2.54c-.57.23-1.11.54-1.62.94l-2.39-.96a.5.5 0 00-.61.22L2.71 8.84a.5.5 0 00.12.64l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94L2.83 14.5a.5.5 0 00-.12.64l1.92 3.32c.14.24.43.34.68.22l2.39-.96c.5.4 1.05.72 1.62.94l.36 2.54c.05.24.26.42.5.42h3.8c.24 0 .45-.18.5-.42l.36-2.54c.57-.22 1.11-.54 1.62-.94l2.39.96c.25.1.54 0 .68-.22l1.92-3.32a.5.5 0 00-.12-.64l-2.03-1.58zM12 15.5A3.5 3.5 0 1112 8a3.5 3.5 0 010 7.5z"/></svg>
+            </button>
           </div>
         </footer>
       </aside>
 
-      <main class="stage">
-        <header class="stage-head">
-          <div class="title-wrap">
-            <span class="hash" id="titleIcon">#</span>
+      <section class="chat">
+        <header class="chat-bar">
+          <div class="chat-title">
+            <span id="titleIcon" class="ch-icon">#</span>
             <h1 id="channelTitle">genel</h1>
-            <div class="vbar"></div>
+            <i class="split"></i>
             <p id="channelTopic">Ana sohbet</p>
           </div>
-          <div class="stage-tools">
-            <button type="button" class="icon-btn" id="pinsBtn" title="Sabitlemeler">📌</button>
-            <button type="button" class="icon-btn" id="membersBtn" title="Üyeler">👥</button>
-            <input class="search" id="searchInput" type="search" placeholder="Ara" />
+          <div class="chat-actions">
+            <button type="button" class="icon" id="pinsBtn" title="Sabitlemeler" aria-label="Sabitlemeler">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"/></svg>
+            </button>
+            <button type="button" class="icon" id="membersBtn" title="Üyeler" aria-label="Üyeler">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5s-3 1.34-3 3 1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5C15 14.17 10.33 13 8 13zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+            </button>
+            <div class="search-wrap">
+              <input id="searchInput" type="search" placeholder="Ara" />
+            </div>
           </div>
         </header>
 
-        <div class="messages" id="messages"></div>
-        <div class="typing hidden" id="typing"></div>
-
-        <div class="reply-bar hidden" id="replyBar">
-          <span id="replyLabel">Yanıtlanıyor</span>
-          <button type="button" id="cancelReply">✕</button>
-        </div>
-
-        <form class="composer" id="composer">
-          <div class="composer-box">
-            <button type="button" class="plus" id="emojiBtn" title="Emoji">☺</button>
-            <input id="messageInput" type="text" maxlength="1800" autocomplete="off" placeholder="Mesaj yaz…" />
-            <button type="button" class="gif" id="gifBtn">GIF</button>
-            <button type="submit" class="send-btn" id="sendBtn">➤</button>
+        <div class="chat-body">
+          <div id="messages" class="messages" role="log" aria-live="polite"></div>
+          <button type="button" id="jumpBtn" class="jump hidden">↓ Yeni mesajlar</button>
+          <div id="typing" class="typing hidden"></div>
+          <div id="replyBar" class="reply-dock hidden">
+            <div>
+              <strong id="replyTitle">Yanıt</strong>
+              <span id="replyPreview"></span>
+            </div>
+            <button type="button" id="cancelReply" class="icon" aria-label="İptal">✕</button>
           </div>
-        </form>
-      </main>
+          <form id="composer" class="composer">
+            <div class="composer-shell">
+              <button type="button" class="icon soft" id="emojiBtn" title="Emoji" aria-label="Emoji">☺</button>
+              <input id="messageInput" type="text" maxlength="1800" autocomplete="off" placeholder="Mesaj yaz…" />
+              <button type="submit" class="send" id="sendBtn" aria-label="Gönder">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+              </button>
+            </div>
+          </form>
+        </div>
+      </section>
 
       <aside class="members" id="membersPane">
         <div id="membersContent"></div>
       </aside>
     </div>
 
-    <div class="popover hidden" id="statusMenu"></div>
-    <div class="popover emoji-pop hidden" id="emojiPop"></div>
-    <div class="profile-pop hidden" id="profilePop"></div>
-    <div class="drawer hidden" id="pinsDrawer">
-      <header><strong>Sabitlenmiş Mesajlar</strong><button type="button" id="closePins">✕</button></header>
+    <div id="statusMenu" class="menu hidden"></div>
+    <div id="emojiPop" class="menu emoji hidden"></div>
+    <div id="profilePop" class="profile hidden"></div>
+    <div id="pinsDrawer" class="sheet hidden">
+      <header>
+        <strong>Sabitlenmiş Mesajlar</strong>
+        <button type="button" id="closePins" class="icon">✕</button>
+      </header>
       <div id="pinsList"></div>
     </div>
-    <div class="modal-backdrop hidden" id="settingsModal">
+    <div id="settingsModal" class="overlay hidden">
       <div class="settings">
-        <aside class="settings-nav" id="settingsNav"></aside>
-        <section class="settings-pane" id="settingsPane"></section>
-        <button class="settings-close" id="closeSettings" type="button">✕</button>
+        <aside id="settingsNav" class="settings-nav"></aside>
+        <section id="settingsPane" class="settings-pane"></section>
+        <button type="button" id="closeSettings" class="settings-x" aria-label="Kapat">✕</button>
       </div>
     </div>
-    <div class="toast hidden" id="toast"></div>
-    <nav class="mobile-bar hidden" id="mobileBar">
+    <div id="toast" class="toast hidden"></div>
+    <nav id="mobileBar" class="mobile-bar hidden">
       <button type="button" data-m="rail">Sunucu</button>
       <button type="button" data-m="channels">Kanallar</button>
-      <button type="button" data-m="chat" class="active">Sohbet</button>
+      <button type="button" data-m="chat" class="on">Sohbet</button>
       <button type="button" data-m="members">Üyeler</button>
     </nav>
-
     <script src="js/app.js" type="module"></script>
   </body>
 </html>

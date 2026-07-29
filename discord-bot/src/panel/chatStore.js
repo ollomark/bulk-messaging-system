@@ -452,18 +452,30 @@ export function getPinnedMessages(channelId, viewerId = null) {
   return hydrateMessages(rows, viewerId);
 }
 
+const rateBuckets = new Map();
+
+function assertRateLimit(userId) {
+  const nowTs = now();
+  const bucket = rateBuckets.get(userId) || [];
+  const recent = bucket.filter((t) => nowTs - t < 5000);
+  if (recent.length >= 6) {
+    throw new Error("Çok hızlı yazıyorsun — biraz yavaşla");
+  }
+  recent.push(nowTs);
+  rateBuckets.set(userId, recent);
+}
+
 export function postMessage(user, channelId, content, { replyToId = null } = {}) {
   const meta = getChannelMeta(channelId);
   if (!meta) throw new Error("Kanal bulunamadı");
-  if (meta.type === "voice") {
-    // Allow chat in voice channels as Discord text-in-voice style sidebar chat
-  }
 
   if (meta.type === "dm") {
     if (user.id !== meta.userA && user.id !== meta.userB) {
       throw new Error("Bu DM'ye erişimin yok");
     }
   }
+
+  assertRateLimit(user.id);
 
   const text = String(content || "").trim().slice(0, 1800);
   if (!text) throw new Error("Boş mesaj gönderilemez");

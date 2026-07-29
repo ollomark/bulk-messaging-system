@@ -1,20 +1,50 @@
 const $ = (id) => document.getElementById(id);
-const EMOJIS = ["😀","😂","🥹","😍","🔥","👍","👎","❤️","💜","✨","🎉","💀","😭","😡","🤝","👀","✅","❌","⚡","🎮","💬","📌","🚀","😎"];
+const EMOJIS = ["😀","😂","🥹","😍","🔥","👍","👎","❤️","💜","✨","🎉","💀","😭","😡","🤝","👀","✅","⚡","🎮","💬","📌","🚀","😎","🙌"];
+const STATUS = { online: "Çevrimiçi", idle: "Boşta", dnd: "Rahatsız Etmeyin", invisible: "Görünmez" };
 
 const els = {
-  boot: $("boot"), app: $("app"), joinForm: $("joinForm"), displayName: $("displayName"),
-  joinBtn: $("joinBtn"), bootError: $("bootError"), guildRail: $("guildRail"),
-  dmHomeBtn: $("dmHomeBtn"), sidebarHead: $("sidebarHead"), channelNav: $("channelNav"),
-  messages: $("messages"), channelTitle: $("channelTitle"), channelTopic: $("channelTopic"),
-  titleIcon: $("titleIcon"), messageInput: $("messageInput"), composer: $("composer"),
-  sendBtn: $("sendBtn"), membersContent: $("membersContent"), membersPane: $("membersPane"),
-  meAvatar: $("meAvatar"), meName: $("meName"), meSub: $("meSub"), typing: $("typing"),
-  liveDot: null, voicePanel: $("voicePanel"), voiceName: $("voiceName"),
-  replyBar: $("replyBar"), replyLabel: $("replyLabel"), cancelReply: $("cancelReply"),
-  statusMenu: $("statusMenu"), emojiPop: $("emojiPop"), profilePop: $("profilePop"),
-  pinsDrawer: $("pinsDrawer"), pinsList: $("pinsList"), settingsModal: $("settingsModal"),
-  settingsNav: $("settingsNav"), settingsPane: $("settingsPane"), toast: $("toast"),
-  mobileBar: $("mobileBar"), searchInput: $("searchInput"),
+  boot: $("boot"),
+  app: $("app"),
+  joinForm: $("joinForm"),
+  displayName: $("displayName"),
+  joinBtn: $("joinBtn"),
+  bootError: $("bootError"),
+  netBanner: $("netBanner"),
+  guildRail: $("guildRail"),
+  dmHomeBtn: $("dmHomeBtn"),
+  sidebarHead: $("sidebarHead"),
+  channelNav: $("channelNav"),
+  messages: $("messages"),
+  channelTitle: $("channelTitle"),
+  channelTopic: $("channelTopic"),
+  titleIcon: $("titleIcon"),
+  messageInput: $("messageInput"),
+  composer: $("composer"),
+  sendBtn: $("sendBtn"),
+  membersContent: $("membersContent"),
+  membersPane: $("membersPane"),
+  meAvatar: $("meAvatar"),
+  meName: $("meName"),
+  meSub: $("meSub"),
+  typing: $("typing"),
+  voicePanel: $("voicePanel"),
+  voiceName: $("voiceName"),
+  replyBar: $("replyBar"),
+  replyTitle: $("replyTitle"),
+  replyPreview: $("replyPreview"),
+  jumpBtn: $("jumpBtn"),
+  chat: document.querySelector(".chat"),
+  statusMenu: $("statusMenu"),
+  emojiPop: $("emojiPop"),
+  profilePop: $("profilePop"),
+  pinsDrawer: $("pinsDrawer"),
+  pinsList: $("pinsList"),
+  settingsModal: $("settingsModal"),
+  settingsNav: $("settingsNav"),
+  settingsPane: $("settingsPane"),
+  toast: $("toast"),
+  mobileBar: $("mobileBar"),
+  searchInput: $("searchInput"),
 };
 
 const state = {
@@ -22,9 +52,9 @@ const state = {
   token: localStorage.getItem("xzon_token") || "",
   guilds: [],
   channels: [],
-  view: "guild", // guild | dms
+  view: "guild",
   guildId: "xzon",
-  channelId: "genel",
+  channelId: localStorage.getItem("xzon_channel") || "genel",
   messages: [],
   online: [],
   offline: [],
@@ -37,14 +67,9 @@ const state = {
   lastTypingSent: 0,
   typingUsers: new Map(),
   reconnectTimer: null,
-  searchMode: false,
-};
-
-const STATUS_LABEL = {
-  online: "Çevrimiçi",
-  idle: "Boşta",
-  dnd: "Rahatsız Etmeyin",
-  invisible: "Görünmez",
+  stickBottom: true,
+  loadingOlder: false,
+  switching: false,
 };
 
 function toast(text) {
@@ -58,19 +83,19 @@ function initials(name) {
   return String(name || "?").slice(0, 1).toUpperCase();
 }
 
-function escapeHtml(str) {
+function esc(str) {
   return String(str)
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;");
 }
 
-function formatMarkdown(text) {
-  let s = escapeHtml(text);
+function md(text) {
+  let s = esc(text);
   s = s.replace(/\|\|(.+?)\|\|/g, '<span class="spoiler">$1</span>');
   s = s.replace(/`([^`]+)`/g, "<code>$1</code>");
   s = s.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
-  s = s.replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, "<em>$1</em>");
+  s = s.replace(/\*([^*]+)\*/g, "<em>$1</em>");
   s = s.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noreferrer">$1</a>');
   s = s.replace(/@(\w+)/g, '<span class="mention">@$1</span>');
   return s.replaceAll("\n", "<br>");
@@ -79,6 +104,7 @@ function formatMarkdown(text) {
 function fmtTime(ts) {
   return new Date(ts).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
 }
+
 function fmtDay(ts) {
   return new Date(ts).toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" });
 }
@@ -87,7 +113,7 @@ async function api(path, options = {}) {
   const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
   if (state.token) headers["x-xzon-token"] = state.token;
   const res = await fetch(path, {
-    ...options,
+    method: options.method || "GET",
     headers,
     credentials: "same-origin",
     body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
@@ -100,21 +126,21 @@ async function api(path, options = {}) {
 function channelMeta(id = state.channelId) {
   if (String(id).startsWith("dm:")) {
     const dm = state.dms.find((d) => d.channelId === id);
-    return {
-      id,
-      name: dm?.peer?.name || "DM",
-      topic: dm?.peer ? `@${dm.peer.name}` : "Direkt mesaj",
-      type: "dm",
-    };
+    return { id, name: dm?.peer?.name || "DM", topic: "Direkt mesaj", type: "dm" };
   }
   return state.channels.find((c) => c.id === id) || { id, name: id, topic: "", type: "text" };
 }
 
-function showApp() {
-  els.boot.classList.add("hidden");
-  els.app.classList.remove("hidden");
-  syncMe();
-  if (window.matchMedia("(max-width: 760px)").matches) els.mobileBar.classList.remove("hidden");
+function nearBottom() {
+  const el = els.messages;
+  return el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+}
+
+function scrollBottom(force = false) {
+  if (force || state.stickBottom) {
+    els.messages.scrollTop = els.messages.scrollHeight;
+    els.jumpBtn.classList.add("hidden");
+  }
 }
 
 function syncMe() {
@@ -123,39 +149,34 @@ function syncMe() {
   els.meName.textContent = u.name;
   els.meAvatar.textContent = initials(u.name);
   els.meAvatar.style.background = u.color;
-  els.meAvatar.className = `avatar ${u.status || "online"}`;
-  els.meSub.textContent = u.customStatus || STATUS_LABEL[u.status || "online"];
+  els.meAvatar.className = `av ${u.status || "online"}`;
+  els.meSub.textContent = u.customStatus || STATUS[u.status || "online"];
   $("micBtn").classList.toggle("off", Boolean(u.muted));
   $("deafBtn").classList.toggle("off", Boolean(u.deafened));
   if (u.voiceChannelId) {
     els.voicePanel.classList.remove("hidden");
-    const ch = state.channels.find((c) => c.id === u.voiceChannelId);
-    els.voiceName.textContent = ch?.name || u.voiceChannelId;
+    els.voiceName.textContent =
+      state.channels.find((c) => c.id === u.voiceChannelId)?.name || u.voiceChannelId;
   } else {
     els.voicePanel.classList.add("hidden");
   }
 }
 
 function setLive(on, label) {
-  const dot = document.querySelector(".live-dot");
-  if (dot) {
-    dot.classList.toggle("on", on);
-  }
+  const pulse = els.sidebarHead.querySelector(".pulse");
+  if (pulse) pulse.classList.toggle("on", on);
   const small = els.sidebarHead.querySelector("small");
   if (small) small.textContent = label;
+  els.netBanner.classList.toggle("hidden", on);
 }
 
 function renderRail() {
   els.dmHomeBtn.classList.toggle("active", state.view === "dms");
   els.guildRail.innerHTML = state.guilds
-    .map(
-      (g) => `
-      <button class="pill ${state.view === "guild" && state.guildId === g.id ? "active" : ""}"
-        data-guild="${g.id}" type="button" title="${escapeHtml(g.name)}"
-        style="${state.view === "guild" && state.guildId === g.id ? `background:${g.color}` : ""}">
-        ${escapeHtml(g.short)}
-      </button>`,
-    )
+    .map((g) => {
+      const active = state.view === "guild" && state.guildId === g.id;
+      return `<button class="guild-btn ${active ? "active" : ""}" data-guild="${g.id}" type="button" title="${esc(g.name)}" style="${active ? `background:${g.color}` : ""}">${esc(g.short)}</button>`;
+    })
     .join("");
   els.guildRail.querySelectorAll("[data-guild]").forEach((btn) => {
     btn.addEventListener("click", () => openGuild(btn.dataset.guild));
@@ -164,207 +185,115 @@ function renderRail() {
 
 function renderSidebar() {
   if (state.view === "dms") {
-    els.sidebarHead.innerHTML = `
-      <div><strong>Direkt Mesajlar</strong><small>arkadaşların</small></div>
-      <span class="live-dot on"></span>`;
+    els.sidebarHead.innerHTML = `<div><strong>Direkt Mesajlar</strong><small>${state.online.length} çevrimiçi</small></div><span class="pulse on"></span>`;
     els.channelNav.innerHTML = `
-      <div class="cat">
-        <div class="cat-label">DİREKT MESAJLAR</div>
-        ${
-          state.dms.length
-            ? state.dms
-                .map((d) => {
-                  const unread = state.unread[d.channelId];
-                  return `
-                  <button class="dm-row ${state.channelId === d.channelId ? "active" : ""}" data-dm="${d.channelId}" type="button">
-                    <div class="avatar sm ${d.peer?.status || "offline"}" style="background:${d.peer?.color || "#5865f2"}">${initials(d.peer?.name)}</div>
-                    <span>${escapeHtml(d.peer?.name || "?")}</span>
-                    ${unread ? `<span class="unread">${unread}</span>` : ""}
-                  </button>`;
-                })
-                .join("")
-            : `<p style="padding:8px;color:var(--text-3);font-size:13px">Üye listesinden birine tıkla → Mesaj Gönder</p>`
-        }
-      </div>`;
-    els.channelNav.querySelectorAll("[data-dm]").forEach((btn) => {
-      btn.addEventListener("click", () => switchChannel(btn.dataset.dm));
-    });
+      <div class="cat"><div class="cat-name">Direkt Mesajlar</div>
+      ${
+        state.dms.length
+          ? state.dms
+              .map((d) => {
+                const n = state.unread[d.channelId];
+                return `<button class="dm-item ${state.channelId === d.channelId ? "active" : ""}" data-dm="${d.channelId}" type="button">
+                  <div class="av ${d.peer?.status || "offline"}" style="background:${d.peer?.color || "#5865f2"}">${initials(d.peer?.name)}</div>
+                  <span>${esc(d.peer?.name || "?")}</span>
+                  ${n ? `<span class="badge">${n}</span>` : ""}
+                </button>`;
+              })
+              .join("")
+          : `<p style="padding:10px;color:var(--text-faint);font-size:13px;line-height:1.4">Üye listesinden birine tıkla ve mesaj gönder.</p>`
+      }</div>`;
+    els.channelNav.querySelectorAll("[data-dm]").forEach((b) =>
+      b.addEventListener("click", () => switchChannel(b.dataset.dm)),
+    );
     return;
   }
 
   const guild = state.guilds.find((g) => g.id === state.guildId);
-  els.sidebarHead.innerHTML = `
-    <div><strong>${escapeHtml(guild?.name || "Sunucu")}</strong><small>bağlanıyor…</small></div>
-    <span class="live-dot"></span>`;
+  els.sidebarHead.innerHTML = `<div><strong>${esc(guild?.name || "Sunucu")}</strong><small>bağlanıyor…</small></div><span class="pulse"></span>`;
 
-  const channels = state.channels.filter((c) => c.guildId === state.guildId);
-  const cats = [...new Set(channels.map((c) => c.category))];
+  const list = state.channels.filter((c) => c.guildId === state.guildId);
+  const cats = [...new Set(list.map((c) => c.category))];
   els.channelNav.innerHTML = cats
     .map((cat) => {
-      const items = channels.filter((c) => c.category === cat);
-      return `
-      <div class="cat">
-        <button class="cat-label" data-toggle-cat type="button">▼ ${escapeHtml(cat)}</button>
-        <div class="cat-items">
-          ${items
-            .map((ch) => {
-              if (ch.type === "voice") {
-                const inVoice = state.voice.filter((v) => v.voiceChannelId === ch.id);
-                return `
-                  <button class="channel ${state.channelId === ch.id ? "active" : ""}" data-channel="${ch.id}" data-type="voice" type="button">
-                    <span class="hash">🔊</span><span>${escapeHtml(ch.name)}</span>
-                  </button>
-                  ${
-                    inVoice.length
-                      ? `<div class="voice-users">${inVoice
-                          .map(
-                            (v) => `
-                        <div class="voice-user">
-                          <div class="avatar av ${v.status}" style="background:${v.color}">${initials(v.name)}</div>
-                          <span>${escapeHtml(v.name)}</span>
-                          <span class="flags">${v.muted ? "🔇" : ""}${v.deafened ? "🎧" : ""}</span>
-                        </div>`,
-                          )
-                          .join("")}</div>`
-                      : ""
-                  }`;
-              }
-              const unread = state.unread[ch.id];
-              return `
-                <button class="channel ${state.channelId === ch.id ? "active" : ""}" data-channel="${ch.id}" type="button">
-                  <span class="hash">#</span><span>${escapeHtml(ch.name)}</span>
-                  ${unread ? `<span class="unread">${unread}</span>` : ""}
-                </button>`;
-            })
-            .join("")}
-        </div>
-      </div>`;
+      const items = list.filter((c) => c.category === cat);
+      return `<div class="cat"><button class="cat-name" type="button">▼ ${esc(cat)}</button><div>${items
+        .map((ch) => {
+          if (ch.type === "voice") {
+            const people = state.voice.filter((v) => v.voiceChannelId === ch.id);
+            return `<button class="ch ${state.channelId === ch.id ? "active" : ""}" data-channel="${ch.id}" data-type="voice" type="button"><span class="hash">🔊</span><span>${esc(ch.name)}</span></button>
+              ${
+                people.length
+                  ? `<div class="voice-list">${people
+                      .map(
+                        (v) =>
+                          `<div class="voice-row"><div class="av ${v.status}" style="background:${v.color}">${initials(v.name)}</div><span>${esc(v.name)}</span></div>`,
+                      )
+                      .join("")}</div>`
+                  : ""
+              }`;
+          }
+          const n = state.unread[ch.id];
+          return `<button class="ch ${state.channelId === ch.id ? "active" : ""}" data-channel="${ch.id}" type="button"><span class="hash">#</span><span>${esc(ch.name)}</span>${n ? `<span class="badge">${n}</span>` : ""}</button>`;
+        })
+        .join("")}</div></div>`;
     })
     .join("");
 
   els.channelNav.querySelectorAll("[data-channel]").forEach((btn) => {
     btn.addEventListener("click", () => {
-      if (btn.dataset.type === "voice") joinVoiceChannel(btn.dataset.channel);
+      if (btn.dataset.type === "voice") joinVoice(btn.dataset.channel);
       else switchChannel(btn.dataset.channel);
     });
   });
 }
 
 function renderMembers() {
-  if (state.view === "dms") {
-    els.membersContent.innerHTML = `
-      <h3>AKTİF ŞİMDİ — ${state.online.length}</h3>
-      ${state.online
-        .map(
-          (u) => `
-        <button class="member" data-user="${u.id}" type="button">
-          <div class="avatar ${u.status}" style="background:${u.color}">${initials(u.name)}</div>
-          <div class="meta">
-            <span class="name" style="color:${u.color}">${escapeHtml(u.name)}</span>
-            <span class="activity">${escapeHtml(u.customStatus || STATUS_LABEL[u.status] || "")}</span>
-          </div>
-        </button>`,
-        )
-        .join("")}`;
-  } else {
-    els.membersContent.innerHTML = `
-      <h3>ÇEVRİMİÇİ — ${state.online.length}</h3>
-      ${state.online
-        .map(
-          (u) => `
-        <button class="member" data-user="${u.id}" type="button">
-          <div class="avatar ${u.status}" style="background:${u.color}">${initials(u.name)}</div>
-          <div class="meta">
-            <span class="name" style="color:${u.color}">${escapeHtml(u.name)}</span>
-            <span class="activity">${escapeHtml(
-              u.voiceChannelId
-                ? `🔊 ${state.channels.find((c) => c.id === u.voiceChannelId)?.name || "Ses"}`
-                : u.customStatus || STATUS_LABEL[u.status] || "",
-            )}</span>
-          </div>
-        </button>`,
-        )
-        .join("")}
-      <h3>ÇEVRİMDIŞI — ${state.offline.length}</h3>
-      ${state.offline
-        .map(
-          (u) => `
-        <button class="member offline" data-user="${u.id}" type="button">
-          <div class="avatar offline" style="background:${u.color}">${initials(u.name)}</div>
-          <div class="meta"><span class="name">${escapeHtml(u.name)}</span></div>
-        </button>`,
-        )
-        .join("")}`;
-  }
+  const row = (u, dim = false) => `
+    <button class="member ${dim ? "dim" : ""}" data-user="${u.id}" type="button">
+      <div class="av ${u.status || "offline"}" style="background:${u.color}">${initials(u.name)}</div>
+      <div class="meta">
+        <span class="n" style="color:${u.color || "inherit"}">${esc(u.name)}</span>
+        <span class="a">${esc(
+          u.voiceChannelId
+            ? `🔊 ${state.channels.find((c) => c.id === u.voiceChannelId)?.name || "Ses"}`
+            : u.customStatus || STATUS[u.status] || "",
+        )}</span>
+      </div>
+    </button>`;
+
+  els.membersContent.innerHTML = `
+    <h3>Çevrimiçi — ${state.online.length}</h3>
+    ${state.online.map((u) => row(u)).join("")}
+    <h3>Çevrimdışı — ${state.offline.length}</h3>
+    ${state.offline.map((u) => row(u, true)).join("")}`;
 
   els.membersContent.querySelectorAll("[data-user]").forEach((btn) => {
     btn.addEventListener("click", (e) => openProfile(btn.dataset.user, e));
   });
 }
 
-function renderMessages() {
-  const ch = channelMeta();
-  els.channelTitle.textContent = ch.name;
-  els.channelTopic.textContent = ch.topic || "";
-  els.titleIcon.textContent = ch.type === "dm" ? "@" : ch.type === "voice" ? "🔊" : "#";
-  els.messageInput.placeholder =
-    ch.type === "dm" ? `@${ch.name} kullanıcısına mesaj gönder` : `#${ch.name} kanalına mesaj gönder`;
-
-  const nearBottom =
-    els.messages.scrollHeight - els.messages.scrollTop - els.messages.clientHeight < 140;
-
-  let html = `
-    <div class="welcome">
-      <div class="orb">${ch.type === "dm" ? "@" : ch.type === "voice" ? "🔊" : "#"}</div>
-      <h2>${ch.type === "dm" ? ch.name : `#${ch.name}`}</h2>
-      <p>${escapeHtml(ch.topic || "Canlı kanal. Markdown: **kalın** *italik* \`kod\` ||spoiler||")}</p>
-    </div>`;
-
-  let lastDay = "";
-  let prev = null;
-  for (const msg of state.messages) {
-    const day = fmtDay(msg.createdAt);
-    if (day !== lastDay) {
-      html += `<div class="day-sep">${escapeHtml(day)}</div>`;
-      lastDay = day;
-    }
-    const compact =
-      prev &&
-      prev.userId === msg.userId &&
-      !msg.replyTo &&
-      msg.createdAt - prev.createdAt < 5 * 60 * 1000;
-    html += messageHtml(msg, compact);
-    prev = msg;
-  }
-  els.messages.innerHTML = html;
-  bindMessageEvents();
-  if (nearBottom || state.messages.length < 15) {
-    els.messages.scrollTop = els.messages.scrollHeight;
-  }
-}
-
-function messageHtml(msg, compact) {
+function msgHtml(msg, compact, enter = false) {
   const mine = state.user && msg.userId === state.user.id;
   return `
-    <article class="msg ${compact ? "compact" : ""} ${msg.deleted ? "deleted" : ""}" data-id="${msg.id}">
-      <div class="msg-av" data-user="${msg.userId}" style="background:${escapeHtml(msg.userColor)}">${initials(msg.userName)}</div>
+    <article class="msg ${compact ? "compact" : ""} ${msg.deleted ? "deleted" : ""} ${msg.pending ? "pending" : ""} ${enter ? "enter" : ""}" data-id="${msg.id}">
+      <div class="msg-av" data-user="${msg.userId}" style="background:${esc(msg.userColor)}">${initials(msg.userName)}</div>
       <div>
         ${
           msg.replyTo
-            ? `<div class="reply-ref"><strong style="color:${escapeHtml(msg.replyTo.userColor)}">${escapeHtml(msg.replyTo.userName)}</strong> ${escapeHtml(msg.replyTo.content)}</div>`
+            ? `<div class="reply"><strong style="color:${esc(msg.replyTo.userColor)}">${esc(msg.replyTo.userName)}</strong> ${esc(msg.replyTo.content)}</div>`
             : ""
         }
         ${
           compact
             ? ""
-            : `<div class="msg-head">
-                <span class="msg-name" data-user="${msg.userId}" style="color:${escapeHtml(msg.userColor)}">${escapeHtml(msg.userName)}</span>
-                <time class="msg-time">${fmtTime(msg.createdAt)}</time>
+            : `<div class="head">
+                <span class="name" data-user="${msg.userId}" style="color:${esc(msg.userColor)}">${esc(msg.userName)}</span>
+                <time class="time">${fmtTime(msg.createdAt)}</time>
                 ${msg.editedAt ? `<span class="edited">(düzenlendi)</span>` : ""}
-                ${msg.pinned ? `<span class="pin-badge">📌 sabitli</span>` : ""}
+                ${msg.pinned ? `<span class="pin-tag">📌</span>` : ""}
               </div>`
         }
-        <div class="msg-text">${msg.deleted ? escapeHtml(msg.content) : formatMarkdown(msg.content)}</div>
+        <div class="body">${msg.deleted ? esc(msg.content) : md(msg.content)}</div>
         ${
           msg.reactions?.length
             ? `<div class="reactions">${msg.reactions
@@ -377,9 +306,9 @@ function messageHtml(msg, compact) {
         }
       </div>
       ${
-        msg.deleted
+        msg.deleted || msg.pending
           ? ""
-          : `<div class="msg-actions">
+          : `<div class="toolbar">
               <button type="button" data-act="react" data-id="${msg.id}" title="Tepki">😊</button>
               <button type="button" data-act="reply" data-id="${msg.id}" title="Yanıtla">↩</button>
               ${mine ? `<button type="button" data-act="edit" data-id="${msg.id}" title="Düzenle">✎</button>` : ""}
@@ -390,93 +319,173 @@ function messageHtml(msg, compact) {
     </article>`;
 }
 
-function bindMessageEvents() {
-  els.messages.querySelectorAll(".spoiler").forEach((el) => {
-    el.addEventListener("click", () => el.classList.add("revealed"));
+function bindMessageNode(root = els.messages) {
+  root.querySelectorAll(".spoiler").forEach((el) => {
+    el.onclick = () => el.classList.add("on");
   });
-  els.messages.querySelectorAll("[data-user]").forEach((el) => {
-    el.addEventListener("click", (e) => openProfile(el.dataset.user, e));
+  root.querySelectorAll("[data-user]").forEach((el) => {
+    el.onclick = (e) => openProfile(el.dataset.user, e);
   });
-  els.messages.querySelectorAll("[data-react]").forEach((btn) => {
-    btn.addEventListener("click", () => react(btn.dataset.react, btn.dataset.emoji));
+  root.querySelectorAll("[data-react]").forEach((btn) => {
+    btn.onclick = () => react(btn.dataset.react, btn.dataset.emoji);
   });
-  els.messages.querySelectorAll("[data-act]").forEach((btn) => {
-    btn.addEventListener("click", (e) => {
+  root.querySelectorAll("[data-act]").forEach((btn) => {
+    btn.onclick = (e) => {
       e.stopPropagation();
       const id = btn.dataset.id;
       const act = btn.dataset.act;
-      if (act === "react") showEmojiPop(btn, (emoji) => react(id, emoji));
+      if (act === "react") showEmoji(btn, (emoji) => react(id, emoji));
       if (act === "reply") startReply(id);
       if (act === "edit") startEdit(id);
       if (act === "pin") pin(id);
-      if (act === "delete") removeMessage(id);
-    });
+      if (act === "delete") removeMsg(id);
+    };
   });
 }
 
-function upsertMessage(message) {
-  if (message.channelId !== state.channelId) {
-    state.unread[message.channelId] = (state.unread[message.channelId] || 0) + 1;
-    renderSidebar();
-    return;
+function renderMessages({ enterId = null } = {}) {
+  const ch = channelMeta();
+  els.channelTitle.textContent = ch.name;
+  els.channelTopic.textContent = ch.topic || "";
+  els.titleIcon.textContent = ch.type === "dm" ? "@" : ch.type === "voice" ? "🔊" : "#";
+  els.messageInput.placeholder =
+    ch.type === "dm" ? `@${ch.name} kişisine mesaj gönder` : `#${ch.name} kanalına mesaj gönder`;
+
+  let html = `<div class="welcome"><div class="orb">${ch.type === "dm" ? "@" : "#"}</div><h2>${ch.type === "dm" ? esc(ch.name) : `#${esc(ch.name)}`}</h2><p>${esc(ch.topic || "Bu kanalda herkes canlı konuşur. Markdown: **kalın** *italik* `kod` ||spoiler||")}</p></div>`;
+
+  let lastDay = "";
+  let prev = null;
+  for (const msg of state.messages) {
+    const day = fmtDay(msg.createdAt);
+    if (day !== lastDay) {
+      html += `<div class="day">${esc(day)}</div>`;
+      lastDay = day;
+    }
+    const compact =
+      prev &&
+      prev.userId === msg.userId &&
+      !msg.replyTo &&
+      msg.createdAt - prev.createdAt < 5 * 60 * 1000;
+    html += msgHtml(msg, compact, enterId === msg.id);
+    prev = msg;
   }
-  const idx = state.messages.findIndex((m) => m.id === message.id);
-  if (idx >= 0) state.messages[idx] = message;
-  else state.messages.push(message);
-  state.messages.sort((a, b) => a.createdAt - b.createdAt);
-  renderMessages();
+
+  const keep = state.stickBottom;
+  const prevHeight = els.messages.scrollHeight;
+  const prevTop = els.messages.scrollTop;
+  els.messages.innerHTML = html;
+  bindMessageNode();
+  if (keep) scrollBottom(true);
+  else els.messages.scrollTop = els.messages.scrollHeight - prevHeight + prevTop;
 }
 
-async function loadMessages() {
-  const data = await api(`/xzon/api/messages?channel=${encodeURIComponent(state.channelId)}&limit=100`);
-  state.messages = data.messages || [];
+function upsertMessage(message, { enter = false } = {}) {
+  if (!message) return;
+  if (message.channelId !== state.channelId) {
+    if (message.userId !== state.user?.id) {
+      state.unread[message.channelId] = (state.unread[message.channelId] || 0) + 1;
+      renderSidebar();
+    }
+    return;
+  }
+
+  const idx = state.messages.findIndex((m) => m.id === message.id || (m.pending && m.localId && m.localId === message.localId));
+  if (idx >= 0) state.messages[idx] = { ...message, pending: false };
+  else state.messages.push(message);
+  state.messages.sort((a, b) => a.createdAt - b.createdAt);
+
+  // Fast path: append if newest and stuck to bottom
+  const last = state.messages[state.messages.length - 1];
+  const existing = els.messages.querySelector(`[data-id="${message.id}"]`);
+  if (!existing && last?.id === message.id && state.stickBottom && !message.deleted) {
+    const prev = state.messages[state.messages.length - 2];
+    const compact =
+      prev &&
+      prev.userId === message.userId &&
+      !message.replyTo &&
+      message.createdAt - prev.createdAt < 5 * 60 * 1000;
+    els.messages.insertAdjacentHTML("beforeend", msgHtml(message, compact, true));
+    bindMessageNode(els.messages.lastElementChild);
+    scrollBottom(true);
+    return;
+  }
+
+  renderMessages({ enterId: enter ? message.id : null });
+  if (!state.stickBottom) els.jumpBtn.classList.remove("hidden");
+  else scrollBottom(true);
+}
+
+async function loadMessages({ before = 0, appendTop = false } = {}) {
+  const data = await api(
+    `/xzon/api/messages?channel=${encodeURIComponent(state.channelId)}&limit=80${before ? `&before=${before}` : ""}`,
+  );
   state.unread = data.unread || state.unread;
-  state.searchMode = false;
+  if (appendTop) {
+    const older = data.messages || [];
+    const ids = new Set(state.messages.map((m) => m.id));
+    state.messages = [...older.filter((m) => !ids.has(m.id)), ...state.messages];
+  } else {
+    state.messages = data.messages || [];
+  }
   renderMessages();
   renderSidebar();
 }
 
 async function switchChannel(channelId) {
+  if (state.switching) return;
+  state.switching = true;
   state.channelId = channelId;
+  localStorage.setItem("xzon_channel", channelId);
   state.replyTo = null;
   state.editingId = null;
   els.replyBar.classList.add("hidden");
   state.typingUsers.clear();
   renderTyping();
+  state.stickBottom = true;
+  els.chat.classList.add("switching");
   renderRail();
   renderSidebar();
-  await loadMessages();
-  openStream();
-  els.messageInput.focus();
+
+  try {
+    await loadMessages();
+    openStream();
+  } finally {
+    requestAnimationFrame(() => {
+      els.chat.classList.remove("switching");
+      state.switching = false;
+      scrollBottom(true);
+      els.messageInput.focus();
+    });
+  }
 }
 
 async function openGuild(guildId) {
   state.view = "guild";
   state.guildId = guildId;
   const first =
-    state.channels.find((c) => c.guildId === guildId && c.type === "text")?.id || "genel";
+    state.channels.find((c) => c.guildId === guildId && c.type === "text" && c.id === "genel")?.id ||
+    state.channels.find((c) => c.guildId === guildId && c.type === "text")?.id;
   renderRail();
-  await switchChannel(first);
+  if (first) await switchChannel(first);
 }
 
 async function openDms() {
   state.view = "dms";
-  const data = await api("/xzon/api/dms");
-  state.dms = data.dms || [];
+  state.dms = (await api("/xzon/api/dms")).dms || [];
   renderRail();
   renderSidebar();
   renderMembers();
   if (state.dms[0]) await switchChannel(state.dms[0].channelId);
   else {
     state.messages = [];
-    els.channelTitle.textContent = "Arkadaşlar";
-    els.titleIcon.textContent = "👥";
-    els.channelTopic.textContent = "Birine DM açmak için üye listesini kullan";
-    els.messages.innerHTML = `<div class="welcome"><div class="orb">💬</div><h2>Direkt Mesajlar</h2><p>Sağdaki üyelerden birine tıkla ve Mesaj Gönder.</p></div>`;
+    els.channelTitle.textContent = "Direkt Mesajlar";
+    els.titleIcon.textContent = "💬";
+    els.channelTopic.textContent = "Bir üye seçip mesaj gönder";
+    els.messages.innerHTML = `<div class="welcome"><div class="orb">💬</div><h2>Direkt Mesajlar</h2><p>Sağdaki listeden birine tıklayarak sohbet başlat.</p></div>`;
   }
 }
 
-async function joinVoiceChannel(channelId) {
+async function joinVoice(channelId) {
   const data = await api("/xzon/api/voice/join", { method: "POST", body: { channelId } });
   state.user = data.user;
   state.voice = data.voice || [];
@@ -502,7 +511,8 @@ function startReply(id) {
   state.replyTo = msg;
   state.editingId = null;
   els.replyBar.classList.remove("hidden");
-  els.replyLabel.textContent = `${msg.userName} yanıtlanıyor: ${msg.content.slice(0, 60)}`;
+  els.replyTitle.textContent = `${msg.userName} yanıtlanıyor`;
+  els.replyPreview.textContent = msg.content.slice(0, 80);
   els.messageInput.focus();
 }
 
@@ -512,41 +522,65 @@ function startEdit(id) {
   state.editingId = id;
   state.replyTo = null;
   els.replyBar.classList.remove("hidden");
-  els.replyLabel.textContent = "Mesaj düzenleniyor…";
+  els.replyTitle.textContent = "Mesaj düzenleniyor";
+  els.replyPreview.textContent = "";
   els.messageInput.value = msg.content;
   els.messageInput.focus();
 }
 
 async function react(id, emoji) {
-  const data = await api(`/xzon/api/messages/${id}/react`, { method: "POST", body: { emoji } });
-  upsertMessage(data.message);
+  upsertMessage((await api(`/xzon/api/messages/${id}/react`, { method: "POST", body: { emoji } })).message);
 }
-
 async function pin(id) {
-  const data = await api(`/xzon/api/messages/${id}/pin`, { method: "POST", body: {} });
-  upsertMessage(data.message);
-  toast(data.message.pinned ? "Mesaj sabitlendi" : "Sabit kaldırıldı");
+  const message = (await api(`/xzon/api/messages/${id}/pin`, { method: "POST", body: {} })).message;
+  upsertMessage(message);
+  toast(message.pinned ? "Sabitlendi" : "Sabit kaldırıldı");
 }
-
-async function removeMessage(id) {
+async function removeMsg(id) {
   if (!confirm("Mesaj silinsin mi?")) return;
-  const data = await api(`/xzon/api/messages/${id}`, { method: "DELETE" });
-  upsertMessage(data.message);
+  upsertMessage((await api(`/xzon/api/messages/${id}`, { method: "DELETE" })).message);
 }
 
 async function sendMessage() {
   const content = els.messageInput.value.trim();
-  if (!content) return;
+  if (!content || els.sendBtn.disabled) return;
   els.sendBtn.disabled = true;
+
   try {
     if (state.editingId) {
-      const data = await api(`/xzon/api/messages/${state.editingId}`, {
-        method: "PATCH",
-        body: { content },
-      });
-      upsertMessage(data.message);
+      upsertMessage(
+        (
+          await api(`/xzon/api/messages/${state.editingId}`, {
+            method: "PATCH",
+            body: { content },
+          })
+        ).message,
+      );
       state.editingId = null;
     } else {
+      const localId = `local-${Date.now()}`;
+      const optimistic = {
+        id: localId,
+        localId,
+        channelId: state.channelId,
+        userId: state.user.id,
+        userName: state.user.name,
+        userColor: state.user.color,
+        content,
+        createdAt: Date.now(),
+        pending: true,
+        reactions: [],
+        replyTo: state.replyTo
+          ? {
+              id: state.replyTo.id,
+              userName: state.replyTo.userName,
+              userColor: state.replyTo.userColor,
+              content: state.replyTo.content.slice(0, 120),
+            }
+          : null,
+      };
+      upsertMessage(optimistic, { enter: true });
+      els.messageInput.value = "";
       const data = await api("/xzon/api/messages", {
         method: "POST",
         body: {
@@ -555,12 +589,17 @@ async function sendMessage() {
           replyToId: state.replyTo?.id || null,
         },
       });
-      upsertMessage(data.message);
+      state.messages = state.messages.filter((m) => m.id !== localId);
+      upsertMessage({ ...data.message, localId }, { enter: true });
       state.replyTo = null;
     }
     els.replyBar.classList.add("hidden");
     els.messageInput.value = "";
+    state.stickBottom = true;
+    scrollBottom(true);
   } catch (error) {
+    state.messages = state.messages.filter((m) => !m.pending);
+    renderMessages();
     toast(error.message);
   } finally {
     els.sendBtn.disabled = false;
@@ -590,17 +629,16 @@ function closeStream() {
 
 function openStream() {
   closeStream();
-  if (!state.token && !document.cookie.includes("xzon_token")) return;
   const qs = new URLSearchParams({ channel: state.channelId });
   if (state.token) qs.set("token", state.token);
   const es = new EventSource(`/xzon/api/stream?${qs}`, { withCredentials: true });
   state.stream = es;
   setLive(false, "bağlanıyor…");
 
-  es.addEventListener("hello", () => setLive(true, "canlı · " + (state.online.length || 0) + " online"));
+  es.addEventListener("hello", () => setLive(true, `canlı · ${state.online.length} online`));
   es.addEventListener("message", (ev) => {
     try {
-      upsertMessage(JSON.parse(ev.data).message);
+      upsertMessage(JSON.parse(ev.data).message, { enter: true });
     } catch { /* ignore */ }
   });
   es.addEventListener("message_update", (ev) => {
@@ -636,7 +674,7 @@ function openStream() {
       const t = setTimeout(() => {
         state.typingUsers.delete(p.user.id);
         renderTyping();
-      }, 2500);
+      }, 2400);
       state.typingUsers.set(`t:${p.user.id}`, t);
     } catch { /* ignore */ }
   });
@@ -644,128 +682,93 @@ function openStream() {
     setLive(false, "yeniden bağlanıyor…");
     es.close();
     state.stream = null;
-    state.reconnectTimer = setTimeout(() => {
+    state.reconnectTimer = setTimeout(async () => {
       openStream();
-      loadMessages().catch(() => {});
-    }, 1600);
+      try {
+        await loadMessages();
+      } catch { /* ignore */ }
+    }, 1500);
   };
 }
 
 async function openProfile(userId, event) {
-  try {
-    const data = await api(`/xzon/api/users/${userId}`);
-    const u = data.user;
-    const pop = els.profilePop;
-    pop.innerHTML = `
-      <div class="profile-banner" style="background:linear-gradient(135deg,${u.color},#1e1f22)"></div>
-      <div class="avatar ${u.status}" style="background:${u.color}">${initials(u.name)}</div>
-      <div class="profile-body">
-        <h2>${escapeHtml(u.name)}</h2>
-        <p>${escapeHtml(u.name)}#${escapeHtml(u.tag || "0000")}</p>
-        <div class="profile-section"><h4>HAKKINDA</h4><p>${escapeHtml(u.bio || "—")}</p></div>
-        <div class="profile-section"><h4>DURUM</h4><p>${escapeHtml(u.customStatus || STATUS_LABEL[u.status] || "—")}</p></div>
-        <div class="profile-actions">
-          ${
-            u.id !== state.user.id
-              ? `<button type="button" id="dmFromProfile">Mesaj Gönder</button>`
-              : `<button type="button" class="ghost" id="editFromProfile">Profili Düzenle</button>`
-          }
-        </div>
-      </div>`;
-    const x = Math.min(window.innerWidth - 320, (event?.clientX || 200) + 8);
-    const y = Math.min(window.innerHeight - 380, (event?.clientY || 100) - 20);
-    pop.style.left = `${Math.max(8, x)}px`;
-    pop.style.top = `${Math.max(8, y)}px`;
-    pop.classList.remove("hidden");
-    $("dmFromProfile")?.addEventListener("click", async () => {
-      const dm = await api("/xzon/api/dms", { method: "POST", body: { userId: u.id } });
-      state.view = "dms";
-      const list = await api("/xzon/api/dms");
-      state.dms = list.dms || [];
-      pop.classList.add("hidden");
-      await switchChannel(dm.channelId);
-      renderRail();
-    });
-    $("editFromProfile")?.addEventListener("click", () => {
-      pop.classList.add("hidden");
-      openSettings("profile");
-    });
-  } catch (error) {
-    toast(error.message);
-  }
+  const { user: u } = await api(`/xzon/api/users/${userId}`);
+  const pop = els.profilePop;
+  pop.innerHTML = `
+    <div class="banner" style="background:linear-gradient(135deg,${u.color},#1e1f22)"></div>
+    <div class="av ${u.status}" style="background:${u.color}">${initials(u.name)}</div>
+    <div class="pad">
+      <h2>${esc(u.name)}</h2>
+      <p class="tag">${esc(u.name)}#${esc(u.tag || "0000")}</p>
+      <div class="card"><h4>Hakkında</h4><p>${esc(u.bio || "—")}</p></div>
+      <div class="card"><h4>Durum</h4><p>${esc(u.customStatus || STATUS[u.status] || "—")}</p></div>
+      <div class="actions">
+        ${
+          u.id !== state.user.id
+            ? `<button type="button" id="dmFromProfile">Mesaj Gönder</button>`
+            : `<button type="button" class="ghost" id="editFromProfile">Profili Düzenle</button>`
+        }
+      </div>
+    </div>`;
+  pop.style.left = `${Math.max(8, Math.min(window.innerWidth - 320, (event?.clientX || 200) + 8))}px`;
+  pop.style.top = `${Math.max(8, Math.min(window.innerHeight - 380, (event?.clientY || 100) - 20))}px`;
+  pop.classList.remove("hidden");
+  $("dmFromProfile")?.addEventListener("click", async () => {
+    const dm = await api("/xzon/api/dms", { method: "POST", body: { userId: u.id } });
+    state.view = "dms";
+    state.dms = (await api("/xzon/api/dms")).dms || [];
+    pop.classList.add("hidden");
+    await switchChannel(dm.channelId);
+    renderRail();
+  });
+  $("editFromProfile")?.addEventListener("click", () => {
+    pop.classList.add("hidden");
+    openSettings("profile");
+  });
 }
 
-function showEmojiPop(anchor, onPick) {
+function showEmoji(anchor, onPick) {
   const pop = els.emojiPop;
   pop.innerHTML = EMOJIS.map((e) => `<button type="button" data-e="${e}">${e}</button>`).join("");
   const rect = anchor.getBoundingClientRect();
-  pop.style.left = `${Math.min(window.innerWidth - 340, rect.left)}px`;
-  pop.style.top = `${Math.max(8, rect.top - 180)}px`;
+  pop.style.left = `${Math.min(window.innerWidth - 300, rect.left)}px`;
+  pop.style.top = `${Math.max(8, rect.top - 190)}px`;
   pop.classList.remove("hidden");
   pop.querySelectorAll("[data-e]").forEach((btn) => {
-    btn.addEventListener("click", () => {
+    btn.onclick = () => {
       pop.classList.add("hidden");
       onPick(btn.dataset.e);
-    });
+    };
   });
 }
 
 function openSettings(tab = "account") {
   const tabs = [
     ["account", "Hesabım"],
-    ["profile", "Profiller"],
+    ["profile", "Profil"],
     ["status", "Durum"],
-    ["voice", "Ses & Video"],
-    ["appearance", "Görünüm"],
+    ["voice", "Ses"],
     ["logout", "Çıkış Yap"],
   ];
+  const u = state.user;
   els.settingsNav.innerHTML = `<h3>Kullanıcı Ayarları</h3>${tabs
     .map(
       ([id, label]) =>
-        `<button type="button" data-tab="${id}" class="${id === tab ? "active" : ""} ${id === "logout" ? "danger" : ""}">${label}</button>`,
+        `<button type="button" data-tab="${id}" class="${id === tab ? "on" : ""} ${id === "logout" ? "danger" : ""}">${label}</button>`,
     )
     .join("")}`;
-  els.settingsNav.querySelectorAll("[data-tab]").forEach((btn) => {
-    btn.addEventListener("click", () => openSettings(btn.dataset.tab));
-  });
+  els.settingsNav.querySelectorAll("[data-tab]").forEach((b) =>
+    b.addEventListener("click", () => openSettings(b.dataset.tab)),
+  );
 
-  const u = state.user;
   const panes = {
-    account: `
-      <h2>Hesabım</h2>
-      <label>Kullanıcı adı<input id="setName" value="${escapeHtml(u.name)}" /></label>
-      <label>Etiket<input value="${escapeHtml(u.name)}#${escapeHtml(u.tag || "0000")}" disabled /></label>
-      <button class="save" id="saveAccount" type="button">Kaydet</button>`,
-    profile: `
-      <h2>Profiller</h2>
-      <label>Hakkında<textarea id="setBio">${escapeHtml(u.bio || "")}</textarea></label>
-      <label>Özel durum<input id="setCustom" value="${escapeHtml(u.customStatus || "")}" maxlength="80" /></label>
-      <button class="save" id="saveProfile" type="button">Kaydet</button>`,
-    status: `
-      <h2>Durum</h2>
-      <label>Görünürlük
-        <select id="setStatus">
-          ${["online", "idle", "dnd", "invisible"]
-            .map((s) => `<option value="${s}" ${u.status === s ? "selected" : ""}>${STATUS_LABEL[s]}</option>`)
-            .join("")}
-        </select>
-      </label>
-      <button class="save" id="saveStatus" type="button">Kaydet</button>`,
-    voice: `
-      <h2>Ses & Video</h2>
-      <p style="color:var(--text-2)">Ses odalarına katılınca alt panelde bağlantı görünür. Mikrofon / kulaklık bayrakları senkronlanır.</p>
-      <label>Giriş<select><option>Varsayılan Mikrofon</option></select></label>
-      <label>Çıkış<select><option>Varsayılan Hoparlör</option></select></label>`,
-    appearance: `
-      <h2>Görünüm</h2>
-      <p style="color:var(--text-2)">Koyu Discord teması aktif. Mesajlarda markdown desteklenir.</p>
-      <label>Mesaj yoğunluğu<select><option>Rahat</option><option>Kompakt</option></select></label>`,
-    logout: `
-      <h2>Çıkış Yap</h2>
-      <p style="color:var(--text-2)">Oturumu kapatmak istediğine emin misin?</p>
-      <button class="save" id="confirmLogout" type="button" style="background:var(--red)">Çıkış Yap</button>`,
+    account: `<h2>Hesabım</h2><label>Kullanıcı adı<input id="setName" value="${esc(u.name)}" /></label><button class="save" id="saveAccount" type="button">Kaydet Değişiklikleri</button>`,
+    profile: `<h2>Profil</h2><label>Hakkında<textarea id="setBio">${esc(u.bio || "")}</textarea></label><label>Özel durum<input id="setCustom" value="${esc(u.customStatus || "")}" maxlength="80" /></label><button class="save" id="saveProfile" type="button">Kaydet</button>`,
+    status: `<h2>Durum</h2><label>Görünürlük<select id="setStatus">${["online", "idle", "dnd", "invisible"].map((s) => `<option value="${s}" ${u.status === s ? "selected" : ""}>${STATUS[s]}</option>`).join("")}</select></label><button class="save" id="saveStatus" type="button">Kaydet</button>`,
+    voice: `<h2>Ses</h2><p style="color:var(--text-muted);line-height:1.5">Ses odalarına katılınca alt panelde bağlantı görünür. Mikrofon ve kulaklık durumun senkronlanır.</p>`,
+    logout: `<h2>Çıkış Yap</h2><p style="color:var(--text-muted)">Oturumu kapatmak istediğine emin misin?</p><button class="save" id="confirmLogout" type="button" style="background:var(--danger)">Çıkış Yap</button>`,
   };
-  els.settingsPane.innerHTML = panes[tab] || panes.account;
+  els.settingsPane.innerHTML = panes[tab];
   els.settingsModal.classList.remove("hidden");
 
   $("saveAccount")?.addEventListener("click", async () => {
@@ -814,13 +817,22 @@ async function bootstrap() {
   state.dms = data.dms || [];
   state.unread = data.unread || {};
   state.voice = data.voice || [];
-  showApp();
+
+  if (!state.channels.some((c) => c.id === state.channelId) && !String(state.channelId).startsWith("dm:")) {
+    state.channelId = "genel";
+  }
+
+  els.boot.classList.add("hidden");
+  els.app.classList.remove("hidden");
+  if (window.matchMedia("(max-width: 760px)").matches) els.mobileBar.classList.remove("hidden");
+  syncMe();
   renderRail();
   renderSidebar();
   renderMembers();
   await loadMessages();
   openStream();
   startPresence();
+  setLive(true, `canlı · ${state.online.length} online`);
 }
 
 let presenceTimer;
@@ -852,7 +864,7 @@ els.joinForm.addEventListener("submit", async (e) => {
     state.token = data.token;
     localStorage.setItem("xzon_token", data.token);
     await bootstrap();
-    toast("XZON'a hoş geldin");
+    toast("XZON’a hoş geldin");
   } catch (error) {
     els.bootError.textContent = error.message;
     els.bootError.classList.remove("hidden");
@@ -867,13 +879,32 @@ els.composer.addEventListener("submit", (e) => {
 });
 
 els.messageInput.addEventListener("input", () => {
-  const now = Date.now();
-  if (now - state.lastTypingSent < 1500) return;
-  state.lastTypingSent = now;
+  const t = Date.now();
+  if (t - state.lastTypingSent < 1400) return;
+  state.lastTypingSent = t;
   api("/xzon/api/typing", { method: "POST", body: { channelId: state.channelId } }).catch(() => {});
 });
 
-els.cancelReply.addEventListener("click", () => {
+els.messages.addEventListener("scroll", () => {
+  state.stickBottom = nearBottom();
+  if (state.stickBottom) els.jumpBtn.classList.add("hidden");
+  if (els.messages.scrollTop < 40 && !state.loadingOlder && state.messages.length) {
+    state.loadingOlder = true;
+    const oldest = state.messages[0]?.createdAt;
+    loadMessages({ before: oldest, appendTop: true })
+      .catch(() => {})
+      .finally(() => {
+        state.loadingOlder = false;
+      });
+  }
+});
+
+els.jumpBtn.addEventListener("click", () => {
+  state.stickBottom = true;
+  scrollBottom(true);
+});
+
+$("cancelReply").addEventListener("click", () => {
   state.replyTo = null;
   state.editingId = null;
   els.replyBar.classList.add("hidden");
@@ -886,29 +917,34 @@ $("settingsBtn").addEventListener("click", () => openSettings("account"));
 $("closeSettings").addEventListener("click", () => els.settingsModal.classList.add("hidden"));
 $("membersBtn").addEventListener("click", () => els.membersPane.classList.toggle("open"));
 $("emojiBtn").addEventListener("click", (e) => {
-  showEmojiPop(e.currentTarget, (emoji) => {
+  showEmoji(e.currentTarget, (emoji) => {
     els.messageInput.value += emoji;
     els.messageInput.focus();
   });
 });
-$("gifBtn").addEventListener("click", () => toast("GIF seçici yakında — şimdilik link yapıştır"));
 
 $("micBtn").addEventListener("click", async () => {
-  const muted = !state.user.muted;
-  state.user = (await api("/xzon/api/voice/flags", { method: "POST", body: { muted } })).user;
+  state.user = (
+    await api("/xzon/api/voice/flags", { method: "POST", body: { muted: !state.user.muted } })
+  ).user;
   syncMe();
 });
 $("deafBtn").addEventListener("click", async () => {
   const deafened = !state.user.deafened;
-  state.user = (await api("/xzon/api/voice/flags", { method: "POST", body: { deafened, muted: deafened || state.user.muted } })).user;
+  state.user = (
+    await api("/xzon/api/voice/flags", {
+      method: "POST",
+      body: { deafened, muted: deafened || state.user.muted },
+    })
+  ).user;
   syncMe();
 });
 
 $("statusBtn").addEventListener("click", (e) => {
   e.stopPropagation();
   const menu = els.statusMenu;
-  menu.innerHTML = ["online", "idle", "dnd", "invisible"]
-    .map((s) => `<button type="button" data-s="${s}">${STATUS_LABEL[s]}</button>`)
+  menu.innerHTML = Object.entries(STATUS)
+    .map(([k, v]) => `<button type="button" data-s="${k}">${v}</button>`)
     .join("");
   const rect = e.currentTarget.getBoundingClientRect();
   menu.style.left = `${rect.left}px`;
@@ -916,11 +952,11 @@ $("statusBtn").addEventListener("click", (e) => {
   menu.style.top = "auto";
   menu.classList.toggle("hidden");
   menu.querySelectorAll("[data-s]").forEach((btn) => {
-    btn.addEventListener("click", async () => {
+    btn.onclick = async () => {
       state.user = (await api("/xzon/api/me", { method: "PATCH", body: { status: btn.dataset.s } })).user;
       syncMe();
       menu.classList.add("hidden");
-    });
+    };
   });
 });
 
@@ -929,11 +965,11 @@ $("pinsBtn").addEventListener("click", async () => {
   els.pinsList.innerHTML = data.messages?.length
     ? data.messages
         .map(
-          (m) => `
-      <div class="pin-item"><strong>${escapeHtml(m.userName)}</strong> · ${fmtTime(m.createdAt)}<br>${escapeHtml(m.content)}</div>`,
+          (m) =>
+            `<div class="pin-item"><strong>${esc(m.userName)}</strong> · ${fmtTime(m.createdAt)}<br>${esc(m.content)}</div>`,
         )
         .join("")
-    : `<p style="padding:12px;color:var(--text-3)">Sabitlenmiş mesaj yok</p>`;
+    : `<p style="padding:12px;color:var(--text-faint)">Sabitlenmiş mesaj yok</p>`;
   els.pinsDrawer.classList.toggle("hidden");
 });
 $("closePins").addEventListener("click", () => els.pinsDrawer.classList.add("hidden"));
@@ -947,19 +983,20 @@ els.searchInput.addEventListener("input", () => {
       await loadMessages();
       return;
     }
-    const data = await api(
-      `/xzon/api/search?channel=${encodeURIComponent(state.channelId)}&q=${encodeURIComponent(q)}`,
-    );
-    state.messages = data.messages || [];
-    state.searchMode = true;
+    state.messages =
+      (
+        await api(
+          `/xzon/api/search?channel=${encodeURIComponent(state.channelId)}&q=${encodeURIComponent(q)}`,
+        )
+      ).messages || [];
     renderMessages();
-  }, 250);
+  }, 220);
 });
 
 els.mobileBar.querySelectorAll("[data-m]").forEach((btn) => {
   btn.addEventListener("click", () => {
-    els.mobileBar.querySelectorAll("button").forEach((b) => b.classList.remove("active"));
-    btn.classList.add("active");
+    els.mobileBar.querySelectorAll("button").forEach((b) => b.classList.remove("on"));
+    btn.classList.add("on");
     els.app.classList.remove("show-rail", "show-channels", "show-members");
     if (btn.dataset.m === "rail") els.app.classList.add("show-rail");
     if (btn.dataset.m === "channels") els.app.classList.add("show-channels");
@@ -968,10 +1005,10 @@ els.mobileBar.querySelectorAll("[data-m]").forEach((btn) => {
 });
 
 document.addEventListener("click", (e) => {
-  if (!els.statusMenu.contains(e.target) && e.target !== $("statusBtn")) {
+  if (!els.statusMenu.contains(e.target) && e.target !== $("statusBtn") && !e.target.closest?.("#statusBtn")) {
     els.statusMenu.classList.add("hidden");
   }
-  if (!els.emojiPop.contains(e.target) && e.target !== $("emojiBtn") && !e.target.closest?.("[data-act=react]")) {
+  if (!els.emojiPop.contains(e.target) && e.target !== $("emojiBtn") && !e.target.closest?.('[data-act="react"]')) {
     els.emojiPop.classList.add("hidden");
   }
   if (!els.profilePop.contains(e.target) && !e.target.closest?.("[data-user]")) {
@@ -981,9 +1018,7 @@ document.addEventListener("click", (e) => {
 
 (async () => {
   try {
-    if (state.token || document.cookie.includes("xzon_token")) {
-      await bootstrap();
-    }
+    if (state.token || document.cookie.includes("xzon_token")) await bootstrap();
   } catch {
     state.token = "";
     localStorage.removeItem("xzon_token");
