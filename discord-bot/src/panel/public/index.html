@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Lexyxzon Control Panel</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Syne:wght@500;700;800&family=Manrope:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="bg-glow"></div>
+
+    <section id="loginView" class="login-wrap">
+      <div class="login-card">
+        <p class="eyebrow">Lexyxzon Ultra</p>
+        <h1>Control Panel</h1>
+        <p class="sub">Botunu yönet · mesaj at · anonim gönder</p>
+        <form id="loginForm">
+          <label>
+            Panel şifresi
+            <input id="password" type="password" autocomplete="current-password" required />
+          </label>
+          <button type="submit">Panele Gir</button>
+          <p id="loginError" class="error"></p>
+        </form>
+      </div>
+    </section>
+
+    <section id="appView" class="app hidden">
+      <aside class="sidebar">
+        <div class="brand">
+          <span class="dot"></span>
+          <div>
+            <strong>Lexyxzon</strong>
+            <small>Command Deck</small>
+          </div>
+        </div>
+        <nav>
+          <button class="nav active" data-tab="dashboard">Dashboard</button>
+          <button class="nav" data-tab="messages">Mesaj Gönder</button>
+          <button class="nav" data-tab="embed">Embed Studio</button>
+          <button class="nav" data-tab="anon">Anonim</button>
+        </nav>
+        <button id="logoutBtn" class="logout">Çıkış</button>
+      </aside>
+
+      <main class="main">
+        <header class="top">
+          <div>
+            <h2 id="pageTitle">Dashboard</h2>
+            <p id="pageSub">Canlı bot durumu</p>
+          </div>
+          <div id="botChip" class="bot-chip">Yükleniyor…</div>
+        </header>
+
+        <section id="tab-dashboard" class="tab">
+          <div class="stat-grid">
+            <article class="stat"><span>Bot</span><strong id="statTag">-</strong></article>
+            <article class="stat"><span>Sunucu</span><strong id="statGuilds">-</strong></article>
+            <article class="stat"><span>Ping</span><strong id="statPing">-</strong></article>
+            <article class="stat"><span>Uptime</span><strong id="statUptime">-</strong></article>
+            <article class="stat"><span>Komut</span><strong id="statCommands">-</strong></article>
+          </div>
+          <div class="card">
+            <h3>Sunucular</h3>
+            <div id="guildList" class="guild-list"></div>
+          </div>
+        </section>
+
+        <section id="tab-messages" class="tab hidden">
+          <div class="card form-card">
+            <h3>Bot olarak mesaj gönder</h3>
+            <div class="row">
+              <label>
+                Sunucu
+                <select id="msgGuild"></select>
+              </label>
+              <label>
+                Kanal
+                <select id="msgChannel"></select>
+              </label>
+            </div>
+            <label>
+              Mesaj
+              <textarea id="msgContent" rows="6" placeholder="Yazmak istediğin mesaj…"></textarea>
+            </label>
+            <button id="sendBotBtn" class="primary">Bot ile Gönder</button>
+            <p id="msgStatus" class="status"></p>
+          </div>
+        </section>
+
+        <section id="tab-embed" class="tab hidden">
+          <div class="card form-card">
+            <h3>Embed Studio</h3>
+            <div class="row">
+              <label>
+                Sunucu
+                <select id="embedGuild"></select>
+              </label>
+              <label>
+                Kanal
+                <select id="embedChannel"></select>
+              </label>
+            </div>
+            <label>
+              Başlık
+              <input id="embedTitle" type="text" placeholder="Başlık" />
+            </label>
+            <label>
+              Açıklama
+              <textarea id="embedDesc" rows="6" placeholder="Embed içeriği"></textarea>
+            </label>
+            <label>
+              Renk (hex)
+              <input id="embedColor" type="text" value="A855F7" />
+            </label>
+            <button id="sendEmbedBtn" class="primary">Embed Gönder</button>
+            <p id="embedStatus" class="status"></p>
+          </div>
+        </section>
+
+        <section id="tab-anon" class="tab hidden">
+          <div class="card form-card">
+            <h3>Anonim mesaj (webhook)</h3>
+            <p class="hint">Lexyxzon görünmez. Mesaj “Anonim” veya özel isimle gider.</p>
+            <div class="row">
+              <label>
+                Sunucu
+                <select id="anonGuild"></select>
+              </label>
+              <label>
+                Kanal
+                <select id="anonChannel"></select>
+              </label>
+            </div>
+            <label>
+              Görünen isim
+              <input id="anonName" type="text" value="Anonim" />
+            </label>
+            <label>
+              Mesaj
+              <textarea id="anonContent" rows="6" placeholder="Gizli mesaj…"></textarea>
+            </label>
+            <button id="sendAnonBtn" class="primary danger">Anonim Gönder</button>
+            <p id="anonStatus" class="status"></p>
+          </div>
+        </section>
+      </main>
+    </section>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

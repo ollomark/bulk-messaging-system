@@ -1,0 +1,30 @@
+{
+  "name": "lexyxzon-suite",
+  "version": "3.0.0",
+  "description": "Lexyxzon Ultra Premium — Discord operating system for elite communities",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "deploy-commands": "node src/deploy-commands.js",
+    "pm2:start": "pm2 start ecosystem.config.cjs",
+    "pm2:stop": "pm2 stop guardian-bot",
+    "pm2:logs": "pm2 logs guardian-bot"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@discordjs/voice": "^0.19.2",
+    "bcryptjs": "^3.0.3",
+    "better-sqlite3": "^11.10.0",
+    "cookie-parser": "^1.4.7",
+    "discord.js": "^14.19.3",
+    "dotenv": "^16.5.0",
+    "express": "^5.2.1",
+    "ms": "^2.1.3",
+    "sodium-native": "^4.3.3"
+  },
+  "license": "MIT"
+}

@@ -1,0 +1,10 @@
+{
+  "name": "xzon-community-ui",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Discord clone UI (XZON) — no rewards, pure chat client lookalike",
+  "scripts": {
+    "start": "npx --yes serve -l 4173 .",
+    "dev": "npx --yes serve -l 4173 ."
+  }
+}
