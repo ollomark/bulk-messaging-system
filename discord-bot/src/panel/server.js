@@ -48,8 +48,13 @@ export function startPanelServer(client) {
 
   // Discord çakması istemci — public, auth yok
   const xzonDir = path.join(__dirname, "xzon");
-  app.get("/xzon", (_req, res) => res.redirect(302, "/xzon/"));
-  app.use("/xzon", express.static(xzonDir, { index: "index.html" }));
+  app.get("/xzon", (_req, res) => {
+    res.sendFile(path.join(xzonDir, "index.html"));
+  });
+  app.get("/xzon/", (_req, res) => {
+    res.sendFile(path.join(xzonDir, "index.html"));
+  });
+  app.use("/xzon", express.static(xzonDir, { index: false, redirect: false }));
 
   app.use(express.static(path.join(__dirname, "public")));
 
