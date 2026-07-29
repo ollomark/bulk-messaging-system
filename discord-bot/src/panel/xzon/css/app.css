@@ -330,7 +330,7 @@ button { border: 0; background: none; cursor: pointer; }
 
 .av {
   width: 34px; height: 34px; border-radius: 12px; display: grid; place-items: center;
-  font-weight: 700; color: #061018; background: linear-gradient(145deg, #3dffa8, #6ea8ff);
+  font-weight: 700; color: #fff; background: #3d5afe;
   position: relative; flex-shrink: 0;
   box-shadow: 0 0 0 2px rgba(5, 7, 11, 0.8);
 }
@@ -466,8 +466,9 @@ button { border: 0; background: none; cursor: pointer; }
 
 .msg-av {
   width: 42px; height: 42px; border-radius: 14px; display: grid; place-items: center;
-  font-weight: 700; color: #061018; margin-top: 2px; cursor: pointer;
+  font-weight: 700; color: #fff; margin-top: 2px; cursor: pointer;
   transition: transform 0.15s var(--ease);
+  box-shadow: 0 0 0 2px rgba(5, 7, 11, 0.55);
 }
 .msg-av:hover { transform: scale(1.05); }
 .head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 2px; flex-wrap: wrap; }

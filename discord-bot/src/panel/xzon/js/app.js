@@ -263,22 +263,22 @@ function renderSidebar() {
       const items = list.filter((c) => c.category === cat);
       return `<div class="cat"><button class="cat-name" type="button">▼ ${esc(cat)}</button><div>${items
         .map((ch) => {
-          if (ch.type === "voice") {
+            if (ch.type === "voice") {
             const people = state.voice.filter((v) => v.voiceChannelId === ch.id);
-            return `<button class="ch ${state.channelId === ch.id ? "active" : ""}" data-channel="${ch.id}" data-type="voice" type="button"><span class="hash">🔊</span><span>${esc(ch.name)}</span></button>
+            return `<button class="ch ${state.channelId === ch.id ? "active" : ""}" data-channel="${ch.id}" data-type="voice" type="button"><span class="hash">🔊</span><span>${esc(ch.name)}</span>${people.length ? `<span class="badge">${people.length}</span>` : ""}</button>
               ${
                 people.length
                   ? `<div class="voice-list">${people
                       .map(
                         (v) =>
-                          `<div class="voice-row"><div class="av ${v.status}" style="background:${v.color}">${initials(v.name)}</div><span>${esc(v.name)}</span></div>`,
+                          `<div class="voice-row"><div class="av ${v.status}" style="background:${v.color}">${initials(v.name)}</div><span>${esc(v.name)}</span>${v.muted ? "<small>sessiz</small>" : ""}</div>`,
                       )
                       .join("")}</div>`
                   : ""
               }`;
           }
           const n = state.unread[ch.id];
-          return `<button class="ch ${state.channelId === ch.id ? "active" : ""}" data-channel="${ch.id}" type="button"><span class="hash">#</span><span>${esc(ch.name)}</span>${n ? `<span class="badge">${n}</span>` : ""}</button>`;
+          return `<button class="ch ${state.channelId === ch.id ? "active" : ""}" data-channel="${ch.id}" type="button"><span class="hash">#</span><span>${esc(ch.name)}</span>${n ? `<span class="badge">${n > 99 ? "99+" : n}</span>` : ""}</button>`;
         })
         .join("")}</div></div>`;
     })
@@ -481,7 +481,8 @@ async function loadMessages({ before = 0, appendTop = false } = {}) {
 }
 
 async function switchChannel(channelId) {
-  if (!channelId || channelId === state.channelId && state.messages.length && !state.switching) {
+  if (!channelId) return;
+  if (channelId === state.channelId && state.messages.length && !state.switching) {
     closeAllDrawers();
     return;
   }
