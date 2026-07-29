@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import bcrypt from "bcryptjs";
 import db from "../database/db.js";
 
 db.exec(`
@@ -177,6 +178,18 @@ db.exec(`
     slowmode INTEGER NOT NULL DEFAULT 0,
     nsfw INTEGER NOT NULL DEFAULT 0
   );
+
+  CREATE TABLE IF NOT EXISTS web_orders (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    product TEXT NOT NULL,
+    amount INTEGER NOT NULL,
+    currency TEXT NOT NULL DEFAULT 'TRY',
+    status TEXT NOT NULL,
+    meta TEXT,
+    created_at INTEGER NOT NULL,
+    paid_at INTEGER
+  );
 `);
 
 for (const [col, type] of [
@@ -185,11 +198,41 @@ for (const [col, type] of [
   ["badge", "TEXT"],
   ["accent", "TEXT"],
   ["activity", "TEXT"],
+  ["username", "TEXT"],
+  ["password_hash", "TEXT"],
+  ["nitro_expires_at", "INTEGER"],
 ]) {
   if (!userCols.includes(col)) {
     db.exec(`ALTER TABLE web_users ADD COLUMN ${col} ${type}`);
   }
 }
+
+try {
+  db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_web_users_username ON web_users(username) WHERE username IS NOT NULL`);
+} catch {
+  /* index may already exist */
+}
+
+export const NITRO_PLANS = {
+  classic: {
+    id: "nitro_classic_month",
+    tier: "classic",
+    label: "XZON Nitro Classic",
+    price: 49,
+    currency: "TRY",
+    days: 30,
+    perks: ["Rozet", "Klasik banner", "1 sunucu boost"],
+  },
+  full: {
+    id: "nitro_full_month",
+    tier: "full",
+    label: "XZON Nitro",
+    price: 99,
+    currency: "TRY",
+    days: 30,
+    perks: ["Aurora banner", "2 sunucu boost", "Özel accent", "Profil animasyonu"],
+  },
+};
 
 const COLORS = [
   "#ed4245",
@@ -245,8 +288,21 @@ function makeTag() {
   return String(Math.floor(1000 + Math.random() * 9000));
 }
 
+function effectiveNitroTier(row) {
+  const tier = row.nitro_tier || "none";
+  if (tier === "none") return "none";
+  if (row.nitro_expires_at && row.nitro_expires_at < Date.now()) {
+    db.prepare(
+      `UPDATE web_users SET nitro_tier = 'none', badge = '', banner = '' WHERE id = ?`,
+    ).run(row.id);
+    return "none";
+  }
+  return tier;
+}
+
 function mapUser(row) {
   if (!row) return null;
+  const nitroTier = effectiveNitroTier(row);
   return {
     id: row.id,
     name: row.name,
@@ -259,11 +315,15 @@ function mapUser(row) {
     muted: Boolean(row.muted),
     deafened: Boolean(row.deafened),
     lastSeen: row.last_seen,
-    nitroTier: row.nitro_tier || "none",
-    banner: row.banner || "",
-    badge: row.badge || "",
+    nitroTier,
+    banner: nitroTier === "none" ? "" : row.banner || "",
+    badge: nitroTier === "none" ? "" : row.badge || "",
     accent: row.accent || row.color,
     activity: row.activity || "",
+    username: row.username || null,
+    hasPassword: Boolean(row.password_hash),
+    nitroExpiresAt: nitroTier === "none" ? null : row.nitro_expires_at || null,
+    isGuest: !row.username,
   };
 }
 
@@ -426,32 +486,188 @@ function seedIfEmpty() {
 
 seedIfEmpty();
 
-export function createWebSession(rawName) {
-  const name = String(rawName || "")
-    .trim()
-    .replace(/\s+/g, " ")
-    .slice(0, 24);
-  if (name.length < 2) throw new Error("İsim en az 2 karakter olmalı");
-  if (/[@#:`*]/.test(name)) throw new Error("İsimde geçersiz karakter var");
-
-  const id = crypto.randomUUID();
-  const color = COLORS[Math.floor(Math.random() * COLORS.length)];
+function issueSession(userId) {
   const token = crypto.randomBytes(24).toString("hex");
   const created = now();
   const expires = created + 30 * 24 * 60 * 60 * 1000;
+  db.prepare(
+    "INSERT INTO web_sessions (token, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)",
+  ).run(token, userId, created, expires);
+  db.prepare("UPDATE web_users SET last_seen = ? WHERE id = ?").run(created, userId);
+  return { token, user: getUserById(userId) };
+}
+
+function normalizeUsername(raw) {
+  const username = String(raw || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_\.]/g, "")
+    .slice(0, 24);
+  if (username.length < 3) throw new Error("Kullanıcı adı en az 3 karakter olmalı");
+  if (!/^[a-z]/.test(username)) throw new Error("Kullanıcı adı harfle başlamalı");
+  return username;
+}
+
+function normalizeDisplayName(raw) {
+  const name = String(raw || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .slice(0, 24);
+  if (name.length < 2) throw new Error("Görünen ad en az 2 karakter olmalı");
+  if (/[@#:`*]/.test(name)) throw new Error("Görünen adda geçersiz karakter var");
+  return name;
+}
+
+function normalizePassword(raw) {
+  const password = String(raw || "");
+  if (password.length < 6) throw new Error("Şifre en az 6 karakter olmalı");
+  if (password.length > 72) throw new Error("Şifre çok uzun");
+  return password;
+}
+
+/** Guest join — limited account without password */
+export function createWebSession(rawName) {
+  const name = normalizeDisplayName(rawName);
+  const id = crypto.randomUUID();
+  const color = COLORS[Math.floor(Math.random() * COLORS.length)];
+  const created = now();
   const tag = makeTag();
 
   db.prepare(
     `INSERT INTO web_users
       (id, name, color, created_at, last_seen, tag, bio, status, custom_status, muted, deafened)
      VALUES (?, ?, ?, ?, ?, ?, ?, 'online', '', 0, 0)`,
-  ).run(id, name, color, created, created, tag, "XZON üyesi");
+  ).run(id, name, color, created, created, tag, "XZON misafir");
+
+  return issueSession(id);
+}
+
+export function registerAccount({ username, password, displayName }) {
+  const user = normalizeUsername(username);
+  const pass = normalizePassword(password);
+  const name = normalizeDisplayName(displayName || username);
+  const exists = db.prepare("SELECT id FROM web_users WHERE username = ?").get(user);
+  if (exists) throw new Error("Bu kullanıcı adı alınmış");
+
+  const id = crypto.randomUUID();
+  const color = COLORS[Math.floor(Math.random() * COLORS.length)];
+  const created = now();
+  const tag = makeTag();
+  const hash = bcrypt.hashSync(pass, 10);
 
   db.prepare(
-    "INSERT INTO web_sessions (token, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)",
-  ).run(token, id, created, expires);
+    `INSERT INTO web_users
+      (id, name, color, created_at, last_seen, tag, bio, status, custom_status, muted, deafened,
+       username, password_hash, nitro_tier)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 'online', '', 0, 0, ?, ?, 'none')`,
+  ).run(id, name, color, created, created, tag, "XZON üyesi", user, hash);
 
-  return { token, user: getUserById(id) };
+  return issueSession(id);
+}
+
+export function loginAccount({ username, password }) {
+  const user = normalizeUsername(username);
+  const pass = normalizePassword(password);
+  const row = db.prepare("SELECT * FROM web_users WHERE username = ?").get(user);
+  if (!row?.password_hash) throw new Error("Hesap bulunamadı");
+  if (!bcrypt.compareSync(pass, row.password_hash)) throw new Error("Şifre hatalı");
+  return issueSession(row.id);
+}
+
+export function upgradeGuestToAccount(userId, { username, password, displayName }) {
+  const current = db.prepare("SELECT * FROM web_users WHERE id = ?").get(userId);
+  if (!current) throw new Error("Oturum yok");
+  if (current.username) throw new Error("Zaten hesaplısın");
+  const user = normalizeUsername(username);
+  const pass = normalizePassword(password);
+  const name = displayName ? normalizeDisplayName(displayName) : current.name;
+  if (db.prepare("SELECT id FROM web_users WHERE username = ?").get(user)) {
+    throw new Error("Bu kullanıcı adı alınmış");
+  }
+  const hash = bcrypt.hashSync(pass, 10);
+  db.prepare(
+    `UPDATE web_users
+     SET username = ?, password_hash = ?, name = ?, bio = ?, last_seen = ?
+     WHERE id = ?`,
+  ).run(user, hash, name, "XZON üyesi", now(), userId);
+  return getUserById(userId);
+}
+
+export function changePassword(userId, { currentPassword, newPassword }) {
+  const row = db.prepare("SELECT * FROM web_users WHERE id = ?").get(userId);
+  if (!row?.password_hash) throw new Error("Misafir hesapta şifre yok — önce hesap oluştur");
+  if (!bcrypt.compareSync(String(currentPassword || ""), row.password_hash)) {
+    throw new Error("Mevcut şifre hatalı");
+  }
+  const hash = bcrypt.hashSync(normalizePassword(newPassword), 10);
+  db.prepare("UPDATE web_users SET password_hash = ?, last_seen = ? WHERE id = ?").run(
+    hash,
+    now(),
+    userId,
+  );
+  return { ok: true };
+}
+
+export function listOrders(userId) {
+  return db
+    .prepare(
+      `SELECT id, product, amount, currency, status, created_at AS createdAt, paid_at AS paidAt
+       FROM web_orders WHERE user_id = ? ORDER BY created_at DESC LIMIT 40`,
+    )
+    .all(userId);
+}
+
+export function purchaseNitro(userId, tier, { cardLast4 } = {}) {
+  const user = getUserById(userId);
+  if (!user) throw new Error("Kullanıcı yok");
+  if (user.isGuest) throw new Error("Nitro için hesap oluşturmalısın");
+  const plan = NITRO_PLANS[tier];
+  if (!plan) throw new Error("Geçersiz Nitro planı");
+
+  const orderId = crypto.randomUUID();
+  const created = now();
+  db.prepare(
+    `INSERT INTO web_orders (id, user_id, product, amount, currency, status, meta, created_at)
+     VALUES (?, ?, ?, ?, ?, 'pending', ?, ?)`,
+  ).run(
+    orderId,
+    userId,
+    plan.id,
+    plan.price,
+    plan.currency,
+    JSON.stringify({ cardLast4: String(cardLast4 || "4242").slice(-4), gateway: "xzon_demo_pay" }),
+    created,
+  );
+
+  // Demo ödeme ağ geçidi — gerçek banka/Stripe yok; sipariş ücretli kaydedilir
+  const paidAt = now();
+  db.prepare(
+    `UPDATE web_orders SET status = 'paid', paid_at = ? WHERE id = ?`,
+  ).run(paidAt, orderId);
+
+  const row = db.prepare("SELECT nitro_expires_at AS exp FROM web_users WHERE id = ?").get(userId);
+  const base = Math.max(row?.exp || 0, paidAt);
+  const expires = base + plan.days * 24 * 60 * 60 * 1000;
+  const badge = plan.tier === "full" ? "NITRO" : "CLASSIC";
+  const banner = plan.tier === "full" ? "aurora" : "classic";
+  db.prepare(
+    `UPDATE web_users
+     SET nitro_tier = ?, nitro_expires_at = ?, badge = ?, banner = ?, last_seen = ?
+     WHERE id = ?`,
+  ).run(plan.tier, expires, badge, banner, paidAt, userId);
+
+  return {
+    order: {
+      id: orderId,
+      product: plan.id,
+      amount: plan.price,
+      currency: plan.currency,
+      status: "paid",
+      paidAt,
+    },
+    user: getUserById(userId),
+    plan,
+  };
 }
 
 export function getSessionUser(token) {
@@ -492,13 +708,10 @@ export function updateProfile(userId, patch = {}) {
       ? String(patch.customStatus).slice(0, 80)
       : user.customStatus;
 
-  const nitroTier = ["none", "classic", "full"].includes(patch.nitroTier)
-    ? patch.nitroTier
-    : user.nitroTier || "none";
-  const banner =
-    patch.banner !== undefined ? String(patch.banner).slice(0, 80) : user.banner || "";
-  const badge =
-    patch.badge !== undefined ? String(patch.badge).slice(0, 24) : user.badge || "";
+  // Nitro tier only changes via paid purchase — ignore client nitroTier patches
+  const nitroTier = user.nitroTier || "none";
+  const banner = user.banner || "";
+  const badge = user.badge || "";
   const accent =
     patch.accent !== undefined ? String(patch.accent).slice(0, 32) : user.accent || user.color;
   const activity =
@@ -1183,11 +1396,8 @@ export function createChannel(userId, guildId, { name, type = "text", topic = ""
 }
 
 export function boostGuild(userId, guildId) {
-  const user = getUserById(userId);
+  const user = assertNitroActive(userId);
   if (!user) throw new Error("Kullanıcı yok");
-  if ((user.nitroTier || "none") === "none") {
-    throw new Error("Boost için Nitro gerekli");
-  }
   if (!userInGuild(userId, guildId)) throw new Error("Bu sunucuda değilsin");
   if (isStaticGuild(guildId)) {
     return { guild: listGuildsForUser(userId).find((g) => g.id === guildId), boosted: true };
@@ -1215,14 +1425,14 @@ export function boostGuild(userId, guildId) {
   };
 }
 
-export function activateNitro(userId, tier = "full") {
-  const next = ["classic", "full"].includes(tier) ? tier : "full";
-  const banner =
-    next === "full"
-      ? "aurora"
-      : "classic";
-  const badge = next === "full" ? "NITRO" : "CLASSIC";
-  return updateProfile(userId, { nitroTier: next, banner, badge });
+export function activateNitro(_userId, _tier = "full") {
+  throw new Error("Nitro artık ücretli — Ödeme ile satın al");
+}
+
+export function assertNitroActive(userId) {
+  const user = getUserById(userId);
+  if (!user || user.nitroTier === "none") throw new Error("Aktif Nitro gerekli");
+  return user;
 }
 
 export function sendFriendRequest(fromId, toId) {

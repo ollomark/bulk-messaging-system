@@ -1292,3 +1292,45 @@ button { border: 0; background: none; cursor: pointer; }
 .nsfw-tag {
   margin-left: 6px; font-size: 10px; font-weight: 800; color: #ff8a95;
 }
+
+/* ===== Auth + paid Nitro v11 ===== */
+.auth-tabs {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 14px;
+}
+.auth-tabs button {
+  height: 38px; border-radius: 12px; font-weight: 700; font-size: 12px;
+  color: var(--text-3); border: 1px solid var(--line); background: rgba(255,255,255,0.03);
+}
+.auth-tabs button.on {
+  color: #061018; border-color: transparent;
+  background: linear-gradient(135deg, #3dffa8, #6ea8ff);
+}
+.auth-pane { display: grid; gap: 10px; }
+.auth-pane.hidden { display: none !important; }
+.boot-card label {
+  display: grid; gap: 6px; font-size: 12px; font-weight: 700; color: var(--text-3);
+}
+.boot-card input {
+  height: 46px; border-radius: 12px; border: 1px solid var(--line);
+  background: rgba(5,7,11,0.7); color: var(--text); padding: 0 12px; font: inherit;
+}
+.nitro-pay { display: grid; gap: 10px; margin-top: 12px; }
+.nitro-pay.hidden { display: none !important; }
+.nitro-pay label {
+  display: grid; gap: 6px; font-size: 12px; font-weight: 700; color: var(--text-3);
+}
+.nitro-pay input {
+  height: 44px; border-radius: 12px; border: 1px solid var(--line);
+  background: rgba(5,7,11,0.7); color: var(--text); padding: 0 12px; font: inherit;
+}
+.pay-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.guest-banner {
+  margin: 8px 12px 0; padding: 10px 12px; border-radius: 12px;
+  border: 1px solid rgba(255,193,74,0.35);
+  background: rgba(255,193,74,0.08); color: #ffe6a8; font-size: 12px;
+  display: flex; justify-content: space-between; gap: 8px; align-items: center;
+}
+.guest-banner button {
+  height: 28px; padding: 0 10px; border-radius: 999px; font-weight: 800; font-size: 11px;
+  color: #1a1205; background: #ffc14a;
+}

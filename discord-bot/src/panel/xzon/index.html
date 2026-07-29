@@ -12,7 +12,7 @@
       href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="/xzon/css/app.css?v=10" />
+    <link rel="stylesheet" href="/xzon/css/app.css?v=11" />
   </head>
   <body>
     <div id="boot" class="boot">
@@ -20,33 +20,51 @@
       <div class="boot-grid" aria-hidden="true"></div>
       <div class="boot-shell">
         <aside class="boot-art">
-          <div class="boot-badge">LIVE COMMUNITY</div>
+          <div class="boot-badge">XZON ACCOUNTS</div>
           <div class="boot-logo">
             <span>XZ</span>
           </div>
           <h2>XZON</h2>
-          <p>Premium topluluk deneyimi. Sunucu kur, davet et, Nitro ile parlat — Discord köşesi senin uygulamanda.</p>
+          <p>Hesap aç, sunucu kur, paralı Nitro al. Gmail / telefon onayı yok — sadece kullanıcı adı ve şifre.</p>
           <ul class="boot-points">
-            <li>Gerçek zamanlı mesajlaşma</li>
-            <li>Sunucu kur · davet · boost</li>
-            <li>Nitro · profil · ses odaları</li>
+            <li>Şifreli hesap sistemi</li>
+            <li>Paralı Nitro · boost · sunucu</li>
+            <li>Discord seviyesinde canlı sohbet</li>
           </ul>
         </aside>
-        <form id="joinForm" class="boot-card" autocomplete="nickname">
-          <p class="eyebrow">Hesapsız giriş</p>
-          <h1>Aramıza katıl</h1>
-          <p class="sub">Görünen adını seç, saniyeler içinde sohbete düş.</p>
-          <label>
-            Görünen ad
-            <input id="displayName" name="displayName" maxlength="24" minlength="2" placeholder="Örn. Nova" required autofocus />
-          </label>
-          <button type="submit" id="joinBtn" class="btn-primary">
-            <span>XZON’a Gir</span>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
-          </button>
+        <div class="boot-card">
+          <div class="auth-tabs" id="authTabs">
+            <button type="button" class="on" data-auth="register">Hesap Aç</button>
+            <button type="button" data-auth="login">Giriş Yap</button>
+            <button type="button" data-auth="guest">Misafir</button>
+          </div>
+          <form id="registerForm" class="auth-pane" autocomplete="on">
+            <p class="eyebrow">Yeni hesap</p>
+            <h1>Kayıt ol</h1>
+            <p class="sub">Doğrulama yok. Kullanıcı adı + şifre yeterli.</p>
+            <label>Kullanıcı adı<input id="regUser" name="username" maxlength="24" minlength="3" placeholder="nova_xd" required autocomplete="username" /></label>
+            <label>Görünen ad<input id="regName" name="displayName" maxlength="24" minlength="2" placeholder="Nova" required autocomplete="nickname" /></label>
+            <label>Şifre<input id="regPass" name="password" type="password" minlength="6" placeholder="En az 6 karakter" required autocomplete="new-password" /></label>
+            <button type="submit" id="regBtn" class="btn-primary"><span>Hesap Oluştur</span></button>
+          </form>
+          <form id="loginForm" class="auth-pane hidden" autocomplete="on">
+            <p class="eyebrow">Hoş geldin</p>
+            <h1>Giriş yap</h1>
+            <p class="sub">Hesabınla XZON’a devam et.</p>
+            <label>Kullanıcı adı<input id="loginUser" name="username" maxlength="24" required autocomplete="username" /></label>
+            <label>Şifre<input id="loginPass" name="password" type="password" minlength="6" required autocomplete="current-password" /></label>
+            <button type="submit" id="loginBtn" class="btn-primary"><span>Giriş Yap</span></button>
+          </form>
+          <form id="joinForm" class="auth-pane hidden" autocomplete="nickname">
+            <p class="eyebrow">Hızlı bakış</p>
+            <h1>Misafir gir</h1>
+            <p class="sub">Nitro ve bazı özellikler için sonra hesap açman gerekir.</p>
+            <label>Görünen ad<input id="displayName" name="displayName" maxlength="24" minlength="2" placeholder="Örn. Nova" required /></label>
+            <button type="submit" id="joinBtn" class="btn-primary"><span>Misafir Gir</span></button>
+          </form>
           <p class="boot-error hidden" id="bootError"></p>
-          <p class="hint">Saygı · spam yok · reklam yasak</p>
-        </form>
+          <p class="hint">E-posta / telefon onayı yok · Saygı · spam yasak</p>
+        </div>
       </div>
     </div>
 
@@ -215,22 +233,33 @@
         <div class="nitro-hero">
           <span class="nitro-orb">N</span>
           <div>
-            <p class="eyebrow">XZON NITRO</p>
-            <h2>Profilini parlat</h2>
-            <p>Rozet, özel banner, sunucu boost ve renkli tag — Discord Nitro hissi, XZON’da.</p>
+            <p class="eyebrow">XZON NITRO · ÜCRETLİ</p>
+            <h2>Abonelik satın al</h2>
+            <p>Aylık ücretli Nitro. Kart ile öde (demo gateway) — süre 30 gün.</p>
           </div>
         </div>
-        <div class="nitro-plans">
+        <div class="nitro-plans" id="nitroPlans">
           <button type="button" class="nitro-plan" data-tier="classic">
-            <strong>Classic</strong>
-            <span>Rozet · klasik banner</span>
+            <strong>Classic · ₺49/ay</strong>
+            <span>Rozet · klasik banner · 1 boost</span>
           </button>
           <button type="button" class="nitro-plan featured" data-tier="full">
-            <strong>Full Nitro</strong>
-            <span>Aurora banner · boost · accent</span>
+            <strong>Nitro · ₺99/ay</strong>
+            <span>Aurora · 2 boost · accent</span>
           </button>
         </div>
-        <p class="nitro-note">Demo ortamında tek tıkla aktif edilir. Gerçek ödeme yok.</p>
+        <form id="nitroPayForm" class="nitro-pay hidden">
+          <label>Kart üzerindeki ad<input id="payName" maxlength="40" placeholder="Ad Soyad" required /></label>
+          <label>Kart numarası<input id="payCard" maxlength="19" placeholder="4242 4242 4242 4242" required /></label>
+          <div class="pay-row">
+            <label>SKT<input id="payExp" maxlength="5" placeholder="12/28" required /></label>
+            <label>CVC<input id="payCvc" maxlength="4" placeholder="123" required /></label>
+          </div>
+          <input type="hidden" id="payTier" value="full" />
+          <button type="submit" class="btn-primary" id="payBtn"><span>Ödemeyi Tamamla</span></button>
+          <p class="nitro-note">Demo ödeme: gerçek bankadan çekim yok, sipariş ücretli kaydedilir.</p>
+        </form>
+        <p class="nitro-note" id="nitroStatus"></p>
       </div>
     </div>
 
@@ -272,6 +301,6 @@
       </div>
     </div>
     <div id="toast" class="toast hidden"></div>
-    <script src="/xzon/js/app.js?v=10" type="module"></script>
+    <script src="/xzon/js/app.js?v=11" type="module"></script>
   </body>
 </html>

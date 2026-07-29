@@ -1,15 +1,21 @@
 import {
   GUILDS,
   WEB_CHANNELS,
-  activateNitro,
+  NITRO_PLANS,
   blockUser,
   boostGuild,
+  changePassword,
   channelExists,
   channelsForGuild,
   createChannel,
   createGuild,
   createInvite,
   createWebSession,
+  loginAccount,
+  listOrders,
+  purchaseNitro,
+  registerAccount,
+  upgradeGuestToAccount,
   deleteMessage,
   discoverGuilds,
   editMessage,
@@ -92,7 +98,9 @@ export function mountChatRoutes(app) {
       clients: clientCount(),
       channels: WEB_CHANNELS.length,
       guilds: GUILDS.length,
-      version: "xzon-10",
+      version: "xzon-11",
+      auth: "accounts",
+      nitro: "paid",
     });
   });
 
@@ -206,32 +214,99 @@ export function mountChatRoutes(app) {
     }
   });
 
-  app.post("/xzon/api/nitro", (req, res) => {
+  app.post("/xzon/api/nitro", (_req, res) => {
+    return res.status(402).json({
+      error: "Nitro ücretli. Satın alma: POST /xzon/api/nitro/purchase",
+      plans: Object.values(NITRO_PLANS),
+    });
+  });
+
+  function setAuthCookie(res, token) {
+    res.cookie("xzon_token", token, {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 30 * 24 * 60 * 60 * 1000,
+    });
+  }
+
+  app.post("/xzon/api/session", (req, res) => {
+    try {
+      const { name } = req.body || {};
+      const session = createWebSession(name);
+      setAuthCookie(res, session.token);
+      pushPresence();
+      return res.json({ ok: true, user: session.user, token: session.token, mode: "guest" });
+    } catch (error) {
+      return res.status(400).json({ error: error.message || "Giriş başarısız" });
+    }
+  });
+
+  app.post("/xzon/api/auth/register", (req, res) => {
+    try {
+      const session = registerAccount(req.body || {});
+      setAuthCookie(res, session.token);
+      pushPresence();
+      return res.json({ ok: true, user: session.user, token: session.token, mode: "account" });
+    } catch (error) {
+      return res.status(400).json({ error: error.message || "Kayıt başarısız" });
+    }
+  });
+
+  app.post("/xzon/api/auth/login", (req, res) => {
+    try {
+      const session = loginAccount(req.body || {});
+      setAuthCookie(res, session.token);
+      pushPresence();
+      return res.json({ ok: true, user: session.user, token: session.token, mode: "account" });
+    } catch (error) {
+      return res.status(400).json({ error: error.message || "Giriş başarısız" });
+    }
+  });
+
+  app.post("/xzon/api/auth/upgrade", (req, res) => {
     const user = chatUser(req, res);
     if (!user) return;
     try {
-      const updated = activateNitro(user.id, req.body?.tier || "full");
-      broadcast("user_update", { user: updated });
+      const updated = upgradeGuestToAccount(user.id, req.body || {});
       return res.json({ ok: true, user: updated });
     } catch (error) {
       return res.status(400).json({ error: error.message });
     }
   });
 
-  app.post("/xzon/api/session", (req, res) => {
+  app.post("/xzon/api/auth/password", (req, res) => {
+    const user = chatUser(req, res);
+    if (!user) return;
     try {
-      const { name } = req.body || {};
-      const session = createWebSession(name);
-      res.cookie("xzon_token", session.token, {
-        httpOnly: true,
-        sameSite: "lax",
-        secure: process.env.NODE_ENV === "production",
-        maxAge: 30 * 24 * 60 * 60 * 1000,
-      });
-      pushPresence();
-      return res.json({ ok: true, user: session.user, token: session.token });
+      changePassword(user.id, req.body || {});
+      return res.json({ ok: true });
     } catch (error) {
-      return res.status(400).json({ error: error.message || "Giriş başarısız" });
+      return res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.get("/xzon/api/nitro/plans", (_req, res) => {
+    res.json({ plans: Object.values(NITRO_PLANS) });
+  });
+
+  app.get("/xzon/api/billing/orders", (req, res) => {
+    const user = chatUser(req, res);
+    if (!user) return;
+    return res.json({ orders: listOrders(user.id), plans: Object.values(NITRO_PLANS) });
+  });
+
+  app.post("/xzon/api/nitro/purchase", (req, res) => {
+    const user = chatUser(req, res);
+    if (!user) return;
+    try {
+      const result = purchaseNitro(user.id, String(req.body?.tier || "full"), {
+        cardLast4: req.body?.cardLast4,
+      });
+      broadcast("user_update", { user: result.user });
+      return res.json({ ok: true, ...result });
+    } catch (error) {
+      return res.status(400).json({ error: error.message });
     }
   });
 

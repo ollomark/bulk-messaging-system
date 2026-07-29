@@ -1763,6 +1763,20 @@ function openGuildModal(tab = "create") {
 
 function openNitroModal() {
   els.nitroModal.classList.remove("hidden");
+  $("nitroPayForm")?.classList.add("hidden");
+  const status = $("nitroStatus");
+  if (status) {
+    if (state.user?.isGuest) {
+      status.textContent = "Nitro için önce hesap oluştur (kullanıcı adı + şifre).";
+    } else if (state.user?.nitroTier && state.user.nitroTier !== "none") {
+      const exp = state.user.nitroExpiresAt
+        ? new Date(state.user.nitroExpiresAt).toLocaleDateString("tr-TR")
+        : "—";
+      status.textContent = `Aktif: ${state.user.nitroTier.toUpperCase()} · bitiş ${exp}`;
+    } else {
+      status.textContent = "Plan seç → kart bilgisi → öde (₺49 / ₺99).";
+    }
+  }
 }
 
 async function copyInvite(guildId) {
@@ -1818,16 +1832,29 @@ async function createChannelPrompt(guildId) {
   }
 }
 
-async function activateNitro(tier) {
-  try {
-    const data = await api("/xzon/api/nitro", { method: "POST", body: { tier } });
-    state.user = data.user;
-    syncMe();
+function beginNitroCheckout(tier) {
+  if (state.user?.isGuest) {
+    toast("Önce hesap oluştur");
+    openSettings("account");
     els.nitroModal.classList.add("hidden");
-    toast(tier === "full" ? "Full Nitro aktif" : "Nitro Classic aktif");
-  } catch (error) {
-    toast(error.message);
+    return;
   }
+  $("payTier").value = tier === "classic" ? "classic" : "full";
+  $("nitroPayForm")?.classList.remove("hidden");
+  $("nitroStatus").textContent =
+    tier === "classic" ? "Classic · ₺49 / 30 gün" : "Nitro · ₺99 / 30 gün";
+}
+
+async function purchaseNitro(tier, card) {
+  const data = await api("/xzon/api/nitro/purchase", {
+    method: "POST",
+    body: { tier, cardLast4: String(card || "").replace(/\D/g, "").slice(-4) },
+  });
+  state.user = data.user;
+  syncMe();
+  els.nitroModal.classList.add("hidden");
+  toast(`Ödeme OK · ${data.plan?.label || "Nitro"} aktif`);
+  return data;
 }
 
 function showEmoji(anchor, onPick, { compose = false } = {}) {
@@ -1873,10 +1900,11 @@ function showEmoji(anchor, onPick, { compose = false } = {}) {
   });
 }
 
-function openSettings(tab = "account") {
+async function openSettings(tab = "account") {
   const tabs = [
     ["account", "Hesabım"],
     ["profile", "Profil"],
+    ["billing", "Faturalama"],
     ["nitro", "Nitro"],
     ["status", "Durum"],
     ["voice", "Ses"],
@@ -1893,10 +1921,42 @@ function openSettings(tab = "account") {
     b.addEventListener("click", () => openSettings(b.dataset.tab)),
   );
 
+  let ordersHtml = "";
+  if (tab === "billing") {
+    try {
+      const bill = await api("/xzon/api/billing/orders");
+      ordersHtml = (bill.orders || [])
+        .map(
+          (o) =>
+            `<div class="inbox-item"><strong>${esc(o.product)}</strong>₺${o.amount} · ${esc(o.status)} · ${new Date(o.createdAt).toLocaleString("tr-TR")}</div>`,
+        )
+        .join("") || `<p style="color:var(--text-3)">Henüz sipariş yok.</p>`;
+    } catch {
+      ordersHtml = `<p style="color:var(--text-3)">Faturalama yüklenemedi.</p>`;
+    }
+  }
+
+  const accountPane = u.isGuest
+    ? `<h2>Misafir hesap</h2>
+       <p style="color:var(--text-3);line-height:1.5">Kalıcı hesap için kullanıcı adı + şifre oluştur. E-posta/telefon onayı yok.</p>
+       <label>Kullanıcı adı<input id="upUser" maxlength="24" placeholder="nova_xd" /></label>
+       <label>Görünen ad<input id="upName" maxlength="24" value="${esc(u.name)}" /></label>
+       <label>Şifre<input id="upPass" type="password" minlength="6" /></label>
+       <button class="save" id="upgradeAccount" type="button">Hesabı Oluştur</button>`
+    : `<h2>Hesabım</h2>
+       <p style="color:var(--text-3)">@${esc(u.username || "")} · ${esc(u.name)}#${esc(u.tag)}</p>
+       <label>Görünen ad<input id="setName" value="${esc(u.name)}" /></label>
+       <button class="save" id="saveAccount" type="button">Kaydet</button>
+       <h3 style="margin-top:22px">Şifre değiştir</h3>
+       <label>Mevcut şifre<input id="curPass" type="password" /></label>
+       <label>Yeni şifre<input id="newPass" type="password" minlength="6" /></label>
+       <button class="save" id="savePass" type="button">Şifreyi Güncelle</button>`;
+
   const panes = {
-    account: `<h2>Hesabım</h2><label>Kullanıcı adı<input id="setName" value="${esc(u.name)}" /></label><button class="save" id="saveAccount" type="button">Kaydet Değişiklikleri</button>`,
+    account: accountPane,
     profile: `<h2>Profil</h2><label>Hakkında<textarea id="setBio">${esc(u.bio || "")}</textarea></label><label>Özel durum<input id="setCustom" value="${esc(u.customStatus || "")}" maxlength="80" /></label><button class="save" id="saveProfile" type="button">Kaydet</button>`,
-    nitro: `<h2>XZON Nitro</h2><p style="color:var(--text-3);line-height:1.5;margin:0 0 14px">Durum: <strong>${esc(u.nitroTier || "none")}</strong>${u.badge ? ` · ${esc(u.badge)}` : ""}</p><button class="save" id="openNitroFromSettings" type="button">Nitro Mağazası</button>`,
+    billing: `<h2>Faturalama</h2><p style="color:var(--text-3);margin:0 0 12px">XZON Nitro siparişlerin. Classic ₺49 · Nitro ₺99 / 30 gün.</p>${ordersHtml}<button class="save" id="openNitroFromSettings" type="button" style="margin-top:12px">Nitro Satın Al</button>`,
+    nitro: `<h2>XZON Nitro</h2><p style="color:var(--text-3);line-height:1.5;margin:0 0 14px">Durum: <strong>${esc(u.nitroTier || "none")}</strong>${u.nitroExpiresAt ? ` · bitiş ${new Date(u.nitroExpiresAt).toLocaleDateString("tr-TR")}` : ""}</p><button class="save" id="openNitroFromSettings2" type="button">Satın Al / Yenile</button>`,
     status: `<h2>Durum</h2><label>Görünürlük<select id="setStatus">${["online", "idle", "dnd", "invisible"].map((s) => `<option value="${s}" ${u.status === s ? "selected" : ""}>${STATUS[s]}</option>`).join("")}</select></label><label>Aktivite / Playing<input id="setActivity" value="${esc(u.activity || "")}" maxlength="80" placeholder="Valorant oynuyor" /></label><button class="save" id="saveStatus" type="button">Kaydet</button>`,
     voice: `<h2>Ses</h2><p style="color:var(--text-muted);line-height:1.5">Ses odalarına katılınca alt panelde bağlantı görünür. Mikrofon ve kulaklık durumun senkronlanır.</p>`,
     logout: `<h2>Çıkış Yap</h2><p style="color:var(--text-muted)">Oturumu kapatmak istediğine emin misin?</p><button class="save" id="confirmLogout" type="button" style="background:var(--danger)">Çıkış Yap</button>`,
@@ -1908,6 +1968,37 @@ function openSettings(tab = "account") {
     state.user = (await api("/xzon/api/me", { method: "PATCH", body: { name: $("setName").value } })).user;
     syncMe();
     toast("Kaydedildi");
+  });
+  $("upgradeAccount")?.addEventListener("click", async () => {
+    try {
+      state.user = (
+        await api("/xzon/api/auth/upgrade", {
+          method: "POST",
+          body: {
+            username: $("upUser").value,
+            password: $("upPass").value,
+            displayName: $("upName").value,
+          },
+        })
+      ).user;
+      syncMe();
+      renderGuestBanner();
+      toast("Hesap oluşturuldu");
+      openSettings("account");
+    } catch (error) {
+      toast(error.message);
+    }
+  });
+  $("savePass")?.addEventListener("click", async () => {
+    try {
+      await api("/xzon/api/auth/password", {
+        method: "POST",
+        body: { currentPassword: $("curPass").value, newPassword: $("newPass").value },
+      });
+      toast("Şifre güncellendi");
+    } catch (error) {
+      toast(error.message);
+    }
   });
   $("saveProfile")?.addEventListener("click", async () => {
     state.user = (
@@ -1933,7 +2024,27 @@ function openSettings(tab = "account") {
     els.settingsModal.classList.add("hidden");
     openNitroModal();
   });
+  $("openNitroFromSettings2")?.addEventListener("click", () => {
+    els.settingsModal.classList.add("hidden");
+    openNitroModal();
+  });
   $("confirmLogout")?.addEventListener("click", logout);
+}
+
+function renderGuestBanner() {
+  let bar = $("guestBanner");
+  if (!state.user?.isGuest) {
+    bar?.remove();
+    return;
+  }
+  if (!bar) {
+    bar = document.createElement("div");
+    bar.id = "guestBanner";
+    bar.className = "guest-banner";
+    els.chat?.querySelector(".chat-body")?.prepend(bar);
+  }
+  bar.innerHTML = `<span>Misafirsin — Nitro ve kalıcı hesap için kayıt ol.</span><button type="button" id="guestUpgradeBtn">Hesap Aç</button>`;
+  $("guestUpgradeBtn")?.addEventListener("click", () => openSettings("account"));
 }
 
 async function logout() {
@@ -1981,6 +2092,7 @@ async function bootstrap() {
   startPresence();
   setLive(true, `canlı · ${state.online.length} online`);
   syncFab();
+  renderGuestBanner();
   if (window.matchMedia("(max-width: 900px)").matches) {
     toast("Menü butonu her zaman altta — kaybolmaz");
   }
@@ -2003,7 +2115,67 @@ function startPresence() {
 }
 
 /* events */
-els.joinForm.addEventListener("submit", async (e) => {
+function setAuthTab(tab) {
+  document.querySelectorAll("#authTabs [data-auth]").forEach((b) => {
+    b.classList.toggle("on", b.dataset.auth === tab);
+  });
+  $("registerForm")?.classList.toggle("hidden", tab !== "register");
+  $("loginForm")?.classList.toggle("hidden", tab !== "login");
+  $("joinForm")?.classList.toggle("hidden", tab !== "guest");
+  els.bootError?.classList.add("hidden");
+}
+document.querySelectorAll("#authTabs [data-auth]").forEach((btn) => {
+  btn.addEventListener("click", () => setAuthTab(btn.dataset.auth));
+});
+
+async function finishAuth(data, hello) {
+  state.token = data.token;
+  localStorage.setItem("xzon_token", data.token);
+  await bootstrap();
+  toast(hello);
+}
+
+$("registerForm")?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  $("regBtn").disabled = true;
+  els.bootError.classList.add("hidden");
+  try {
+    const data = await api("/xzon/api/auth/register", {
+      method: "POST",
+      body: {
+        username: $("regUser").value,
+        password: $("regPass").value,
+        displayName: $("regName").value,
+      },
+    });
+    await finishAuth(data, "Hesap oluşturuldu — XZON’a hoş geldin");
+  } catch (error) {
+    els.bootError.textContent = error.message;
+    els.bootError.classList.remove("hidden");
+  } finally {
+    $("regBtn").disabled = false;
+  }
+});
+
+$("loginForm")?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  $("loginBtn").disabled = true;
+  els.bootError.classList.add("hidden");
+  try {
+    const data = await api("/xzon/api/auth/login", {
+      method: "POST",
+      body: { username: $("loginUser").value, password: $("loginPass").value },
+    });
+    await finishAuth(data, "Tekrar hoş geldin");
+  } catch (error) {
+    els.bootError.textContent = error.message;
+    els.bootError.classList.remove("hidden");
+  } finally {
+    $("loginBtn").disabled = false;
+  }
+});
+
+els.joinForm?.addEventListener("submit", async (e) => {
   e.preventDefault();
   els.joinBtn.disabled = true;
   els.bootError.classList.add("hidden");
@@ -2012,10 +2184,7 @@ els.joinForm.addEventListener("submit", async (e) => {
       method: "POST",
       body: { name: els.displayName.value },
     });
-    state.token = data.token;
-    localStorage.setItem("xzon_token", data.token);
-    await bootstrap();
-    toast("XZON’a hoş geldin");
+    await finishAuth(data, "Misafir olarak girdin — hesap açmayı unutma");
   } catch (error) {
     els.bootError.textContent = error.message;
     els.bootError.classList.remove("hidden");
@@ -2101,7 +2270,18 @@ els.nitroBtn?.addEventListener("click", () => openNitroModal());
 $("closeGuildModal")?.addEventListener("click", () => els.guildModal.classList.add("hidden"));
 $("closeNitroModal")?.addEventListener("click", () => els.nitroModal.classList.add("hidden"));
 els.nitroModal?.querySelectorAll("[data-tier]").forEach((btn) => {
-  btn.addEventListener("click", () => activateNitro(btn.dataset.tier));
+  btn.addEventListener("click", () => beginNitroCheckout(btn.dataset.tier));
+});
+$("nitroPayForm")?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  $("payBtn").disabled = true;
+  try {
+    await purchaseNitro($("payTier").value, $("payCard").value);
+  } catch (error) {
+    toast(error.message);
+  } finally {
+    $("payBtn").disabled = false;
+  }
 });
 $("inboxBtn")?.addEventListener("click", () => openInbox());
 $("scrollTopBtn")?.addEventListener("click", () => {
@@ -2317,7 +2497,8 @@ document.addEventListener("click", (e) => {
 })();
 
 // Visible build marker for cache debugging
-console.info("[XZON] client v10 discord-parity ready");
+console.info("[XZON] client v11 accounts+paid-nitro ready");
+setAuthTab("register");
 
 // Category collapse
 document.addEventListener("click", (e) => {
