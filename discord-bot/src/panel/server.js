@@ -72,6 +72,25 @@ export function startPanelServer(client) {
     }),
   );
 
+  // Sahte XZON panel — sadece key giriş ekranı (gerçek oturum yok)
+  const xzonPanelDir = path.join(__dirname, "xzon-panel");
+  const sendXzonPanel = (_req, res) => {
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+    res.sendFile(path.join(xzonPanelDir, "index.html"));
+  };
+  app.get("/xzon-panel", sendXzonPanel);
+  app.get("/xzon-panel/", sendXzonPanel);
+  app.use(
+    "/xzon-panel",
+    express.static(xzonPanelDir, {
+      index: false,
+      redirect: false,
+      setHeaders(res) {
+        res.setHeader("Cache-Control", "no-cache");
+      },
+    }),
+  );
+
   app.get("/panel", (_req, res) => {
     res.sendFile(path.join(panelDir, "index.html"));
   });

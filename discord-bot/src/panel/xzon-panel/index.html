@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#061018" />
+    <meta name="description" content="XZON Panel — anahtar ile giriş" />
+    <title>XZON Panel</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Syne:wght@700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/xzon-panel/panel.css?v=1" />
+  </head>
+  <body>
+    <div class="stage" aria-hidden="true">
+      <div class="wash"></div>
+      <div class="mesh"></div>
+      <div class="scan"></div>
+    </div>
+
+    <main class="gate">
+      <p class="mark">XZON</p>
+      <h1>Panel</h1>
+      <p class="lead">Erişim anahtarını gir. Oturum sahte — sadece giriş ekranı.</p>
+
+      <form id="keyForm" class="key-form" autocomplete="off">
+        <label class="sr" for="accessKey">Erişim anahtarı</label>
+        <div class="key-shell">
+          <span class="key-glyph" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <circle cx="8" cy="12" r="3.2" />
+              <path d="M11 12h10M17 12v3M20 12v2" stroke-linecap="round" />
+            </svg>
+          </span>
+          <input
+            id="accessKey"
+            name="key"
+            type="password"
+            inputmode="text"
+            maxlength="64"
+            placeholder="XZON-XXXX-XXXX-XXXX"
+            required
+            autocomplete="off"
+            spellcheck="false"
+          />
+        </div>
+        <button type="submit" class="enter" id="enterBtn">
+          <span class="enter-label">Giriş Yap</span>
+          <span class="enter-spin" aria-hidden="true"></span>
+        </button>
+      </form>
+
+      <p class="status" id="status" role="status" aria-live="polite"></p>
+    </main>
+
+    <script src="/xzon-panel/panel.js?v=1" type="module"></script>
+  </body>
+</html>
