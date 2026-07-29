@@ -632,6 +632,32 @@ export function searchMessages(channelId, query, viewerId = null) {
   return hydrateMessages(rows.reverse(), viewerId);
 }
 
+export function listMentions(userId, limit = 30) {
+  const user = getUserById(userId);
+  if (!user) return [];
+  const channels = listChannelsForUser(userId)
+    .filter((c) => c.type === "text")
+    .map((c) => c.id);
+  const dmIds = db
+    .prepare("SELECT channel_id AS id FROM web_dm_peers WHERE user_a = ? OR user_b = ?")
+    .all(userId, userId)
+    .map((r) => r.id);
+  const all = [...new Set([...channels, ...dmIds])];
+  if (!all.length) return [];
+  const placeholders = all.map(() => "?").join(",");
+  const needle = `%@${user.name}%`;
+  const rows = db
+    .prepare(
+      `SELECT * FROM web_messages
+       WHERE deleted = 0 AND channel_id IN (${placeholders})
+         AND content LIKE ? AND user_id != ?
+       ORDER BY created_at DESC
+       LIMIT ?`,
+    )
+    .all(...all, needle, userId, Math.min(Math.max(limit, 1), 50));
+  return hydrateMessages(rows, userId);
+}
+
 export function getPinnedMessages(channelId, viewerId = null) {
   const rows = db
     .prepare(

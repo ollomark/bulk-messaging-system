@@ -56,9 +56,17 @@ const els = {
   nitroModal: $("nitroModal"),
   sidebarTools: $("sidebarTools"),
   membersCloseBtn: $("membersCloseBtn"),
+  mentionPop: $("mentionPop"),
+  ctxMenu: $("ctxMenu"),
+  lightbox: $("lightbox"),
+  charCount: $("charCount"),
+  sheetTitle: $("sheetTitle"),
+  soundToggleBtn: $("soundToggleBtn"),
 };
 
 const GUILD_COLORS = ["#5865f2", "#ed4245", "#3ba55c", "#faa61a", "#eb459e", "#00a8fc", "#9b59b6", "#1abc9c"];
+const IMG_RE = /https?:\/\/\S+\.(?:png|jpe?g|gif|webp)(?:\?\S*)?/i;
+const URL_RE = /https?:\/\/[^\s<]+/i;
 
 const state = {
   user: null,
@@ -83,6 +91,9 @@ const state = {
   stickBottom: true,
   loadingOlder: false,
   switching: false,
+  lastReadAt: Number(localStorage.getItem("xzon_last_read") || 0),
+  soundOn: localStorage.getItem("xzon_sound") !== "0",
+  unreadDividerAt: null,
 };
 
 function toast(text) {
@@ -211,14 +222,69 @@ function channelMeta(id = state.channelId) {
 
 function nearBottom() {
   const el = els.messages;
-  return el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+  if (!el) return true;
+  return el.scrollHeight - el.scrollTop - el.clientHeight < 140;
 }
 
 function scrollBottom(force = false) {
-  if (force || state.stickBottom) {
-    els.messages.scrollTop = els.messages.scrollHeight;
-    els.jumpBtn.classList.add("hidden");
+  if (!(force || state.stickBottom) || !els.messages) return;
+  const el = els.messages;
+  const go = () => {
+    el.scrollTop = el.scrollHeight + 9999;
+    els.jumpBtn?.classList.add("hidden");
+    state.stickBottom = true;
+  };
+  go();
+  requestAnimationFrame(go);
+}
+
+function resizeComposer() {
+  const ta = els.messageInput;
+  if (!ta || ta.tagName !== "TEXTAREA") return;
+  ta.style.height = "auto";
+  ta.style.height = `${Math.min(140, Math.max(24, ta.scrollHeight))}px`;
+  if (els.charCount) els.charCount.textContent = `${ta.value.length}/1800`;
+}
+
+function userRole(userId) {
+  if (userId === "system") return { label: "BOT", cls: "owner" };
+  const guild = state.guilds.find((g) => g.id === state.guildId);
+  if (guild?.ownerId && guild.ownerId === userId) return { label: "OWNER", cls: "owner" };
+  const u = [...state.online, ...state.offline, state.user].find((x) => x?.id === userId);
+  if (u?.nitroTier && u.nitroTier !== "none") return { label: u.badge || "NITRO", cls: "nitro" };
+  return null;
+}
+
+function embedHtml(content) {
+  if (!content) return "";
+  const img = content.match(IMG_RE)?.[0];
+  if (img) {
+    return `<img class="embed-img" src="${esc(img)}" alt="medya" loading="lazy" data-lightbox="${esc(img)}" />`;
   }
+  const url = content.match(URL_RE)?.[0];
+  if (!url) return "";
+  let host = url;
+  try {
+    host = new URL(url).hostname;
+  } catch { /* ignore */ }
+  return `<div class="embed"><div class="embed-host">${esc(host)}</div><a href="${esc(url)}" target="_blank" rel="noreferrer">${esc(url)}</a></div>`;
+}
+
+function playPing() {
+  if (!state.soundOn) return;
+  try {
+    const ctx = playPing._ctx || (playPing._ctx = new (window.AudioContext || window.webkitAudioContext)());
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = "sine";
+    o.frequency.value = 880;
+    g.gain.value = 0.04;
+    o.connect(g);
+    g.connect(ctx.destination);
+    o.start();
+    g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.18);
+    o.stop(ctx.currentTime + 0.2);
+  } catch { /* ignore */ }
 }
 
 function syncMe() {
@@ -315,12 +381,19 @@ function renderSidebar() {
 
   const guild = state.guilds.find((g) => g.id === state.guildId);
   els.sidebarHead.innerHTML = `
-    <div><strong>${esc(guild?.name || "Sunucu")}</strong>
-    <small>${guild?.boostLevel ? `Boost Lv.${guild.boostLevel} · ` : ""}${state.online.length} online</small></div>
+    <button type="button" id="guildMenuBtn" style="text-align:left;min-width:0;flex:1;color:inherit">
+      <strong>${esc(guild?.name || "Sunucu")} ▾</strong>
+      <small>${guild?.boostLevel ? `Boost Lv.${guild.boostLevel} · ` : ""}${state.online.length} online</small>
+    </button>
     <div class="head-actions"><span class="pulse on"></span>
-    <button type="button" class="icon drawer-close" id="drawerCloseBtn" aria-label="Kapat">✕</button></div>`;
+    <button type="button" class="icon drawer-close" id="drawerCloseBtn" aria-label="Kapat">✕</button></div>
+    <div id="guildMenu" class="guild-menu hidden"></div>`;
   renderSidebarTools(guild);
   $("drawerCloseBtn")?.addEventListener("click", closeNav);
+  $("guildMenuBtn")?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    toggleGuildMenu(guild);
+  });
 
   const list = state.channels.filter((c) => c.guildId === state.guildId);
   const cats = [...new Set(list.map((c) => c.category))];
@@ -365,11 +438,13 @@ function renderSidebar() {
 }
 
 function renderMembers() {
-  const row = (u, dim = false) => `
+  const row = (u, dim = false) => {
+    const role = userRole(u.id);
+    return `
     <button class="member ${dim ? "dim" : ""}" data-user="${u.id}" type="button">
-      <div class="av ${u.status || "offline"}" style="background:${u.color}">${initials(u.name)}</div>
+      <div class="av ${u.status || "offline"}" style="background:${u.accent || u.color}">${initials(u.name)}</div>
       <div class="meta">
-        <span class="n" style="color:${u.color || "inherit"}">${esc(u.name)}</span>
+        <span class="n" style="color:${u.color || "inherit"}">${esc(u.name)}${role ? ` <span class="role-tag ${role.cls}">${esc(role.label)}</span>` : ""}</span>
         <span class="a">${esc(
           u.voiceChannelId
             ? `🔊 ${state.channels.find((c) => c.id === u.voiceChannelId)?.name || "Ses"}`
@@ -377,14 +452,21 @@ function renderMembers() {
         )}</span>
       </div>
     </button>`;
+  };
 
   if (els.memberCountLabel) {
     els.memberCountLabel.textContent = String(state.online.length + state.offline.length);
   }
 
+  const nitro = state.online.filter((u) => u.nitroTier && u.nitroTier !== "none");
+  const voice = state.online.filter((u) => u.voiceChannelId);
+  const rest = state.online.filter((u) => !u.voiceChannelId);
+
   els.membersContent.innerHTML = `
-    <h3>Çevrimiçi — ${state.online.length}</h3>
-    ${state.online.map((u) => row(u)).join("")}
+    ${voice.length ? `<h3>Seste — ${voice.length}</h3>${voice.map((u) => row(u)).join("")}` : ""}
+    ${nitro.length ? `<h3>Nitro — ${nitro.length}</h3>${nitro.map((u) => row(u)).join("")}` : ""}
+    <h3>Çevrimiçi — ${rest.length}</h3>
+    ${rest.map((u) => row(u)).join("")}
     <h3>Çevrimdışı — ${state.offline.length}</h3>
     ${state.offline.map((u) => row(u, true)).join("")}`;
 
@@ -395,8 +477,13 @@ function renderMembers() {
 
 function msgHtml(msg, compact, enter = false) {
   const mine = state.user && msg.userId === state.user.id;
+  const role = userRole(msg.userId);
+  const mentioned =
+    state.user &&
+    !mine &&
+    String(msg.content || "").toLowerCase().includes(`@${state.user.name.toLowerCase()}`);
   return `
-    <article class="msg ${compact ? "compact" : ""} ${msg.deleted ? "deleted" : ""} ${msg.pending ? "pending" : ""} ${enter ? "enter" : ""}" data-id="${msg.id}">
+    <article class="msg ${compact ? "compact" : ""} ${msg.deleted ? "deleted" : ""} ${msg.pending ? "pending" : ""} ${enter ? "enter" : ""} ${mentioned ? "mentioned" : ""}" data-id="${msg.id}">
       <div class="msg-av" data-user="${msg.userId}" style="background:${esc(msg.userColor)}">${initials(msg.userName)}</div>
       <div>
         ${
@@ -406,16 +493,17 @@ function msgHtml(msg, compact, enter = false) {
         }
         ${
           compact
-            ? ""
+            ? `<time class="time compact-time" title="${fmtTime(msg.createdAt)}">${fmtTime(msg.createdAt)}</time>`
             : `<div class="head">
                 <span class="name" data-user="${msg.userId}" style="color:${esc(msg.userColor)}">${esc(msg.userName)}</span>
-                ${state.online.find((u) => u.id === msg.userId)?.nitroTier && state.online.find((u) => u.id === msg.userId)?.nitroTier !== "none" ? `<span class="nitro-tag">NITRO</span>` : ""}
+                ${role ? `<span class="role-tag ${role.cls}">${esc(role.label)}</span>` : ""}
                 <time class="time" title="${fmtTime(msg.createdAt)}">${fmtRelative(msg.createdAt)}</time>
                 ${msg.editedAt ? `<span class="edited">(düzenlendi)</span>` : ""}
                 ${msg.pinned ? `<span class="pin-tag">📌</span>` : ""}
               </div>`
         }
         <div class="body">${msg.deleted ? esc(msg.content) : md(msg.content)}</div>
+        ${msg.deleted ? "" : embedHtml(msg.content)}
         ${
           msg.reactions?.length
             ? `<div class="reactions">${msg.reactions
@@ -435,6 +523,7 @@ function msgHtml(msg, compact, enter = false) {
               <button type="button" data-act="reply" data-id="${msg.id}" title="Yanıtla">↩</button>
               ${mine ? `<button type="button" data-act="edit" data-id="${msg.id}" title="Düzenle">✎</button>` : ""}
               <button type="button" data-act="pin" data-id="${msg.id}" title="Sabitle">📌</button>
+              <button type="button" data-act="copy" data-id="${msg.id}" title="Kopyala">⧉</button>
               ${mine ? `<button type="button" data-act="delete" data-id="${msg.id}" title="Sil">🗑</button>` : ""}
             </div>`
       }
@@ -447,6 +536,9 @@ function bindMessageNode(root = els.messages) {
   });
   root.querySelectorAll("[data-user]").forEach((el) => {
     el.onclick = (e) => openProfile(el.dataset.user, e);
+  });
+  root.querySelectorAll("[data-lightbox]").forEach((el) => {
+    el.onclick = () => openLightbox(el.dataset.lightbox);
   });
   root.querySelectorAll("[data-react]").forEach((btn) => {
     btn.onclick = () => react(btn.dataset.react, btn.dataset.emoji);
@@ -461,7 +553,20 @@ function bindMessageNode(root = els.messages) {
       if (act === "edit") startEdit(id);
       if (act === "pin") pin(id);
       if (act === "delete") removeMsg(id);
+      if (act === "copy") copyMessage(id);
     };
+  });
+  root.querySelectorAll(".msg").forEach((node) => {
+    node.oncontextmenu = (e) => {
+      e.preventDefault();
+      openCtxMenu(node.dataset.id, e.clientX, e.clientY);
+    };
+    let pressTimer;
+    node.ontouchstart = () => {
+      pressTimer = setTimeout(() => openCtxMenu(node.dataset.id, 24, Math.min(window.innerHeight - 220, 120)), 480);
+    };
+    node.ontouchend = () => clearTimeout(pressTimer);
+    node.ontouchmove = () => clearTimeout(pressTimer);
   });
 }
 
@@ -473,11 +578,17 @@ function renderMessages({ enterId = null } = {}) {
   els.messageInput.placeholder =
     ch.type === "dm" ? `@${ch.name} kişisine mesaj gönder` : `#${ch.name} kanalına mesaj gönder`;
 
-  let html = `<div class="welcome"><div class="orb">${ch.type === "dm" ? "@" : "#"}</div><h2>${ch.type === "dm" ? esc(ch.name) : `Welcome to #${esc(ch.name)}`}</h2><p>${esc(ch.topic || "Burası premium canlı kanal. Markdown: **kalın** *italik* `kod` ||spoiler||")}</p></div>`;
+  let html = `<div class="welcome"><div class="orb">${ch.type === "dm" ? "@" : "#"}</div><h2>${ch.type === "dm" ? esc(ch.name) : `#${esc(ch.name)}`}</h2><p>${esc(ch.topic || "Burası XZON canlı kanalı. Markdown: **kalın** *italik* `kod` ||spoiler|| · @bahset · /yardim")}</p></div>`;
 
   let lastDay = "";
   let prev = null;
+  let dividerDone = false;
+  const dividerAt = state.unreadDividerAt;
   for (const msg of state.messages) {
+    if (!dividerDone && dividerAt && msg.createdAt > dividerAt && msg.userId !== state.user?.id) {
+      html += `<div class="unread-sep">Yeni mesajlar</div>`;
+      dividerDone = true;
+    }
     const day = fmtDay(msg.createdAt);
     if (day !== lastDay) {
       html += `<div class="day">${esc(day)}</div>`;
@@ -507,8 +618,16 @@ function upsertMessage(message, { enter = false } = {}) {
     if (message.userId !== state.user?.id) {
       state.unread[message.channelId] = (state.unread[message.channelId] || 0) + 1;
       renderSidebar();
+      playPing();
     }
     return;
+  }
+  if (
+    message.userId !== state.user?.id &&
+    !message.pending &&
+    String(message.content || "").toLowerCase().includes(`@${(state.user?.name || "").toLowerCase()}`)
+  ) {
+    playPing();
   }
 
   const idx = state.messages.findIndex((m) => m.id === message.id || (m.pending && m.localId && m.localId === message.localId));
@@ -574,6 +693,7 @@ async function switchChannel(channelId) {
   state.typingUsers.clear();
   renderTyping();
   state.stickBottom = true;
+  state.unreadDividerAt = state.lastReadAt || null;
   els.chat.classList.add("switching");
   closeAllDrawers();
   renderRail();
@@ -582,6 +702,8 @@ async function switchChannel(channelId) {
   try {
     await loadMessages();
     openStream();
+    state.lastReadAt = Date.now();
+    localStorage.setItem("xzon_last_read", String(state.lastReadAt));
   } catch (error) {
     toast(error.message || "Kanal açılamadı");
   } finally {
@@ -589,7 +711,8 @@ async function switchChannel(channelId) {
     els.chat.classList.remove("switching");
     state.switching = false;
     scrollBottom(true);
-    els.messageInput?.focus();
+    resizeComposer();
+    els.messageInput?.focus({ preventScroll: true });
   }
 }
 
@@ -675,9 +798,58 @@ async function removeMsg(id) {
   upsertMessage((await api(`/xzon/api/messages/${id}`, { method: "DELETE" })).message);
 }
 
+async function handleSlash(content) {
+  const [cmd, ...rest] = content.slice(1).trim().split(/\s+/);
+  const arg = rest.join(" ");
+  switch (cmd.toLowerCase()) {
+    case "yardim":
+    case "help":
+      toast("Komutlar: /nitro /davet /boost /kanal /me /temizle /yardim");
+      return true;
+    case "nitro":
+      openNitroModal();
+      return true;
+    case "davet":
+    case "invite":
+      if (state.guildId) await copyInvite(state.guildId);
+      return true;
+    case "boost":
+      if (state.guildId) await boostCurrentGuild(state.guildId);
+      return true;
+    case "kanal":
+    case "channel":
+      if (state.guildId) await createChannelPrompt(state.guildId);
+      return true;
+    case "me":
+      if (!arg) {
+        toast("Kullanım: /me bir şey yapar");
+        return true;
+      }
+      els.messageInput.value = `*${state.user.name} ${arg}*`;
+      return false;
+    case "temizle":
+    case "clear":
+      els.messageInput.value = "";
+      resizeComposer();
+      return true;
+    default:
+      return false;
+  }
+}
+
 async function sendMessage() {
-  const content = els.messageInput.value.trim();
+  let content = els.messageInput.value.trim();
   if (!content || els.sendBtn.disabled) return;
+  if (content.startsWith("/")) {
+    const handled = await handleSlash(content);
+    if (handled) {
+      els.messageInput.value = "";
+      resizeComposer();
+      return;
+    }
+    content = els.messageInput.value.trim();
+    if (!content) return;
+  }
   els.sendBtn.disabled = true;
 
   try {
@@ -715,6 +887,7 @@ async function sendMessage() {
       };
       upsertMessage(optimistic, { enter: true });
       els.messageInput.value = "";
+      resizeComposer();
       const data = await api("/xzon/api/messages", {
         method: "POST",
         body: {
@@ -729,6 +902,7 @@ async function sendMessage() {
     }
     els.replyBar.classList.add("hidden");
     els.messageInput.value = "";
+    resizeComposer();
     state.stickBottom = true;
     scrollBottom(true);
   } catch (error) {
@@ -739,6 +913,147 @@ async function sendMessage() {
     els.sendBtn.disabled = false;
     els.messageInput.focus();
   }
+}
+
+function toggleGuildMenu(guild) {
+  const menu = $("guildMenu");
+  if (!menu || !guild) return;
+  if (!menu.classList.contains("hidden")) {
+    menu.classList.add("hidden");
+    return;
+  }
+  menu.innerHTML = `
+    <button type="button" data-gact="invite">Davet bağlantısı oluştur</button>
+    <button type="button" data-gact="boost">Sunucuyu boostla</button>
+    ${guild.custom ? `<button type="button" data-gact="channel">Kanal oluştur</button>` : ""}
+    <button type="button" data-gact="nitro">XZON Nitro</button>
+    <button type="button" data-gact="settings">Kullanıcı ayarları</button>
+  `;
+  menu.classList.remove("hidden");
+  menu.querySelectorAll("[data-gact]").forEach((btn) => {
+    btn.onclick = async () => {
+      menu.classList.add("hidden");
+      const a = btn.dataset.gact;
+      if (a === "invite") await copyInvite(guild.id);
+      if (a === "boost") await boostCurrentGuild(guild.id);
+      if (a === "channel") await createChannelPrompt(guild.id);
+      if (a === "nitro") openNitroModal();
+      if (a === "settings") openSettings("account");
+    };
+  });
+}
+
+function openCtxMenu(messageId, x, y) {
+  const msg = state.messages.find((m) => m.id === messageId);
+  if (!msg || !els.ctxMenu) return;
+  const mine = msg.userId === state.user?.id;
+  els.ctxMenu.innerHTML = `
+    <button type="button" data-c="reply">Yanıtla</button>
+    <button type="button" data-c="react">Tepki ekle</button>
+    <button type="button" data-c="pin">${msg.pinned ? "Sabiti kaldır" : "Sabitle"}</button>
+    <button type="button" data-c="copy">Mesajı kopyala</button>
+    ${mine ? `<button type="button" data-c="edit">Düzenle</button>` : ""}
+    ${mine ? `<button type="button" class="danger" data-c="delete">Sil</button>` : ""}
+  `;
+  els.ctxMenu.classList.remove("hidden");
+  const w = 230;
+  const h = 240;
+  els.ctxMenu.style.left = `${Math.min(window.innerWidth - w - 8, Math.max(8, x))}px`;
+  els.ctxMenu.style.top = `${Math.min(window.innerHeight - h - 8, Math.max(8, y))}px`;
+  els.ctxMenu.querySelectorAll("[data-c]").forEach((btn) => {
+    btn.onclick = () => {
+      els.ctxMenu.classList.add("hidden");
+      const c = btn.dataset.c;
+      if (c === "reply") startReply(messageId);
+      if (c === "react") showEmoji(els.sendBtn, (emoji) => react(messageId, emoji));
+      if (c === "pin") pin(messageId);
+      if (c === "copy") copyMessage(messageId);
+      if (c === "edit") startEdit(messageId);
+      if (c === "delete") removeMsg(messageId);
+    };
+  });
+}
+
+async function copyMessage(id) {
+  const msg = state.messages.find((m) => m.id === id);
+  if (!msg) return;
+  try {
+    await navigator.clipboard.writeText(msg.content);
+    toast("Mesaj kopyalandı");
+  } catch {
+    toast(msg.content.slice(0, 80));
+  }
+}
+
+function openLightbox(src) {
+  if (!els.lightbox) return;
+  els.lightbox.innerHTML = `<img src="${esc(src)}" alt="önizleme" /><button type="button" class="settings-x" style="position:fixed;top:16px;right:16px" id="closeLightbox">✕</button>`;
+  els.lightbox.classList.remove("hidden");
+  $("closeLightbox")?.addEventListener("click", () => els.lightbox.classList.add("hidden"));
+  els.lightbox.onclick = (e) => {
+    if (e.target === els.lightbox) els.lightbox.classList.add("hidden");
+  };
+}
+
+function updateMentionPop() {
+  const ta = els.messageInput;
+  const val = ta.value;
+  const caret = ta.selectionStart || val.length;
+  const left = val.slice(0, caret);
+  const m = left.match(/@([\wğüşıöçĞÜŞİÖÇ]{0,24})$/i);
+  if (!m) {
+    els.mentionPop?.classList.add("hidden");
+    return;
+  }
+  const q = m[1].toLowerCase();
+  const people = [...state.online, ...state.offline]
+    .filter((u) => u.id !== state.user?.id && u.name.toLowerCase().includes(q))
+    .slice(0, 6);
+  if (!people.length) {
+    els.mentionPop?.classList.add("hidden");
+    return;
+  }
+  els.mentionPop.innerHTML = people
+    .map(
+      (u) =>
+        `<button type="button" data-mention="${esc(u.name)}"><div class="av ${u.status}" style="width:24px;height:24px;font-size:11px;background:${u.color}">${initials(u.name)}</div><span>${esc(u.name)}</span></button>`,
+    )
+    .join("");
+  const rect = ta.getBoundingClientRect();
+  els.mentionPop.style.left = `${rect.left}px`;
+  els.mentionPop.style.bottom = `${window.innerHeight - rect.top + 8}px`;
+  els.mentionPop.style.top = "auto";
+  els.mentionPop.classList.remove("hidden");
+  els.mentionPop.querySelectorAll("[data-mention]").forEach((btn) => {
+    btn.onclick = () => {
+      const name = btn.dataset.mention;
+      const before = left.replace(/@([\wğüşıöçĞÜŞİÖÇ]{0,24})$/i, `@${name} `);
+      ta.value = before + val.slice(caret);
+      els.mentionPop.classList.add("hidden");
+      resizeComposer();
+      ta.focus();
+    };
+  });
+}
+
+async function openInbox() {
+  const data = await api("/xzon/api/inbox");
+  els.sheetTitle.textContent = "Gelen kutusu · Bahsetmeler";
+  els.pinsList.innerHTML = data.mentions?.length
+    ? data.mentions
+        .map(
+          (m) =>
+            `<button type="button" class="inbox-item" data-jump="${esc(m.channelId)}"><strong>${esc(m.userName)} · ${esc(m.channelId)}</strong>${esc(m.content).slice(0, 140)}</button>`,
+        )
+        .join("")
+    : `<p style="padding:12px;color:var(--text-3)">Henüz bahsetme yok. Biri seni @isim ile etiketleyince burada görünür.</p>`;
+  els.pinsDrawer.classList.remove("hidden");
+  els.pinsList.querySelectorAll("[data-jump]").forEach((btn) => {
+    btn.onclick = async () => {
+      els.pinsDrawer.classList.add("hidden");
+      await switchChannel(btn.dataset.jump);
+    };
+  });
 }
 
 function renderTyping() {
@@ -1179,25 +1494,39 @@ els.composer.addEventListener("submit", (e) => {
 });
 
 els.messageInput.addEventListener("input", () => {
+  resizeComposer();
+  updateMentionPop();
   const t = Date.now();
   if (t - state.lastTypingSent < 1400) return;
   state.lastTypingSent = t;
   api("/xzon/api/typing", { method: "POST", body: { channelId: state.channelId } }).catch(() => {});
 });
 
-els.messages.addEventListener("scroll", () => {
-  state.stickBottom = nearBottom();
-  if (state.stickBottom) els.jumpBtn.classList.add("hidden");
-  if (els.messages.scrollTop < 40 && !state.loadingOlder && state.messages.length) {
-    state.loadingOlder = true;
-    const oldest = state.messages[0]?.createdAt;
-    loadMessages({ before: oldest, appendTop: true })
-      .catch(() => {})
-      .finally(() => {
-        state.loadingOlder = false;
-      });
+els.messageInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
   }
 });
+
+els.messages.addEventListener(
+  "scroll",
+  () => {
+    state.stickBottom = nearBottom();
+    if (state.stickBottom) els.jumpBtn.classList.add("hidden");
+    if (els.messages.scrollTop < 60 && !state.loadingOlder && state.messages.length) {
+      state.loadingOlder = true;
+      state.stickBottom = false;
+      const oldest = state.messages[0]?.createdAt;
+      loadMessages({ before: oldest, appendTop: true })
+        .catch(() => {})
+        .finally(() => {
+          state.loadingOlder = false;
+        });
+    }
+  },
+  { passive: true },
+);
 
 els.jumpBtn.addEventListener("click", () => {
   state.stickBottom = true;
@@ -1238,13 +1567,53 @@ $("closeNitroModal")?.addEventListener("click", () => els.nitroModal.classList.a
 els.nitroModal?.querySelectorAll("[data-tier]").forEach((btn) => {
   btn.addEventListener("click", () => activateNitro(btn.dataset.tier));
 });
-window.addEventListener("resize", syncFab);
-window.visualViewport?.addEventListener("resize", syncFab);
+$("inboxBtn")?.addEventListener("click", () => openInbox());
+$("scrollTopBtn")?.addEventListener("click", () => {
+  els.messages.scrollTo({ top: 0, behavior: "smooth" });
+  state.stickBottom = false;
+});
+$("scrollBottomBtn")?.addEventListener("click", () => scrollBottom(true));
+$("attachBtn")?.addEventListener("click", () => {
+  const url = prompt("Görsel veya link URL’si yapıştır");
+  if (!url) return;
+  els.messageInput.value = `${els.messageInput.value}${els.messageInput.value ? "\n" : ""}${url}`;
+  resizeComposer();
+  els.messageInput.focus();
+});
+$("helpBtn")?.addEventListener("click", () => {
+  toast("Enter gönder · Shift+Enter satır · @ bahset · /yardim · sağ tık menü");
+});
+function syncSoundBtn() {
+  if (els.soundToggleBtn) {
+    els.soundToggleBtn.textContent = state.soundOn ? "Ses: Açık" : "Ses: Kapalı";
+    els.soundToggleBtn.classList.toggle("on", state.soundOn);
+  }
+}
+syncSoundBtn();
+els.soundToggleBtn?.addEventListener("click", () => {
+  state.soundOn = !state.soundOn;
+  localStorage.setItem("xzon_sound", state.soundOn ? "1" : "0");
+  syncSoundBtn();
+  if (state.soundOn) playPing();
+});
+window.addEventListener("resize", () => {
+  syncFab();
+  resizeComposer();
+});
+window.visualViewport?.addEventListener("resize", () => {
+  syncFab();
+  // Keep message list usable when mobile keyboard opens
+  if (state.stickBottom) scrollBottom(true);
+});
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
     closeAllDrawers();
     els.guildModal?.classList.add("hidden");
     els.nitroModal?.classList.add("hidden");
+    els.ctxMenu?.classList.add("hidden");
+    els.mentionPop?.classList.add("hidden");
+    els.lightbox?.classList.add("hidden");
+    $("guildMenu")?.classList.add("hidden");
   }
 });
 $("emojiBtn").addEventListener("click", (e) => {
@@ -1334,6 +1703,13 @@ document.addEventListener("click", (e) => {
   if (!els.profilePop.contains(e.target) && !e.target.closest?.("[data-user]")) {
     els.profilePop.classList.add("hidden");
   }
+  if (els.ctxMenu && !els.ctxMenu.contains(e.target)) els.ctxMenu.classList.add("hidden");
+  if (els.mentionPop && !els.mentionPop.contains(e.target) && e.target !== els.messageInput) {
+    els.mentionPop.classList.add("hidden");
+  }
+  if (!$("guildMenuBtn")?.contains(e.target) && !$("guildMenu")?.contains(e.target)) {
+    $("guildMenu")?.classList.add("hidden");
+  }
 });
 
 (async () => {
@@ -1349,7 +1725,7 @@ document.addEventListener("click", (e) => {
 })();
 
 // Visible build marker for cache debugging
-console.info("[XZON] client v7 pro-discord ready");
+console.info("[XZON] client v8 scroll+pro ready");
 
 // Category collapse
 document.addEventListener("click", (e) => {

@@ -19,6 +19,7 @@ import {
   getUnreadMap,
   getUserById,
   joinByInvite,
+  listMentions,
   joinVoice,
   leaveVoice,
   listChannelsForUser,
@@ -73,7 +74,7 @@ export function mountChatRoutes(app) {
       clients: clientCount(),
       channels: WEB_CHANNELS.length,
       guilds: GUILDS.length,
-      version: "xzon-7",
+      version: "xzon-8",
     });
   });
 
@@ -306,6 +307,22 @@ export function mountChatRoutes(app) {
     }
     return res.json({
       messages: searchMessages(channelId, String(req.query.q || ""), user.id),
+    });
+  });
+
+  app.get("/xzon/api/mentions", (req, res) => {
+    const user = chatUser(req, res);
+    if (!user) return;
+    return res.json({ messages: listMentions(user.id, Number(req.query.limit || 30)) });
+  });
+
+  app.get("/xzon/api/inbox", (req, res) => {
+    const user = chatUser(req, res);
+    if (!user) return;
+    return res.json({
+      mentions: listMentions(user.id, 30),
+      unread: getUnreadMap(user.id),
+      dms: listDms(user.id),
     });
   });
 
