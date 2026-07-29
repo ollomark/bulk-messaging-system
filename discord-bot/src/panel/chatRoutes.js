@@ -1,14 +1,34 @@
 import {
+  GUILDS,
   WEB_CHANNELS,
   channelExists,
+  channelsForGuild,
   createWebSession,
+  deleteMessage,
+  editMessage,
+  getChannelMeta,
   getMessages,
+  getOrCreateDm,
+  getPinnedMessages,
   getSessionUser,
+  getUnreadMap,
+  getUserById,
+  joinVoice,
+  leaveVoice,
+  listDms,
+  listOfflineRecent,
   listOnlineUsers,
+  markRead,
   postMessage,
+  searchMessages,
+  setVoiceFlags,
+  togglePin,
+  toggleReaction,
   touchPresence,
+  updateProfile,
+  voiceRoster,
 } from "./chatStore.js";
-import { broadcast, broadcastPresence, clientCount, subscribe } from "./chatHub.js";
+import { broadcast, broadcastPresence, clientCount, setClientChannel, subscribe } from "./chatHub.js";
 
 function chatUser(req, res) {
   const token =
@@ -22,16 +42,47 @@ function chatUser(req, res) {
 }
 
 function pushPresence() {
-  broadcastPresence(listOnlineUsers());
+  broadcastPresence(listOnlineUsers(), voiceRoster());
+}
+
+function assertChannelAccess(user, channelId) {
+  const meta = getChannelMeta(channelId);
+  if (!meta) return null;
+  if (meta.type === "dm" && user.id !== meta.userA && user.id !== meta.userB) {
+    return null;
+  }
+  return meta;
 }
 
 export function mountChatRoutes(app) {
   app.get("/xzon/api/health", (_req, res) => {
-    res.json({ ok: true, clients: clientCount(), channels: WEB_CHANNELS.length });
+    res.json({
+      ok: true,
+      clients: clientCount(),
+      channels: WEB_CHANNELS.length,
+      guilds: GUILDS.length,
+    });
+  });
+
+  app.get("/xzon/api/bootstrap", (req, res) => {
+    const user = chatUser(req, res);
+    if (!user) return;
+    touchPresence(user.id);
+    return res.json({
+      ok: true,
+      user,
+      guilds: GUILDS,
+      channels: WEB_CHANNELS,
+      online: listOnlineUsers(),
+      offline: listOfflineRecent(25),
+      dms: listDms(user.id),
+      unread: getUnreadMap(user.id),
+      voice: voiceRoster(),
+    });
   });
 
   app.get("/xzon/api/channels", (_req, res) => {
-    res.json({ channels: WEB_CHANNELS });
+    res.json({ guilds: GUILDS, channels: WEB_CHANNELS });
   });
 
   app.post("/xzon/api/session", (req, res) => {
@@ -55,34 +106,118 @@ export function mountChatRoutes(app) {
     const user = chatUser(req, res);
     if (!user) return;
     touchPresence(user.id);
-    return res.json({ ok: true, user, online: listOnlineUsers() });
+    return res.json({
+      ok: true,
+      user,
+      online: listOnlineUsers(),
+      unread: getUnreadMap(user.id),
+      voice: voiceRoster(),
+    });
+  });
+
+  app.patch("/xzon/api/me", (req, res) => {
+    const user = chatUser(req, res);
+    if (!user) return;
+    try {
+      const updated = updateProfile(user.id, req.body || {});
+      pushPresence();
+      broadcast("user_update", { user: updated });
+      return res.json({ ok: true, user: updated });
+    } catch (error) {
+      return res.status(400).json({ error: error.message });
+    }
   });
 
   app.post("/xzon/api/logout", (req, res) => {
+    const token = req.cookies?.xzon_token || req.headers["x-xzon-token"];
+    const user = getSessionUser(token);
+    if (user?.voiceChannelId) leaveVoice(user.id);
     res.clearCookie("xzon_token");
+    pushPresence();
     return res.json({ ok: true });
+  });
+
+  app.get("/xzon/api/users/:id", (req, res) => {
+    const user = chatUser(req, res);
+    if (!user) return;
+    const profile = getUserById(req.params.id);
+    if (!profile) return res.status(404).json({ error: "Kullanıcı yok" });
+    return res.json({ user: profile });
+  });
+
+  app.get("/xzon/api/dms", (req, res) => {
+    const user = chatUser(req, res);
+    if (!user) return;
+    return res.json({ dms: listDms(user.id) });
+  });
+
+  app.post("/xzon/api/dms", (req, res) => {
+    const user = chatUser(req, res);
+    if (!user) return;
+    try {
+      const peerId = String(req.body?.userId || "");
+      const dm = getOrCreateDm(user.id, peerId);
+      return res.json({ ok: true, ...dm });
+    } catch (error) {
+      return res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.get("/xzon/api/guilds/:guildId/channels", (req, res) => {
+    const user = chatUser(req, res);
+    if (!user) return;
+    return res.json({ channels: channelsForGuild(req.params.guildId) });
   });
 
   app.get("/xzon/api/messages", (req, res) => {
     const user = chatUser(req, res);
     if (!user) return;
     const channelId = String(req.query.channel || "genel");
-    if (!channelExists(channelId)) {
+    if (!assertChannelAccess(user, channelId)) {
       return res.status(404).json({ error: "Kanal yok" });
     }
-    const after = Number(req.query.after || 0);
-    return res.json({
-      messages: getMessages(channelId, { after, limit: Number(req.query.limit || 80) }),
+    const messages = getMessages(channelId, {
+      after: Number(req.query.after || 0),
+      before: Number(req.query.before || 0),
+      limit: Number(req.query.limit || 80),
+      viewerId: user.id,
     });
+    markRead(user.id, channelId);
+    return res.json({ messages, unread: getUnreadMap(user.id) });
+  });
+
+  app.get("/xzon/api/search", (req, res) => {
+    const user = chatUser(req, res);
+    if (!user) return;
+    const channelId = String(req.query.channel || "genel");
+    if (!assertChannelAccess(user, channelId)) {
+      return res.status(404).json({ error: "Kanal yok" });
+    }
+    return res.json({
+      messages: searchMessages(channelId, String(req.query.q || ""), user.id),
+    });
+  });
+
+  app.get("/xzon/api/pins", (req, res) => {
+    const user = chatUser(req, res);
+    if (!user) return;
+    const channelId = String(req.query.channel || "genel");
+    if (!assertChannelAccess(user, channelId)) {
+      return res.status(404).json({ error: "Kanal yok" });
+    }
+    return res.json({ messages: getPinnedMessages(channelId, user.id) });
   });
 
   app.post("/xzon/api/messages", (req, res) => {
     const user = chatUser(req, res);
     if (!user) return;
     try {
-      const { channelId, content } = req.body || {};
-      const message = postMessage(user, String(channelId || ""), content);
+      const { channelId, content, replyToId } = req.body || {};
+      const id = String(channelId || "");
+      if (!assertChannelAccess(user, id)) throw new Error("Kanal yok");
+      const message = postMessage(user, id, content, { replyToId: replyToId || null });
       broadcast("message", { message }, { channelId: message.channelId });
+      broadcast("unread", { unread: true });
       pushPresence();
       return res.json({ ok: true, message });
     } catch (error) {
@@ -90,11 +225,62 @@ export function mountChatRoutes(app) {
     }
   });
 
+  app.patch("/xzon/api/messages/:id", (req, res) => {
+    const user = chatUser(req, res);
+    if (!user) return;
+    try {
+      const message = editMessage(user.id, req.params.id, req.body?.content);
+      broadcast("message_update", { message }, { channelId: message.channelId });
+      return res.json({ ok: true, message });
+    } catch (error) {
+      return res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.delete("/xzon/api/messages/:id", (req, res) => {
+    const user = chatUser(req, res);
+    if (!user) return;
+    try {
+      const message = deleteMessage(user.id, req.params.id);
+      broadcast("message_update", { message }, { channelId: message.channelId });
+      return res.json({ ok: true, message });
+    } catch (error) {
+      return res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.post("/xzon/api/messages/:id/react", (req, res) => {
+    const user = chatUser(req, res);
+    if (!user) return;
+    try {
+      const message = toggleReaction(user.id, req.params.id, req.body?.emoji);
+      broadcast("message_update", { message }, { channelId: message.channelId });
+      return res.json({ ok: true, message });
+    } catch (error) {
+      return res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.post("/xzon/api/messages/:id/pin", (req, res) => {
+    const user = chatUser(req, res);
+    if (!user) return;
+    try {
+      const message = togglePin(user.id, req.params.id);
+      broadcast("message_update", { message }, { channelId: message.channelId });
+      broadcast("pins", { channelId: message.channelId });
+      return res.json({ ok: true, message });
+    } catch (error) {
+      return res.status(400).json({ error: error.message });
+    }
+  });
+
   app.post("/xzon/api/typing", (req, res) => {
     const user = chatUser(req, res);
     if (!user) return;
     const channelId = String(req.body?.channelId || "");
-    if (!channelExists(channelId)) return res.status(404).json({ error: "Kanal yok" });
+    if (!channelExists(channelId) || !assertChannelAccess(user, channelId)) {
+      return res.status(404).json({ error: "Kanal yok" });
+    }
     broadcast(
       "typing",
       { channelId, user: { id: user.id, name: user.name } },
@@ -109,7 +295,48 @@ export function mountChatRoutes(app) {
     touchPresence(user.id);
     const online = listOnlineUsers();
     pushPresence();
-    return res.json({ ok: true, online });
+    return res.json({
+      ok: true,
+      online,
+      offline: listOfflineRecent(25),
+      unread: getUnreadMap(user.id),
+      voice: voiceRoster(),
+    });
+  });
+
+  app.post("/xzon/api/voice/join", (req, res) => {
+    const user = chatUser(req, res);
+    if (!user) return;
+    try {
+      const updated = joinVoice(user.id, String(req.body?.channelId || ""));
+      pushPresence();
+      broadcast("voice", { voice: voiceRoster() });
+      return res.json({ ok: true, user: updated, voice: voiceRoster() });
+    } catch (error) {
+      return res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.post("/xzon/api/voice/leave", (req, res) => {
+    const user = chatUser(req, res);
+    if (!user) return;
+    const updated = leaveVoice(user.id);
+    pushPresence();
+    broadcast("voice", { voice: voiceRoster() });
+    return res.json({ ok: true, user: updated, voice: voiceRoster() });
+  });
+
+  app.post("/xzon/api/voice/flags", (req, res) => {
+    const user = chatUser(req, res);
+    if (!user) return;
+    try {
+      const updated = setVoiceFlags(user.id, req.body || {});
+      pushPresence();
+      broadcast("voice", { voice: voiceRoster() });
+      return res.json({ ok: true, user: updated });
+    } catch (error) {
+      return res.status(400).json({ error: error.message });
+    }
   });
 
   app.get("/xzon/api/stream", (req, res) => {
@@ -117,6 +344,12 @@ export function mountChatRoutes(app) {
     if (!user) return;
 
     const channelId = String(req.query.channel || "genel");
+    if (!assertChannelAccess(user, channelId) && !channelExists(channelId)) {
+      return res.status(404).json({ error: "Kanal yok" });
+    }
+    if (String(channelId).startsWith("dm:") && !assertChannelAccess(user, channelId)) {
+      return res.status(403).json({ error: "DM erişimi yok" });
+    }
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache, no-transform");
     res.setHeader("Connection", "keep-alive");
@@ -125,6 +358,7 @@ export function mountChatRoutes(app) {
 
     res.write(`event: hello\ndata: ${JSON.stringify({ userId: user.id, channelId })}\n\n`);
     subscribe(res, { userId: user.id, channelId });
+    setClientChannel(user.id, channelId);
     touchPresence(user.id);
     pushPresence();
 
