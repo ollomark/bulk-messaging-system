@@ -43,10 +43,11 @@ const els = {
   settingsNav: $("settingsNav"),
   settingsPane: $("settingsPane"),
   toast: $("toast"),
-  mobileBar: $("mobileBar"),
   searchInput: $("searchInput"),
   memberCountLabel: $("memberCountLabel"),
   railLive: $("railLive"),
+  navOpenBtn: $("navOpenBtn"),
+  navBackdrop: $("navBackdrop"),
 };
 
 const state = {
@@ -111,6 +112,47 @@ function fmtDay(ts) {
   return new Date(ts).toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" });
 }
 
+function fmtRelative(ts) {
+  const diff = Date.now() - ts;
+  if (diff < 60_000) return "az önce";
+  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)} dk önce`;
+  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)} sa önce`;
+  return fmtTime(ts);
+}
+
+function openNav() {
+  els.app.classList.add("nav-open");
+  els.app.classList.remove("members-open");
+  els.membersPane.classList.remove("open");
+  els.navBackdrop.classList.remove("hidden");
+}
+
+function closeNav() {
+  els.app.classList.remove("nav-open");
+  if (!els.membersPane.classList.contains("open")) {
+    els.navBackdrop.classList.add("hidden");
+  }
+}
+
+function openMembersDrawer() {
+  els.membersPane.classList.add("open");
+  els.app.classList.remove("nav-open");
+  els.navBackdrop.classList.remove("hidden");
+}
+
+function closeMembersDrawer() {
+  els.membersPane.classList.remove("open");
+  if (!els.app.classList.contains("nav-open")) {
+    els.navBackdrop.classList.add("hidden");
+  }
+}
+
+function closeAllDrawers() {
+  closeNav();
+  closeMembersDrawer();
+  els.navBackdrop.classList.add("hidden");
+}
+
 async function api(path, options = {}) {
   const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
   if (state.token) headers["x-xzon-token"] = state.token;
@@ -169,6 +211,7 @@ function setLive(on, label) {
   if (pulse) pulse.classList.toggle("on", on);
   const small = els.sidebarHead.querySelector("small");
   if (small) small.textContent = label;
+  els.railLive?.classList.toggle("on", on);
   els.netBanner.classList.toggle("hidden", on);
 }
 
@@ -263,6 +306,10 @@ function renderMembers() {
       </div>
     </button>`;
 
+  if (els.memberCountLabel) {
+    els.memberCountLabel.textContent = String(state.online.length + state.offline.length);
+  }
+
   els.membersContent.innerHTML = `
     <h3>Çevrimiçi — ${state.online.length}</h3>
     ${state.online.map((u) => row(u)).join("")}
@@ -290,7 +337,7 @@ function msgHtml(msg, compact, enter = false) {
             ? ""
             : `<div class="head">
                 <span class="name" data-user="${msg.userId}" style="color:${esc(msg.userColor)}">${esc(msg.userName)}</span>
-                <time class="time">${fmtTime(msg.createdAt)}</time>
+                <time class="time" title="${fmtTime(msg.createdAt)}">${fmtRelative(msg.createdAt)}</time>
                 ${msg.editedAt ? `<span class="edited">(düzenlendi)</span>` : ""}
                 ${msg.pinned ? `<span class="pin-tag">📌</span>` : ""}
               </div>`
@@ -353,7 +400,7 @@ function renderMessages({ enterId = null } = {}) {
   els.messageInput.placeholder =
     ch.type === "dm" ? `@${ch.name} kişisine mesaj gönder` : `#${ch.name} kanalına mesaj gönder`;
 
-  let html = `<div class="welcome"><div class="orb">${ch.type === "dm" ? "@" : "#"}</div><h2>${ch.type === "dm" ? esc(ch.name) : `#${esc(ch.name)}`}</h2><p>${esc(ch.topic || "Bu kanalda herkes canlı konuşur. Markdown: **kalın** *italik* `kod` ||spoiler||")}</p></div>`;
+  let html = `<div class="welcome"><div class="orb">${ch.type === "dm" ? "@" : "#"}</div><h2>${ch.type === "dm" ? esc(ch.name) : `Welcome to #${esc(ch.name)}`}</h2><p>${esc(ch.topic || "Burası premium canlı kanal. Markdown: **kalın** *italik* `kod` ||spoiler||")}</p></div>`;
 
   let lastDay = "";
   let prev = null;
@@ -434,8 +481,17 @@ async function loadMessages({ before = 0, appendTop = false } = {}) {
 }
 
 async function switchChannel(channelId) {
+  if (!channelId || channelId === state.channelId && state.messages.length && !state.switching) {
+    closeAllDrawers();
+    return;
+  }
   if (state.switching) return;
   state.switching = true;
+  const unlock = setTimeout(() => {
+    state.switching = false;
+    els.chat?.classList.remove("switching");
+  }, 4000);
+
   state.channelId = channelId;
   localStorage.setItem("xzon_channel", channelId);
   state.replyTo = null;
@@ -445,19 +501,21 @@ async function switchChannel(channelId) {
   renderTyping();
   state.stickBottom = true;
   els.chat.classList.add("switching");
+  closeAllDrawers();
   renderRail();
   renderSidebar();
 
   try {
     await loadMessages();
     openStream();
+  } catch (error) {
+    toast(error.message || "Kanal açılamadı");
   } finally {
-    requestAnimationFrame(() => {
-      els.chat.classList.remove("switching");
-      state.switching = false;
-      scrollBottom(true);
-      els.messageInput.focus();
-    });
+    clearTimeout(unlock);
+    els.chat.classList.remove("switching");
+    state.switching = false;
+    scrollBottom(true);
+    els.messageInput?.focus();
   }
 }
 
@@ -806,7 +864,7 @@ async function logout() {
   els.settingsModal.classList.add("hidden");
   els.app.classList.add("hidden");
   els.boot.classList.remove("hidden");
-  els.mobileBar.classList.add("hidden");
+  closeAllDrawers();
 }
 
 async function bootstrap() {
@@ -826,7 +884,6 @@ async function bootstrap() {
 
   els.boot.classList.add("hidden");
   els.app.classList.remove("hidden");
-  if (window.matchMedia("(max-width: 760px)").matches) els.mobileBar.classList.remove("hidden");
   syncMe();
   renderRail();
   renderSidebar();
@@ -835,6 +892,9 @@ async function bootstrap() {
   openStream();
   startPresence();
   setLive(true, `canlı · ${state.online.length} online`);
+  if (window.matchMedia("(max-width: 900px)").matches) {
+    toast("☰ menüden sunucu & kanallara geç");
+  }
 }
 
 let presenceTimer;
@@ -917,7 +977,15 @@ els.dmHomeBtn.addEventListener("click", () => openDms());
 $("leaveVoiceBtn").addEventListener("click", () => leaveVoice());
 $("settingsBtn").addEventListener("click", () => openSettings("account"));
 $("closeSettings").addEventListener("click", () => els.settingsModal.classList.add("hidden"));
-$("membersBtn").addEventListener("click", () => els.membersPane.classList.toggle("open"));
+$("membersBtn").addEventListener("click", () => {
+  if (els.membersPane.classList.contains("open")) closeMembersDrawer();
+  else openMembersDrawer();
+});
+els.navOpenBtn?.addEventListener("click", () => {
+  if (els.app.classList.contains("nav-open")) closeNav();
+  else openNav();
+});
+els.navBackdrop?.addEventListener("click", () => closeAllDrawers());
 $("emojiBtn").addEventListener("click", (e) => {
   showEmoji(e.currentTarget, (emoji) => {
     els.messageInput.value += emoji;
@@ -995,17 +1063,6 @@ els.searchInput.addEventListener("input", () => {
   }, 220);
 });
 
-els.mobileBar.querySelectorAll("[data-m]").forEach((btn) => {
-  btn.addEventListener("click", () => {
-    els.mobileBar.querySelectorAll("button").forEach((b) => b.classList.remove("on"));
-    btn.classList.add("on");
-    els.app.classList.remove("show-rail", "show-channels", "show-members");
-    if (btn.dataset.m === "rail") els.app.classList.add("show-rail");
-    if (btn.dataset.m === "channels") els.app.classList.add("show-channels");
-    if (btn.dataset.m === "members") els.app.classList.add("show-members");
-  });
-});
-
 document.addEventListener("click", (e) => {
   if (!els.statusMenu.contains(e.target) && e.target !== $("statusBtn") && !e.target.closest?.("#statusBtn")) {
     els.statusMenu.classList.add("hidden");
@@ -1031,4 +1088,15 @@ document.addEventListener("click", (e) => {
 })();
 
 // Visible build marker for cache debugging
-console.info("[XZON] client v4 ready");
+console.info("[XZON] client v6 nav-fix ready");
+
+// Category collapse
+document.addEventListener("click", (e) => {
+  const cat = e.target.closest?.(".cat-name");
+  if (!cat || !els.channelNav.contains(cat)) return;
+  const box = cat.nextElementSibling;
+  if (!box) return;
+  const hidden = box.style.display === "none";
+  box.style.display = hidden ? "" : "none";
+  cat.textContent = `${hidden ? "▼" : "▶"} ${cat.textContent.replace(/^[▼▶]\s*/, "")}`;
+});

@@ -12,7 +12,7 @@
       href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="/xzon/css/app.css?v=5" />
+    <link rel="stylesheet" href="/xzon/css/app.css?v=6" />
   </head>
   <body>
     <div id="boot" class="boot">
@@ -99,13 +99,20 @@
         </footer>
       </aside>
 
+      <div id="navBackdrop" class="nav-backdrop hidden" aria-hidden="true"></div>
+
       <section class="chat">
         <header class="chat-bar">
-          <div class="chat-title">
-            <span id="titleIcon" class="ch-icon">#</span>
-            <div>
-              <h1 id="channelTitle">genel</h1>
-              <p id="channelTopic">Ana sohbet</p>
+          <div class="chat-left">
+            <button type="button" class="icon glass nav-open" id="navOpenBtn" title="Kanallar" aria-label="Kanallar">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 6h18v2H3V6zm0 5h18v2H3v-2zm0 5h18v2H3v-2z"/></svg>
+            </button>
+            <div class="chat-title">
+              <span id="titleIcon" class="ch-icon">#</span>
+              <div>
+                <h1 id="channelTitle">genel</h1>
+                <p id="channelTopic">Ana sohbet</p>
+              </div>
             </div>
           </div>
           <div class="chat-actions">
@@ -172,12 +179,6 @@
       </div>
     </div>
     <div id="toast" class="toast hidden"></div>
-    <nav id="mobileBar" class="mobile-bar hidden">
-      <button type="button" data-m="rail">Sunucu</button>
-      <button type="button" data-m="channels">Kanallar</button>
-      <button type="button" data-m="chat" class="on">Sohbet</button>
-      <button type="button" data-m="members">Üyeler</button>
-    </nav>
-    <script src="/xzon/js/app.js?v=5" type="module"></script>
+    <script src="/xzon/js/app.js?v=6" type="module"></script>
   </body>
 </html>
