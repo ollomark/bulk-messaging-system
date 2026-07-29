@@ -1019,8 +1019,14 @@ document.addEventListener("click", (e) => {
 (async () => {
   try {
     if (state.token || document.cookie.includes("xzon_token")) await bootstrap();
-  } catch {
+  } catch (error) {
+    console.error("XZON bootstrap failed:", error);
     state.token = "";
     localStorage.removeItem("xzon_token");
+    els.boot?.classList.remove("hidden");
+    els.app?.classList.add("hidden");
   }
 })();
+
+// Visible build marker for cache debugging
+console.info("[XZON] client v4 ready");

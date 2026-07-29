@@ -45,6 +45,8 @@ const els = {
   toast: $("toast"),
   mobileBar: $("mobileBar"),
   searchInput: $("searchInput"),
+  memberCountLabel: $("memberCountLabel"),
+  railLive: $("railLive"),
 };
 
 const state = {
