@@ -2,6 +2,7 @@ import {
   GUILDS,
   WEB_CHANNELS,
   activateNitro,
+  blockUser,
   boostGuild,
   channelExists,
   channelsForGuild,
@@ -10,30 +11,47 @@ import {
   createInvite,
   createWebSession,
   deleteMessage,
+  discoverGuilds,
   editMessage,
+  forwardMessage,
   getChannelMeta,
   getMessages,
+  getNote,
   getOrCreateDm,
   getPinnedMessages,
   getSessionUser,
   getUnreadMap,
   getUserById,
   joinByInvite,
+  leaveGuild,
   listMentions,
   joinVoice,
   leaveVoice,
+  listBlocks,
   listChannelsForUser,
   listDms,
+  listFriends,
   listGuildsForUser,
+  listMutes,
   listOfflineRecent,
   listOnlineUsers,
+  markAllRead,
   markRead,
   postMessage,
+  removeFriend,
+  reportMessage,
+  respondFriendRequest,
   searchMessages,
+  searchUsers,
+  sendFriendRequest,
+  setChannelSettings,
+  setNote,
   setVoiceFlags,
+  toggleMute,
   togglePin,
   toggleReaction,
   touchPresence,
+  unblockUser,
   updateProfile,
   userInGuild,
   voiceRoster,
@@ -74,7 +92,7 @@ export function mountChatRoutes(app) {
       clients: clientCount(),
       channels: WEB_CHANNELS.length,
       guilds: GUILDS.length,
-      version: "xzon-9",
+      version: "xzon-10",
     });
   });
 
@@ -82,6 +100,7 @@ export function mountChatRoutes(app) {
     const user = chatUser(req, res);
     if (!user) return;
     touchPresence(user.id);
+    const friends = listFriends(user.id);
     return res.json({
       ok: true,
       user,
@@ -92,6 +111,11 @@ export function mountChatRoutes(app) {
       dms: listDms(user.id),
       unread: getUnreadMap(user.id),
       voice: voiceRoster(),
+      friends: friends.friends,
+      friendIncoming: friends.incoming,
+      friendOutgoing: friends.outgoing,
+      mutes: listMutes(user.id),
+      blocks: listBlocks(user.id),
     });
   });
 
@@ -462,6 +486,169 @@ export function mountChatRoutes(app) {
       pushPresence();
       broadcast("voice", { voice: voiceRoster() });
       return res.json({ ok: true, user: updated });
+    } catch (error) {
+      return res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.get("/xzon/api/friends", (req, res) => {
+    const user = chatUser(req, res);
+    if (!user) return;
+    return res.json(listFriends(user.id));
+  });
+
+  app.post("/xzon/api/friends", (req, res) => {
+    const user = chatUser(req, res);
+    if (!user) return;
+    try {
+      const result = sendFriendRequest(user.id, String(req.body?.userId || ""));
+      return res.json({ ok: true, ...result, ...listFriends(user.id) });
+    } catch (error) {
+      return res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.post("/xzon/api/friends/:id/respond", (req, res) => {
+    const user = chatUser(req, res);
+    if (!user) return;
+    try {
+      const result = respondFriendRequest(user.id, req.params.id, Boolean(req.body?.accept));
+      return res.json({ ok: true, ...result, ...listFriends(user.id) });
+    } catch (error) {
+      return res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.delete("/xzon/api/friends/:id", (req, res) => {
+    const user = chatUser(req, res);
+    if (!user) return;
+    removeFriend(user.id, req.params.id);
+    return res.json({ ok: true, ...listFriends(user.id) });
+  });
+
+  app.get("/xzon/api/blocks", (req, res) => {
+    const user = chatUser(req, res);
+    if (!user) return;
+    return res.json({ blocks: listBlocks(user.id) });
+  });
+
+  app.post("/xzon/api/blocks", (req, res) => {
+    const user = chatUser(req, res);
+    if (!user) return;
+    try {
+      blockUser(user.id, String(req.body?.userId || ""));
+      return res.json({ ok: true, blocks: listBlocks(user.id) });
+    } catch (error) {
+      return res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.delete("/xzon/api/blocks/:id", (req, res) => {
+    const user = chatUser(req, res);
+    if (!user) return;
+    unblockUser(user.id, req.params.id);
+    return res.json({ ok: true, blocks: listBlocks(user.id) });
+  });
+
+  app.get("/xzon/api/notes/:id", (req, res) => {
+    const user = chatUser(req, res);
+    if (!user) return;
+    return res.json({ note: getNote(user.id, req.params.id) });
+  });
+
+  app.put("/xzon/api/notes/:id", (req, res) => {
+    const user = chatUser(req, res);
+    if (!user) return;
+    return res.json({ ok: true, ...setNote(user.id, req.params.id, req.body?.note) });
+  });
+
+  app.post("/xzon/api/mutes", (req, res) => {
+    const user = chatUser(req, res);
+    if (!user) return;
+    try {
+      const result = toggleMute(
+        user.id,
+        String(req.body?.targetType || "channel"),
+        String(req.body?.targetId || ""),
+      );
+      return res.json({ ok: true, ...result, mutes: listMutes(user.id) });
+    } catch (error) {
+      return res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.get("/xzon/api/mutes", (req, res) => {
+    const user = chatUser(req, res);
+    if (!user) return;
+    return res.json({ mutes: listMutes(user.id) });
+  });
+
+  app.post("/xzon/api/reports", (req, res) => {
+    const user = chatUser(req, res);
+    if (!user) return;
+    try {
+      return res.json({
+        ok: true,
+        ...reportMessage(user.id, String(req.body?.messageId || ""), req.body?.reason),
+      });
+    } catch (error) {
+      return res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.patch("/xzon/api/channels/:id/settings", (req, res) => {
+    const user = chatUser(req, res);
+    if (!user) return;
+    try {
+      const channel = setChannelSettings(user.id, req.params.id, req.body || {});
+      return res.json({ ok: true, channel, channels: listChannelsForUser(user.id) });
+    } catch (error) {
+      return res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.post("/xzon/api/read-all", (req, res) => {
+    const user = chatUser(req, res);
+    if (!user) return;
+    return res.json({ ok: true, unread: markAllRead(user.id) });
+  });
+
+  app.post("/xzon/api/messages/:id/forward", (req, res) => {
+    const user = chatUser(req, res);
+    if (!user) return;
+    try {
+      const to = String(req.body?.channelId || "");
+      if (!assertChannelAccess(user, to)) throw new Error("Hedef kanal yok");
+      const message = forwardMessage(user.id, req.params.id, to);
+      broadcast("message", { message }, { channelId: message.channelId });
+      return res.json({ ok: true, message });
+    } catch (error) {
+      return res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.get("/xzon/api/discover", (req, res) => {
+    const user = chatUser(req, res);
+    if (!user) return;
+    return res.json({ guilds: discoverGuilds(user.id) });
+  });
+
+  app.get("/xzon/api/users", (req, res) => {
+    const user = chatUser(req, res);
+    if (!user) return;
+    return res.json({ users: searchUsers(String(req.query.q || "")) });
+  });
+
+  app.post("/xzon/api/guilds/:guildId/leave", (req, res) => {
+    const user = chatUser(req, res);
+    if (!user) return;
+    try {
+      leaveGuild(user.id, req.params.guildId);
+      return res.json({
+        ok: true,
+        guilds: listGuildsForUser(user.id),
+        channels: listChannelsForUser(user.id),
+      });
     } catch (error) {
       return res.status(400).json({ error: error.message });
     }

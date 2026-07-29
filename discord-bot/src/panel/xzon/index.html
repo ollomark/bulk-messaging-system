@@ -12,7 +12,7 @@
       href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="/xzon/css/app.css?v=9" />
+    <link rel="stylesheet" href="/xzon/css/app.css?v=10" />
   </head>
   <body>
     <div id="boot" class="boot">
@@ -136,6 +136,10 @@
         </header>
 
         <div class="chat-subbar" id="chatSubbar">
+          <button type="button" class="chip-btn" id="quickSwitchBtn">Ctrl+K</button>
+          <button type="button" class="chip-btn" id="discoverBtn">Keşfet</button>
+          <button type="button" class="chip-btn" id="muteChannelBtn">Kanalı sessize al</button>
+          <button type="button" class="chip-btn" id="readAllBtn">Tümünü oku</button>
           <button type="button" class="chip-btn" id="scrollTopBtn">↑ Yukarı</button>
           <button type="button" class="chip-btn" id="scrollBottomBtn">↓ En alta</button>
           <button type="button" class="chip-btn" id="soundToggleBtn">Ses: Açık</button>
@@ -154,8 +158,16 @@
             <button type="button" id="cancelReply" class="icon" aria-label="İptal">✕</button>
           </div>
           <form id="composer" class="composer">
+            <div class="format-bar" id="formatBar">
+              <button type="button" class="fmt" data-fmt="bold" title="Kalın">B</button>
+              <button type="button" class="fmt" data-fmt="italic" title="İtalik">I</button>
+              <button type="button" class="fmt" data-fmt="strike" title="Üstü çizili">S</button>
+              <button type="button" class="fmt" data-fmt="code" title="Kod">&lt;/&gt;</button>
+              <button type="button" class="fmt" data-fmt="spoiler" title="Spoiler">||</button>
+              <button type="button" class="fmt" data-fmt="quote" title="Alıntı">“”</button>
+            </div>
             <div class="composer-hint">
-              <span>Enter gönder · Shift+Enter satır · @ bahset · / komut</span>
+              <span>Enter gönder · Shift+Enter satır · @ bahset · / komut · Ctrl+K geçiş</span>
               <span id="charCount">0/1800</span>
             </div>
             <div class="composer-shell">
@@ -222,6 +234,23 @@
       </div>
     </div>
 
+    <div id="quickSwitch" class="overlay hidden">
+      <div class="quick-card">
+        <input id="quickInput" type="search" placeholder="Kanal, DM veya kullanıcı ara…" autocomplete="off" />
+        <div id="quickResults" class="quick-results"></div>
+        <p class="quick-hint">↑↓ seç · Enter aç · Esc kapat</p>
+      </div>
+    </div>
+
+    <div id="discoverModal" class="overlay hidden">
+      <div class="modal-card discover-modal">
+        <button type="button" class="settings-x" id="closeDiscover" aria-label="Kapat">✕</button>
+        <h2>Sunucu Keşfet</h2>
+        <p class="sub">Herkese açık ve davetli sunucular — Discord Discovery tarzı.</p>
+        <div id="discoverList" class="discover-list"></div>
+      </div>
+    </div>
+
     <div id="statusMenu" class="menu hidden"></div>
     <div id="emojiPop" class="react-panel hidden"></div>
     <div id="profilePop" class="profile hidden"></div>
@@ -243,6 +272,6 @@
       </div>
     </div>
     <div id="toast" class="toast hidden"></div>
-    <script src="/xzon/js/app.js?v=9" type="module"></script>
+    <script src="/xzon/js/app.js?v=10" type="module"></script>
   </body>
 </html>

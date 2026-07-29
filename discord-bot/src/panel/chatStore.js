@@ -131,6 +131,52 @@ db.exec(`
     created_at INTEGER NOT NULL,
     PRIMARY KEY (guild_id, user_id)
   );
+
+  CREATE TABLE IF NOT EXISTS web_friends (
+    user_id TEXT NOT NULL,
+    friend_id TEXT NOT NULL,
+    status TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    PRIMARY KEY (user_id, friend_id)
+  );
+
+  CREATE TABLE IF NOT EXISTS web_blocks (
+    user_id TEXT NOT NULL,
+    blocked_id TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    PRIMARY KEY (user_id, blocked_id)
+  );
+
+  CREATE TABLE IF NOT EXISTS web_notes (
+    owner_id TEXT NOT NULL,
+    target_id TEXT NOT NULL,
+    note TEXT NOT NULL,
+    updated_at INTEGER NOT NULL,
+    PRIMARY KEY (owner_id, target_id)
+  );
+
+  CREATE TABLE IF NOT EXISTS web_mutes (
+    user_id TEXT NOT NULL,
+    target_type TEXT NOT NULL,
+    target_id TEXT NOT NULL,
+    until_at INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL,
+    PRIMARY KEY (user_id, target_type, target_id)
+  );
+
+  CREATE TABLE IF NOT EXISTS web_reports (
+    id TEXT PRIMARY KEY,
+    reporter_id TEXT NOT NULL,
+    message_id TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    created_at INTEGER NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS web_channel_settings (
+    channel_id TEXT PRIMARY KEY,
+    slowmode INTEGER NOT NULL DEFAULT 0,
+    nsfw INTEGER NOT NULL DEFAULT 0
+  );
 `);
 
 for (const [col, type] of [
@@ -138,6 +184,7 @@ for (const [col, type] of [
   ["banner", "TEXT"],
   ["badge", "TEXT"],
   ["accent", "TEXT"],
+  ["activity", "TEXT"],
 ]) {
   if (!userCols.includes(col)) {
     db.exec(`ALTER TABLE web_users ADD COLUMN ${col} ${type}`);
@@ -216,6 +263,7 @@ function mapUser(row) {
     banner: row.banner || "",
     badge: row.badge || "",
     accent: row.accent || row.color,
+    activity: row.activity || "",
   };
 }
 
@@ -247,7 +295,18 @@ function mapGuild(row) {
   };
 }
 
+function channelSettings(channelId) {
+  return (
+    db.prepare("SELECT * FROM web_channel_settings WHERE channel_id = ?").get(channelId) || {
+      channel_id: channelId,
+      slowmode: 0,
+      nsfw: 0,
+    }
+  );
+}
+
 function mapChannel(row) {
+  const settings = channelSettings(row.id || row.channel_id);
   return {
     id: row.id,
     guildId: row.guild_id,
@@ -256,6 +315,8 @@ function mapChannel(row) {
     category: row.category || "SOHBET",
     type: row.type || "text",
     custom: true,
+    slowmode: settings.slowmode || 0,
+    nsfw: Boolean(settings.nsfw),
   };
 }
 
@@ -307,6 +368,16 @@ export function listGuildsForUser(userId) {
   ];
 }
 
+function enrichStaticChannel(ch) {
+  const settings = channelSettings(ch.id);
+  return {
+    ...ch,
+    custom: false,
+    slowmode: settings.slowmode || 0,
+    nsfw: Boolean(settings.nsfw),
+  };
+}
+
 export function listChannelsForUser(userId) {
   const customGuildIds = new Set(
     customGuildRows().filter((g) => userInGuild(userId, g.id)).map((g) => g.id),
@@ -314,7 +385,7 @@ export function listChannelsForUser(userId) {
   const customs = customChannelRows()
     .filter((c) => customGuildIds.has(c.guild_id))
     .map(mapChannel);
-  return [...WEB_CHANNELS, ...customs];
+  return [...WEB_CHANNELS.map(enrichStaticChannel), ...customs];
 }
 
 function ensureSystemUser() {
@@ -430,13 +501,15 @@ export function updateProfile(userId, patch = {}) {
     patch.badge !== undefined ? String(patch.badge).slice(0, 24) : user.badge || "";
   const accent =
     patch.accent !== undefined ? String(patch.accent).slice(0, 32) : user.accent || user.color;
+  const activity =
+    patch.activity !== undefined ? String(patch.activity).slice(0, 80) : user.activity || "";
 
   db.prepare(
     `UPDATE web_users
      SET name = ?, bio = ?, status = ?, custom_status = ?, last_seen = ?,
-         nitro_tier = ?, banner = ?, badge = ?, accent = ?
+         nitro_tier = ?, banner = ?, badge = ?, accent = ?, activity = ?
      WHERE id = ?`,
-  ).run(name, bio, status, customStatus, now(), nitroTier, banner, badge, accent, userId);
+  ).run(name, bio, status, customStatus, now(), nitroTier, banner, badge, accent, activity, userId);
 
   // Keep message author names roughly in sync for recent identity
   db.prepare(
@@ -557,7 +630,7 @@ export function channelExists(channelId) {
 
 export function getChannelMeta(channelId) {
   const ch = WEB_CHANNELS.find((c) => c.id === channelId);
-  if (ch) return ch;
+  if (ch) return enrichStaticChannel(ch);
   const custom = db.prepare("SELECT * FROM web_guild_channels WHERE id = ?").get(channelId);
   if (custom) return mapChannel(custom);
   if (String(channelId).startsWith("dm:")) {
@@ -683,6 +756,17 @@ function assertRateLimit(userId) {
   rateBuckets.set(userId, recent);
 }
 
+export function isBlockedEither(a, b) {
+  return Boolean(
+    db
+      .prepare(
+        `SELECT 1 FROM web_blocks
+         WHERE (user_id = ? AND blocked_id = ?) OR (user_id = ? AND blocked_id = ?)`,
+      )
+      .get(a, b, b, a),
+  );
+}
+
 export function postMessage(user, channelId, content, { replyToId = null } = {}) {
   const meta = getChannelMeta(channelId);
   if (!meta) throw new Error("Kanal bulunamadı");
@@ -691,9 +775,26 @@ export function postMessage(user, channelId, content, { replyToId = null } = {})
     if (user.id !== meta.userA && user.id !== meta.userB) {
       throw new Error("Bu DM'ye erişimin yok");
     }
+    const peer = meta.userA === user.id ? meta.userB : meta.userA;
+    if (isBlockedEither(user.id, peer)) throw new Error("Bu kullanıcıyla mesajlaşamazsın");
   }
 
   assertRateLimit(user.id);
+
+  const slow = Number(meta.slowmode || 0);
+  if (slow > 0) {
+    const last = db
+      .prepare(
+        `SELECT created_at AS at FROM web_messages
+         WHERE channel_id = ? AND user_id = ? AND deleted = 0
+         ORDER BY created_at DESC LIMIT 1`,
+      )
+      .get(channelId, user.id);
+    if (last && now() - last.at < slow * 1000) {
+      const left = Math.ceil((slow * 1000 - (now() - last.at)) / 1000);
+      throw new Error(`Yavaş mod: ${left}sn bekle`);
+    }
+  }
 
   const text = String(content || "").trim().slice(0, 1800);
   if (!text) throw new Error("Boş mesaj gönderilemez");
@@ -1122,4 +1223,287 @@ export function activateNitro(userId, tier = "full") {
       : "classic";
   const badge = next === "full" ? "NITRO" : "CLASSIC";
   return updateProfile(userId, { nitroTier: next, banner, badge });
+}
+
+export function sendFriendRequest(fromId, toId) {
+  if (fromId === toId) throw new Error("Kendine istek atılamaz");
+  const peer = getUserById(toId);
+  if (!peer || toId === "system") throw new Error("Kullanıcı yok");
+  if (isBlockedEither(fromId, toId)) throw new Error("Engelli kullanıcı");
+  const existing = db
+    .prepare("SELECT status FROM web_friends WHERE user_id = ? AND friend_id = ?")
+    .get(fromId, toId);
+  if (existing?.status === "accepted") throw new Error("Zaten arkadaşsınız");
+  const reverse = db
+    .prepare("SELECT status FROM web_friends WHERE user_id = ? AND friend_id = ?")
+    .get(toId, fromId);
+  if (reverse?.status === "pending") {
+    db.prepare("UPDATE web_friends SET status = 'accepted' WHERE user_id = ? AND friend_id = ?").run(
+      toId,
+      fromId,
+    );
+    db.prepare(
+      `INSERT INTO web_friends (user_id, friend_id, status, created_at)
+       VALUES (?, ?, 'accepted', ?)
+       ON CONFLICT(user_id, friend_id) DO UPDATE SET status = 'accepted'`,
+    ).run(fromId, toId, now());
+    return { status: "accepted", user: peer };
+  }
+  db.prepare(
+    `INSERT INTO web_friends (user_id, friend_id, status, created_at)
+     VALUES (?, ?, 'pending', ?)
+     ON CONFLICT(user_id, friend_id) DO UPDATE SET status = 'pending', created_at = excluded.created_at`,
+  ).run(fromId, toId, now());
+  return { status: "pending", user: peer };
+}
+
+export function respondFriendRequest(userId, fromId, accept) {
+  const row = db
+    .prepare("SELECT * FROM web_friends WHERE user_id = ? AND friend_id = ? AND status = 'pending'")
+    .get(fromId, userId);
+  if (!row) throw new Error("İstek bulunamadı");
+  if (!accept) {
+    db.prepare("DELETE FROM web_friends WHERE user_id = ? AND friend_id = ?").run(fromId, userId);
+    return { status: "declined" };
+  }
+  db.prepare("UPDATE web_friends SET status = 'accepted' WHERE user_id = ? AND friend_id = ?").run(
+    fromId,
+    userId,
+  );
+  db.prepare(
+    `INSERT INTO web_friends (user_id, friend_id, status, created_at)
+     VALUES (?, ?, 'accepted', ?)
+     ON CONFLICT(user_id, friend_id) DO UPDATE SET status = 'accepted'`,
+  ).run(userId, fromId, now());
+  return { status: "accepted", user: getUserById(fromId) };
+}
+
+export function removeFriend(userId, friendId) {
+  db.prepare("DELETE FROM web_friends WHERE user_id = ? AND friend_id = ?").run(userId, friendId);
+  db.prepare("DELETE FROM web_friends WHERE user_id = ? AND friend_id = ?").run(friendId, userId);
+  return { ok: true };
+}
+
+export function listFriends(userId) {
+  const accepted = db
+    .prepare(
+      `SELECT friend_id AS id FROM web_friends WHERE user_id = ? AND status = 'accepted'`,
+    )
+    .all(userId)
+    .map((r) => getUserById(r.id))
+    .filter(Boolean);
+  const incoming = db
+    .prepare(
+      `SELECT user_id AS id FROM web_friends WHERE friend_id = ? AND status = 'pending'`,
+    )
+    .all(userId)
+    .map((r) => getUserById(r.id))
+    .filter(Boolean);
+  const outgoing = db
+    .prepare(
+      `SELECT friend_id AS id FROM web_friends WHERE user_id = ? AND status = 'pending'`,
+    )
+    .all(userId)
+    .map((r) => getUserById(r.id))
+    .filter(Boolean);
+  return { friends: accepted, incoming, outgoing };
+}
+
+export function blockUser(userId, targetId) {
+  if (userId === targetId) throw new Error("Kendini engelleyemezsin");
+  if (!getUserById(targetId)) throw new Error("Kullanıcı yok");
+  db.prepare(
+    `INSERT INTO web_blocks (user_id, blocked_id, created_at)
+     VALUES (?, ?, ?)
+     ON CONFLICT(user_id, blocked_id) DO NOTHING`,
+  ).run(userId, targetId, now());
+  removeFriend(userId, targetId);
+  return { ok: true };
+}
+
+export function unblockUser(userId, targetId) {
+  db.prepare("DELETE FROM web_blocks WHERE user_id = ? AND blocked_id = ?").run(userId, targetId);
+  return { ok: true };
+}
+
+export function listBlocks(userId) {
+  return db
+    .prepare("SELECT blocked_id AS id FROM web_blocks WHERE user_id = ?")
+    .all(userId)
+    .map((r) => getUserById(r.id))
+    .filter(Boolean);
+}
+
+export function setNote(ownerId, targetId, note) {
+  const text = String(note || "").trim().slice(0, 240);
+  if (!text) {
+    db.prepare("DELETE FROM web_notes WHERE owner_id = ? AND target_id = ?").run(ownerId, targetId);
+    return { note: "" };
+  }
+  db.prepare(
+    `INSERT INTO web_notes (owner_id, target_id, note, updated_at)
+     VALUES (?, ?, ?, ?)
+     ON CONFLICT(owner_id, target_id) DO UPDATE SET note = excluded.note, updated_at = excluded.updated_at`,
+  ).run(ownerId, targetId, text, now());
+  return { note: text };
+}
+
+export function getNote(ownerId, targetId) {
+  const row = db
+    .prepare("SELECT note FROM web_notes WHERE owner_id = ? AND target_id = ?")
+    .get(ownerId, targetId);
+  return row?.note || "";
+}
+
+export function toggleMute(userId, targetType, targetId) {
+  if (!["channel", "guild"].includes(targetType)) throw new Error("Geçersiz hedef");
+  const existing = db
+    .prepare(
+      "SELECT 1 FROM web_mutes WHERE user_id = ? AND target_type = ? AND target_id = ?",
+    )
+    .get(userId, targetType, targetId);
+  if (existing) {
+    db.prepare(
+      "DELETE FROM web_mutes WHERE user_id = ? AND target_type = ? AND target_id = ?",
+    ).run(userId, targetType, targetId);
+    return { muted: false };
+  }
+  db.prepare(
+    `INSERT INTO web_mutes (user_id, target_type, target_id, until_at, created_at)
+     VALUES (?, ?, ?, 0, ?)`,
+  ).run(userId, targetType, targetId, now());
+  return { muted: true };
+}
+
+export function listMutes(userId) {
+  return db
+    .prepare(
+      `SELECT target_type AS targetType, target_id AS targetId, until_at AS untilAt
+       FROM web_mutes WHERE user_id = ?`,
+    )
+    .all(userId);
+}
+
+export function isMuted(userId, channelId, guildId = null) {
+  const ch = db
+    .prepare(
+      `SELECT 1 FROM web_mutes WHERE user_id = ? AND target_type = 'channel' AND target_id = ?`,
+    )
+    .get(userId, channelId);
+  if (ch) return true;
+  if (guildId) {
+    return Boolean(
+      db
+        .prepare(
+          `SELECT 1 FROM web_mutes WHERE user_id = ? AND target_type = 'guild' AND target_id = ?`,
+        )
+        .get(userId, guildId),
+    );
+  }
+  return false;
+}
+
+export function reportMessage(reporterId, messageId, reason) {
+  const row = db.prepare("SELECT id FROM web_messages WHERE id = ?").get(messageId);
+  if (!row) throw new Error("Mesaj yok");
+  const id = crypto.randomUUID();
+  db.prepare(
+    `INSERT INTO web_reports (id, reporter_id, message_id, reason, created_at)
+     VALUES (?, ?, ?, ?, ?)`,
+  ).run(id, reporterId, messageId, String(reason || "Uygunsuz").slice(0, 200), now());
+  return { id, ok: true };
+}
+
+export function setChannelSettings(userId, channelId, { slowmode, nsfw } = {}) {
+  const meta = getChannelMeta(channelId);
+  if (!meta || meta.type === "dm") throw new Error("Kanal yok");
+  if (meta.custom) {
+    const member = db
+      .prepare("SELECT role FROM web_guild_members WHERE guild_id = ? AND user_id = ?")
+      .get(meta.guildId, userId);
+    if (!member || !["owner", "admin"].includes(member.role)) {
+      throw new Error("Yetkin yok");
+    }
+  }
+  const prev = channelSettings(channelId);
+  const nextSlow =
+    slowmode !== undefined ? Math.min(120, Math.max(0, Number(slowmode) || 0)) : prev.slowmode;
+  const nextNsfw = nsfw !== undefined ? (nsfw ? 1 : 0) : prev.nsfw ? 1 : 0;
+  db.prepare(
+    `INSERT INTO web_channel_settings (channel_id, slowmode, nsfw)
+     VALUES (?, ?, ?)
+     ON CONFLICT(channel_id) DO UPDATE SET slowmode = excluded.slowmode, nsfw = excluded.nsfw`,
+  ).run(channelId, nextSlow, nextNsfw);
+  return getChannelMeta(channelId);
+}
+
+export function markAllRead(userId) {
+  const channels = listChannelsForUser(userId)
+    .filter((c) => c.type === "text")
+    .map((c) => c.id);
+  const dms = db
+    .prepare("SELECT channel_id AS id FROM web_dm_peers WHERE user_a = ? OR user_b = ?")
+    .all(userId, userId)
+    .map((r) => r.id);
+  const at = now();
+  for (const id of [...new Set([...channels, ...dms])]) markRead(userId, id, at);
+  return getUnreadMap(userId);
+}
+
+export function forwardMessage(userId, messageId, toChannelId) {
+  const row = db.prepare("SELECT * FROM web_messages WHERE id = ? AND deleted = 0").get(messageId);
+  if (!row) throw new Error("Mesaj yok");
+  const user = getUserById(userId);
+  const content = `↪ ${row.user_name}: ${row.content}`.slice(0, 1800);
+  return postMessage(user, toChannelId, content);
+}
+
+export function discoverGuilds(userId) {
+  const mine = new Set(listGuildsForUser(userId).map((g) => g.id));
+  const publicStatic = GUILDS.filter((g) => !mine.has(g.id)).map((g) => ({
+    ...g,
+    custom: false,
+    memberCount: listOnlineUsers().length,
+    invite: `xzon-${g.id}`,
+  }));
+  const customs = customGuildRows()
+    .filter((g) => !mine.has(g.id))
+    .slice(0, 30)
+    .map((g) => {
+      const mapped = mapGuild(g);
+      const invite = db
+        .prepare("SELECT code FROM web_invites WHERE guild_id = ? ORDER BY created_at DESC LIMIT 1")
+        .get(g.id);
+      const members = db
+        .prepare("SELECT COUNT(*) AS c FROM web_guild_members WHERE guild_id = ?")
+        .get(g.id).c;
+      return { ...mapped, memberCount: members, invite: invite?.code || null };
+    })
+    .filter((g) => g.invite);
+  return [...publicStatic, ...customs];
+}
+
+export function searchUsers(query, limit = 20) {
+  const q = `%${String(query || "").trim().slice(0, 40)}%`;
+  if (q === "%%") return [];
+  return db
+    .prepare(
+      `SELECT * FROM web_users
+       WHERE id != 'system' AND name LIKE ?
+       ORDER BY last_seen DESC LIMIT ?`,
+    )
+    .all(q, Math.min(Math.max(limit, 1), 40))
+    .map(mapUser);
+}
+
+export function leaveGuild(userId, guildId) {
+  if (isStaticGuild(guildId)) throw new Error("Varsayılan sunucudan çıkılamaz");
+  const g = db.prepare("SELECT * FROM web_guilds WHERE id = ?").get(guildId);
+  if (!g) throw new Error("Sunucu yok");
+  if (g.owner_id === userId) throw new Error("Sahip sunucudan çıkamaz — önce devret");
+  db.prepare("DELETE FROM web_guild_members WHERE guild_id = ? AND user_id = ?").run(
+    guildId,
+    userId,
+  );
+  return { ok: true };
 }
