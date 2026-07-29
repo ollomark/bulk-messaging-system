@@ -404,6 +404,7 @@ export function getMessages(channelId, { after = 0, before = 0, limit = 80, view
   const safeLimit = Math.min(Math.max(Number(limit) || 80, 1), 150);
   let rows;
   if (before) {
+    // Older page (scroll up)
     rows = db
       .prepare(
         `SELECT * FROM web_messages
@@ -413,7 +414,8 @@ export function getMessages(channelId, { after = 0, before = 0, limit = 80, view
       )
       .all(channelId, Number(before), safeLimit)
       .reverse();
-  } else {
+  } else if (after) {
+    // Newer than cursor (live catch-up)
     rows = db
       .prepare(
         `SELECT * FROM web_messages
@@ -421,7 +423,20 @@ export function getMessages(channelId, { after = 0, before = 0, limit = 80, view
          ORDER BY created_at ASC
          LIMIT ?`,
       )
-      .all(channelId, Number(after) || 0, safeLimit);
+      .all(channelId, Number(after), safeLimit);
+  } else {
+    // Initial open: newest page, chronological
+    rows = db
+      .prepare(
+        `SELECT * FROM (
+           SELECT * FROM web_messages
+           WHERE channel_id = ?
+           ORDER BY created_at DESC
+           LIMIT ?
+         ) recent
+         ORDER BY created_at ASC`,
+      )
+      .all(channelId, safeLimit);
   }
   return hydrateMessages(rows, viewerId);
 }
