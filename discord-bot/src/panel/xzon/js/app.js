@@ -48,7 +48,17 @@ const els = {
   railLive: $("railLive"),
   navOpenBtn: $("navOpenBtn"),
   navBackdrop: $("navBackdrop"),
+  mobileFab: $("mobileFab"),
+  addGuildBtn: $("addGuildBtn"),
+  nitroBtn: $("nitroBtn"),
+  guildModal: $("guildModal"),
+  guildModalBody: $("guildModalBody"),
+  nitroModal: $("nitroModal"),
+  sidebarTools: $("sidebarTools"),
+  membersCloseBtn: $("membersCloseBtn"),
 };
+
+const GUILD_COLORS = ["#5865f2", "#ed4245", "#3ba55c", "#faa61a", "#eb459e", "#00a8fc", "#9b59b6", "#1abc9c"];
 
 const state = {
   user: null,
@@ -120,37 +130,61 @@ function fmtRelative(ts) {
   return fmtTime(ts);
 }
 
+function syncFab() {
+  if (!els.mobileFab) return;
+  const mobile = window.matchMedia("(max-width: 900px)").matches;
+  const inApp = !els.app.classList.contains("hidden");
+  els.mobileFab.classList.toggle("hidden", !(mobile && inApp));
+}
+
 function openNav() {
   els.app.classList.add("nav-open");
   els.app.classList.remove("members-open");
   els.membersPane.classList.remove("open");
   els.navBackdrop.classList.remove("hidden");
+  els.navBackdrop.setAttribute("aria-hidden", "false");
+  syncFab();
 }
 
 function closeNav() {
   els.app.classList.remove("nav-open");
   if (!els.membersPane.classList.contains("open")) {
     els.navBackdrop.classList.add("hidden");
+    els.navBackdrop.setAttribute("aria-hidden", "true");
   }
+  syncFab();
 }
 
 function openMembersDrawer() {
   els.membersPane.classList.add("open");
+  els.app.classList.add("members-open");
   els.app.classList.remove("nav-open");
   els.navBackdrop.classList.remove("hidden");
+  els.navBackdrop.setAttribute("aria-hidden", "false");
+  syncFab();
 }
 
 function closeMembersDrawer() {
   els.membersPane.classList.remove("open");
+  els.app.classList.remove("members-open");
   if (!els.app.classList.contains("nav-open")) {
     els.navBackdrop.classList.add("hidden");
+    els.navBackdrop.setAttribute("aria-hidden", "true");
   }
+  syncFab();
 }
 
 function closeAllDrawers() {
-  closeNav();
-  closeMembersDrawer();
+  els.app.classList.remove("nav-open", "members-open");
+  els.membersPane.classList.remove("open");
   els.navBackdrop.classList.add("hidden");
+  els.navBackdrop.setAttribute("aria-hidden", "true");
+  syncFab();
+}
+
+function toggleNav() {
+  if (els.app.classList.contains("nav-open")) closeNav();
+  else openNav();
 }
 
 async function api(path, options = {}) {
@@ -190,11 +224,14 @@ function scrollBottom(force = false) {
 function syncMe() {
   const u = state.user;
   if (!u) return;
-  els.meName.textContent = u.name;
+  const nitro = u.nitroTier && u.nitroTier !== "none";
+  els.meName.innerHTML = `${esc(u.name)}${nitro ? '<span class="nitro-dot" title="Nitro"></span>' : ""}`;
   els.meAvatar.textContent = initials(u.name);
-  els.meAvatar.style.background = u.color;
+  els.meAvatar.style.background = u.accent || u.color;
   els.meAvatar.className = `av ${u.status || "online"}`;
-  els.meSub.textContent = u.customStatus || STATUS[u.status || "online"];
+  els.meSub.textContent = nitro
+    ? `${u.badge || "NITRO"} · ${u.customStatus || STATUS[u.status || "online"]}`
+    : u.customStatus || STATUS[u.status || "online"];
   $("micBtn").classList.toggle("off", Boolean(u.muted));
   $("deafBtn").classList.toggle("off", Boolean(u.deafened));
   if (u.voiceChannelId) {
@@ -220,7 +257,8 @@ function renderRail() {
   els.guildRail.innerHTML = state.guilds
     .map((g) => {
       const active = state.view === "guild" && state.guildId === g.id;
-      return `<button class="guild-btn ${active ? "active" : ""}" data-guild="${g.id}" type="button" title="${esc(g.name)}" style="${active ? `background:${g.color}` : ""}">${esc(g.short)}</button>`;
+      const boost = g.boostLevel > 0 ? `<span class="boost-pip" title="Boost Lv.${g.boostLevel}">✦</span>` : "";
+      return `<button class="guild-btn ${active ? "active" : ""}" data-guild="${g.id}" type="button" title="${esc(g.name)}" style="${active ? `background:${g.color}` : `box-shadow:inset 0 0 0 1px ${g.color}55`}">${esc(g.short)}${boost}</button>`;
     })
     .join("");
   els.guildRail.querySelectorAll("[data-guild]").forEach((btn) => {
@@ -228,9 +266,31 @@ function renderRail() {
   });
 }
 
+function renderSidebarTools(guild) {
+  if (!els.sidebarTools) return;
+  if (state.view === "dms" || !guild) {
+    els.sidebarTools.innerHTML = "";
+    return;
+  }
+  const canChannel = Boolean(guild.custom);
+  els.sidebarTools.innerHTML = `
+    <button type="button" class="tool-chip" id="inviteTool">Davet</button>
+    <button type="button" class="tool-chip" id="boostTool">Boost ${guild.boostLevel ? `Lv.${guild.boostLevel}` : ""}</button>
+    ${canChannel ? `<button type="button" class="tool-chip" id="channelTool">+ Kanal</button>` : ""}
+  `;
+  $("inviteTool")?.addEventListener("click", () => copyInvite(guild.id));
+  $("boostTool")?.addEventListener("click", () => boostCurrentGuild(guild.id));
+  $("channelTool")?.addEventListener("click", () => createChannelPrompt(guild.id));
+}
+
 function renderSidebar() {
   if (state.view === "dms") {
-    els.sidebarHead.innerHTML = `<div><strong>Direkt Mesajlar</strong><small>${state.online.length} çevrimiçi</small></div><span class="pulse on"></span>`;
+    els.sidebarHead.innerHTML = `
+      <div><strong>Direkt Mesajlar</strong><small>${state.online.length} çevrimiçi</small></div>
+      <div class="head-actions"><span class="pulse on"></span>
+      <button type="button" class="icon drawer-close" id="drawerCloseBtn" aria-label="Kapat">✕</button></div>`;
+    renderSidebarTools(null);
+    $("drawerCloseBtn")?.addEventListener("click", closeNav);
     els.channelNav.innerHTML = `
       <div class="cat"><div class="cat-name">Direkt Mesajlar</div>
       ${
@@ -254,18 +314,30 @@ function renderSidebar() {
   }
 
   const guild = state.guilds.find((g) => g.id === state.guildId);
-  els.sidebarHead.innerHTML = `<div><strong>${esc(guild?.name || "Sunucu")}</strong><small>bağlanıyor…</small></div><span class="pulse"></span>`;
+  els.sidebarHead.innerHTML = `
+    <div><strong>${esc(guild?.name || "Sunucu")}</strong>
+    <small>${guild?.boostLevel ? `Boost Lv.${guild.boostLevel} · ` : ""}${state.online.length} online</small></div>
+    <div class="head-actions"><span class="pulse on"></span>
+    <button type="button" class="icon drawer-close" id="drawerCloseBtn" aria-label="Kapat">✕</button></div>`;
+  renderSidebarTools(guild);
+  $("drawerCloseBtn")?.addEventListener("click", closeNav);
 
   const list = state.channels.filter((c) => c.guildId === state.guildId);
   const cats = [...new Set(list.map((c) => c.category))];
-  els.channelNav.innerHTML = cats
-    .map((cat) => {
-      const items = list.filter((c) => c.category === cat);
-      return `<div class="cat"><button class="cat-name" type="button">▼ ${esc(cat)}</button><div>${items
-        .map((ch) => {
+  const boostNote =
+    guild?.boostLevel > 0
+      ? `<div class="boost-banner"><span><strong>Sunucu Boost</strong> · Seviye ${guild.boostLevel} (${guild.boostCount || 0} boost)</span></div>`
+      : "";
+  els.channelNav.innerHTML =
+    boostNote +
+    cats
+      .map((cat) => {
+        const items = list.filter((c) => c.category === cat);
+        return `<div class="cat"><button class="cat-name" type="button">▼ ${esc(cat)}</button><div>${items
+          .map((ch) => {
             if (ch.type === "voice") {
-            const people = state.voice.filter((v) => v.voiceChannelId === ch.id);
-            return `<button class="ch ${state.channelId === ch.id ? "active" : ""}" data-channel="${ch.id}" data-type="voice" type="button"><span class="hash">🔊</span><span>${esc(ch.name)}</span>${people.length ? `<span class="badge">${people.length}</span>` : ""}</button>
+              const people = state.voice.filter((v) => v.voiceChannelId === ch.id);
+              return `<button class="ch ${state.channelId === ch.id ? "active" : ""}" data-channel="${ch.id}" data-type="voice" type="button"><span class="hash">🔊</span><span>${esc(ch.name)}</span>${people.length ? `<span class="badge">${people.length}</span>` : ""}</button>
               ${
                 people.length
                   ? `<div class="voice-list">${people
@@ -276,13 +348,13 @@ function renderSidebar() {
                       .join("")}</div>`
                   : ""
               }`;
-          }
-          const n = state.unread[ch.id];
-          return `<button class="ch ${state.channelId === ch.id ? "active" : ""}" data-channel="${ch.id}" type="button"><span class="hash">#</span><span>${esc(ch.name)}</span>${n ? `<span class="badge">${n > 99 ? "99+" : n}</span>` : ""}</button>`;
-        })
-        .join("")}</div></div>`;
-    })
-    .join("");
+            }
+            const n = state.unread[ch.id];
+            return `<button class="ch ${state.channelId === ch.id ? "active" : ""}" data-channel="${ch.id}" type="button"><span class="hash">#</span><span>${esc(ch.name)}</span>${n ? `<span class="badge">${n > 99 ? "99+" : n}</span>` : ""}</button>`;
+          })
+          .join("")}</div></div>`;
+      })
+      .join("");
 
   els.channelNav.querySelectorAll("[data-channel]").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -337,6 +409,7 @@ function msgHtml(msg, compact, enter = false) {
             ? ""
             : `<div class="head">
                 <span class="name" data-user="${msg.userId}" style="color:${esc(msg.userColor)}">${esc(msg.userName)}</span>
+                ${state.online.find((u) => u.id === msg.userId)?.nitroTier && state.online.find((u) => u.id === msg.userId)?.nitroTier !== "none" ? `<span class="nitro-tag">NITRO</span>` : ""}
                 <time class="time" title="${fmtTime(msg.createdAt)}">${fmtRelative(msg.createdAt)}</time>
                 ${msg.editedAt ? `<span class="edited">(düzenlendi)</span>` : ""}
                 ${msg.pinned ? `<span class="pin-tag">📌</span>` : ""}
@@ -755,12 +828,15 @@ function openStream() {
 async function openProfile(userId, event) {
   const { user: u } = await api(`/xzon/api/users/${userId}`);
   const pop = els.profilePop;
+  const nitro = u.nitroTier && u.nitroTier !== "none";
+  pop.classList.toggle("nitro", Boolean(nitro));
   pop.innerHTML = `
-    <div class="banner" style="background:linear-gradient(135deg,${u.color},#1e1f22)"></div>
-    <div class="av ${u.status}" style="background:${u.color}">${initials(u.name)}</div>
+    <div class="banner" style="background:linear-gradient(135deg,${u.accent || u.color},${u.color},#1e1f22)"></div>
+    <div class="av ${u.status}" style="background:${u.accent || u.color}">${initials(u.name)}</div>
     <div class="pad">
       <h2>${esc(u.name)}</h2>
       <p class="tag">${esc(u.name)}#${esc(u.tag || "0000")}</p>
+      ${nitro ? `<span class="nitro-badge">${esc(u.badge || "NITRO")}</span>` : ""}
       <div class="card"><h4>Hakkında</h4><p>${esc(u.bio || "—")}</p></div>
       <div class="card"><h4>Durum</h4><p>${esc(u.customStatus || STATUS[u.status] || "—")}</p></div>
       <div class="actions">
@@ -788,6 +864,159 @@ async function openProfile(userId, event) {
   });
 }
 
+function openGuildModal(tab = "create") {
+  let selected = GUILD_COLORS[0];
+  const paint = () => {
+    document.querySelectorAll("#guildTabs [data-gtab]").forEach((b) => {
+      b.classList.toggle("on", b.dataset.gtab === tab);
+    });
+    if (tab === "join") {
+      els.guildModalBody.innerHTML = `
+        <h2>Davet ile katıl</h2>
+        <p class="sub">Arkadaşının davet kodunu yapıştır. Örn. <code>xzon-xzon</code> veya özel kod.</p>
+        <label>Davet kodu<input id="inviteCodeInput" placeholder="abcd1234" maxlength="40" /></label>
+        <div class="modal-actions"><button type="button" class="btn-primary" id="joinGuildSubmit">Sunucuya Katıl</button></div>`;
+      $("joinGuildSubmit")?.addEventListener("click", async () => {
+        try {
+          const data = await api("/xzon/api/guilds/join", {
+            method: "POST",
+            body: { code: $("inviteCodeInput").value },
+          });
+          state.guilds = data.guilds || state.guilds;
+          state.channels = data.channels || state.channels;
+          els.guildModal.classList.add("hidden");
+          toast(`Katıldın: ${data.guild?.name || "Sunucu"}`);
+          if (data.guild?.id) await openGuild(data.guild.id);
+          else {
+            renderRail();
+            renderSidebar();
+          }
+        } catch (error) {
+          toast(error.message);
+        }
+      });
+      return;
+    }
+    els.guildModalBody.innerHTML = `
+      <h2>Sunucunu kur</h2>
+      <p class="sub">Kendi topluluğunu oluştur. Kanallar, davet ve boost hazır gelir.</p>
+      <label>Sunucu adı<input id="guildNameInput" maxlength="40" placeholder="Örn. Nova Crew" /></label>
+      <label>Renk
+        <div class="color-row" id="guildColorRow">
+          ${GUILD_COLORS.map(
+            (c, i) =>
+              `<button type="button" class="color-swatch ${i === 0 ? "on" : ""}" data-color="${c}" style="background:${c}" aria-label="${c}"></button>`,
+          ).join("")}
+        </div>
+      </label>
+      <div class="modal-actions"><button type="button" class="btn-primary" id="createGuildSubmit">Sunucu Oluştur</button></div>`;
+    $("guildColorRow")?.querySelectorAll("[data-color]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        selected = btn.dataset.color;
+        $("guildColorRow").querySelectorAll(".color-swatch").forEach((b) => b.classList.remove("on"));
+        btn.classList.add("on");
+      });
+    });
+    $("createGuildSubmit")?.addEventListener("click", async () => {
+      try {
+        const data = await api("/xzon/api/guilds", {
+          method: "POST",
+          body: { name: $("guildNameInput").value, color: selected },
+        });
+        state.guilds = data.guilds || state.guilds;
+        state.channels = data.channels || state.channels;
+        els.guildModal.classList.add("hidden");
+        toast(`Sunucu hazır · davet: ${data.invite}`);
+        if (data.invite) {
+          try {
+            await navigator.clipboard.writeText(data.invite);
+          } catch { /* ignore */ }
+        }
+        if (data.guild?.id) await openGuild(data.guild.id);
+      } catch (error) {
+        toast(error.message);
+      }
+    });
+  };
+  paint();
+  document.querySelectorAll("#guildTabs [data-gtab]").forEach((btn) => {
+    btn.onclick = () => {
+      tab = btn.dataset.gtab;
+      paint();
+    };
+  });
+  els.guildModal.classList.remove("hidden");
+}
+
+function openNitroModal() {
+  els.nitroModal.classList.remove("hidden");
+}
+
+async function copyInvite(guildId) {
+  try {
+    const data = await api(`/xzon/api/guilds/${guildId}/invite`, { method: "POST", body: {} });
+    const code = data.code;
+    try {
+      await navigator.clipboard.writeText(code);
+      toast(`Davet kopyalandı: ${code}`);
+    } catch {
+      toast(`Davet kodu: ${code}`);
+    }
+  } catch (error) {
+    toast(error.message);
+  }
+}
+
+async function boostCurrentGuild(guildId) {
+  try {
+    if (!state.user?.nitroTier || state.user.nitroTier === "none") {
+      openNitroModal();
+      toast("Boost için önce Nitro aç");
+      return;
+    }
+    const data = await api(`/xzon/api/guilds/${guildId}/boost`, { method: "POST", body: {} });
+    if (data.guilds) state.guilds = data.guilds;
+    else if (data.guild) {
+      state.guilds = state.guilds.map((g) => (g.id === data.guild.id ? data.guild : g));
+    }
+    renderRail();
+    renderSidebar();
+    toast("Sunucu boostlandı ✦");
+  } catch (error) {
+    toast(error.message);
+  }
+}
+
+async function createChannelPrompt(guildId) {
+  const name = prompt("Yeni kanal adı (ör. duyuru-2)");
+  if (!name) return;
+  const voice = confirm("Ses kanalı olsun mu? (İptal = metin)");
+  try {
+    const data = await api(`/xzon/api/guilds/${guildId}/channels`, {
+      method: "POST",
+      body: { name, type: voice ? "voice" : "text" },
+    });
+    state.channels = data.channels || [...state.channels, data.channel];
+    renderSidebar();
+    if (data.channel?.type === "text") await switchChannel(data.channel.id);
+    toast(`#${data.channel?.name || name} oluşturuldu`);
+  } catch (error) {
+    toast(error.message);
+  }
+}
+
+async function activateNitro(tier) {
+  try {
+    const data = await api("/xzon/api/nitro", { method: "POST", body: { tier } });
+    state.user = data.user;
+    syncMe();
+    els.nitroModal.classList.add("hidden");
+    toast(tier === "full" ? "Full Nitro aktif" : "Nitro Classic aktif");
+  } catch (error) {
+    toast(error.message);
+  }
+}
+
 function showEmoji(anchor, onPick) {
   const pop = els.emojiPop;
   pop.innerHTML = EMOJIS.map((e) => `<button type="button" data-e="${e}">${e}</button>`).join("");
@@ -807,6 +1036,7 @@ function openSettings(tab = "account") {
   const tabs = [
     ["account", "Hesabım"],
     ["profile", "Profil"],
+    ["nitro", "Nitro"],
     ["status", "Durum"],
     ["voice", "Ses"],
     ["logout", "Çıkış Yap"],
@@ -825,6 +1055,7 @@ function openSettings(tab = "account") {
   const panes = {
     account: `<h2>Hesabım</h2><label>Kullanıcı adı<input id="setName" value="${esc(u.name)}" /></label><button class="save" id="saveAccount" type="button">Kaydet Değişiklikleri</button>`,
     profile: `<h2>Profil</h2><label>Hakkında<textarea id="setBio">${esc(u.bio || "")}</textarea></label><label>Özel durum<input id="setCustom" value="${esc(u.customStatus || "")}" maxlength="80" /></label><button class="save" id="saveProfile" type="button">Kaydet</button>`,
+    nitro: `<h2>XZON Nitro</h2><p style="color:var(--text-3);line-height:1.5;margin:0 0 14px">Durum: <strong>${esc(u.nitroTier || "none")}</strong>${u.badge ? ` · ${esc(u.badge)}` : ""}</p><button class="save" id="openNitroFromSettings" type="button">Nitro Mağazası</button>`,
     status: `<h2>Durum</h2><label>Görünürlük<select id="setStatus">${["online", "idle", "dnd", "invisible"].map((s) => `<option value="${s}" ${u.status === s ? "selected" : ""}>${STATUS[s]}</option>`).join("")}</select></label><button class="save" id="saveStatus" type="button">Kaydet</button>`,
     voice: `<h2>Ses</h2><p style="color:var(--text-muted);line-height:1.5">Ses odalarına katılınca alt panelde bağlantı görünür. Mikrofon ve kulaklık durumun senkronlanır.</p>`,
     logout: `<h2>Çıkış Yap</h2><p style="color:var(--text-muted)">Oturumu kapatmak istediğine emin misin?</p><button class="save" id="confirmLogout" type="button" style="background:var(--danger)">Çıkış Yap</button>`,
@@ -852,6 +1083,10 @@ function openSettings(tab = "account") {
     syncMe();
     toast("Durum güncellendi");
   });
+  $("openNitroFromSettings")?.addEventListener("click", () => {
+    els.settingsModal.classList.add("hidden");
+    openNitroModal();
+  });
   $("confirmLogout")?.addEventListener("click", logout);
 }
 
@@ -866,6 +1101,7 @@ async function logout() {
   els.app.classList.add("hidden");
   els.boot.classList.remove("hidden");
   closeAllDrawers();
+  syncFab();
 }
 
 async function bootstrap() {
@@ -893,8 +1129,9 @@ async function bootstrap() {
   openStream();
   startPresence();
   setLive(true, `canlı · ${state.online.length} online`);
+  syncFab();
   if (window.matchMedia("(max-width: 900px)").matches) {
-    toast("☰ menüden sunucu & kanallara geç");
+    toast("Menü butonu her zaman altta — kaybolmaz");
   }
 }
 
@@ -982,11 +1219,34 @@ $("membersBtn").addEventListener("click", () => {
   if (els.membersPane.classList.contains("open")) closeMembersDrawer();
   else openMembersDrawer();
 });
-els.navOpenBtn?.addEventListener("click", () => {
-  if (els.app.classList.contains("nav-open")) closeNav();
-  else openNav();
+els.navOpenBtn?.addEventListener("click", (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  toggleNav();
+});
+els.mobileFab?.addEventListener("click", (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  toggleNav();
 });
 els.navBackdrop?.addEventListener("click", () => closeAllDrawers());
+els.membersCloseBtn?.addEventListener("click", () => closeMembersDrawer());
+els.addGuildBtn?.addEventListener("click", () => openGuildModal("create"));
+els.nitroBtn?.addEventListener("click", () => openNitroModal());
+$("closeGuildModal")?.addEventListener("click", () => els.guildModal.classList.add("hidden"));
+$("closeNitroModal")?.addEventListener("click", () => els.nitroModal.classList.add("hidden"));
+els.nitroModal?.querySelectorAll("[data-tier]").forEach((btn) => {
+  btn.addEventListener("click", () => activateNitro(btn.dataset.tier));
+});
+window.addEventListener("resize", syncFab);
+window.visualViewport?.addEventListener("resize", syncFab);
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") {
+    closeAllDrawers();
+    els.guildModal?.classList.add("hidden");
+    els.nitroModal?.classList.add("hidden");
+  }
+});
 $("emojiBtn").addEventListener("click", (e) => {
   showEmoji(e.currentTarget, (emoji) => {
     els.messageInput.value += emoji;
@@ -1089,7 +1349,7 @@ document.addEventListener("click", (e) => {
 })();
 
 // Visible build marker for cache debugging
-console.info("[XZON] client v6 nav-fix ready");
+console.info("[XZON] client v7 pro-discord ready");
 
 // Category collapse
 document.addEventListener("click", (e) => {

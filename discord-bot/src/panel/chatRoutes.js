@@ -1,8 +1,13 @@
 import {
   GUILDS,
   WEB_CHANNELS,
+  activateNitro,
+  boostGuild,
   channelExists,
   channelsForGuild,
+  createChannel,
+  createGuild,
+  createInvite,
   createWebSession,
   deleteMessage,
   editMessage,
@@ -13,9 +18,12 @@ import {
   getSessionUser,
   getUnreadMap,
   getUserById,
+  joinByInvite,
   joinVoice,
   leaveVoice,
+  listChannelsForUser,
   listDms,
+  listGuildsForUser,
   listOfflineRecent,
   listOnlineUsers,
   markRead,
@@ -26,6 +34,7 @@ import {
   toggleReaction,
   touchPresence,
   updateProfile,
+  userInGuild,
   voiceRoster,
 } from "./chatStore.js";
 import { broadcast, broadcastPresence, clientCount, setClientChannel, subscribe } from "./chatHub.js";
@@ -51,6 +60,9 @@ function assertChannelAccess(user, channelId) {
   if (meta.type === "dm" && user.id !== meta.userA && user.id !== meta.userB) {
     return null;
   }
+  if (meta.guildId && meta.guildId !== "dm" && !userInGuild(user.id, meta.guildId)) {
+    return null;
+  }
   return meta;
 }
 
@@ -61,7 +73,7 @@ export function mountChatRoutes(app) {
       clients: clientCount(),
       channels: WEB_CHANNELS.length,
       guilds: GUILDS.length,
-      version: "xzon-4",
+      version: "xzon-7",
     });
   });
 
@@ -72,8 +84,8 @@ export function mountChatRoutes(app) {
     return res.json({
       ok: true,
       user,
-      guilds: GUILDS,
-      channels: WEB_CHANNELS,
+      guilds: listGuildsForUser(user.id),
+      channels: listChannelsForUser(user.id),
       online: listOnlineUsers(),
       offline: listOfflineRecent(25),
       dms: listDms(user.id),
@@ -82,8 +94,103 @@ export function mountChatRoutes(app) {
     });
   });
 
-  app.get("/xzon/api/channels", (_req, res) => {
-    res.json({ guilds: GUILDS, channels: WEB_CHANNELS });
+  app.get("/xzon/api/channels", (req, res) => {
+    const user = chatUser(req, res);
+    if (!user) return;
+    res.json({
+      guilds: listGuildsForUser(user.id),
+      channels: listChannelsForUser(user.id),
+    });
+  });
+
+  app.post("/xzon/api/guilds", (req, res) => {
+    const user = chatUser(req, res);
+    if (!user) return;
+    try {
+      const result = createGuild(user.id, {
+        name: req.body?.name,
+        color: req.body?.color,
+      });
+      broadcast("guild_create", { guild: result.guild, userId: user.id });
+      return res.json({
+        ok: true,
+        ...result,
+        guilds: listGuildsForUser(user.id),
+        channels: listChannelsForUser(user.id),
+      });
+    } catch (error) {
+      return res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.post("/xzon/api/guilds/join", (req, res) => {
+    const user = chatUser(req, res);
+    if (!user) return;
+    try {
+      const result = joinByInvite(user.id, req.body?.code);
+      return res.json({
+        ok: true,
+        ...result,
+        guilds: listGuildsForUser(user.id),
+        channels: listChannelsForUser(user.id),
+      });
+    } catch (error) {
+      return res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.post("/xzon/api/guilds/:guildId/invite", (req, res) => {
+    const user = chatUser(req, res);
+    if (!user) return;
+    try {
+      const invite = createInvite(user.id, req.params.guildId);
+      return res.json({ ok: true, ...invite });
+    } catch (error) {
+      return res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.post("/xzon/api/guilds/:guildId/channels", (req, res) => {
+    const user = chatUser(req, res);
+    if (!user) return;
+    try {
+      const channel = createChannel(user.id, req.params.guildId, req.body || {});
+      broadcast("channel_create", { channel });
+      return res.json({
+        ok: true,
+        channel,
+        channels: listChannelsForUser(user.id),
+      });
+    } catch (error) {
+      return res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.post("/xzon/api/guilds/:guildId/boost", (req, res) => {
+    const user = chatUser(req, res);
+    if (!user) return;
+    try {
+      const result = boostGuild(user.id, req.params.guildId);
+      return res.json({
+        ok: true,
+        ...result,
+        guilds: listGuildsForUser(user.id),
+      });
+    } catch (error) {
+      return res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.post("/xzon/api/nitro", (req, res) => {
+    const user = chatUser(req, res);
+    if (!user) return;
+    try {
+      const updated = activateNitro(user.id, req.body?.tier || "full");
+      broadcast("user_update", { user: updated });
+      return res.json({ ok: true, user: updated });
+    } catch (error) {
+      return res.status(400).json({ error: error.message });
+    }
   });
 
   app.post("/xzon/api/session", (req, res) => {
@@ -167,6 +274,9 @@ export function mountChatRoutes(app) {
   app.get("/xzon/api/guilds/:guildId/channels", (req, res) => {
     const user = chatUser(req, res);
     if (!user) return;
+    if (!userInGuild(user.id, req.params.guildId)) {
+      return res.status(403).json({ error: "Sunucuya erişim yok" });
+    }
     return res.json({ channels: channelsForGuild(req.params.guildId) });
   });
 

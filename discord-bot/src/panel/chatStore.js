@@ -82,7 +82,67 @@ db.exec(`
     user_b TEXT NOT NULL,
     created_at INTEGER NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS web_guilds (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    short TEXT NOT NULL,
+    color TEXT NOT NULL,
+    owner_id TEXT NOT NULL,
+    boost_level INTEGER NOT NULL DEFAULT 0,
+    boost_count INTEGER NOT NULL DEFAULT 0,
+    banner TEXT,
+    created_at INTEGER NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS web_guild_channels (
+    id TEXT PRIMARY KEY,
+    guild_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    topic TEXT NOT NULL DEFAULT '',
+    category TEXT NOT NULL DEFAULT 'SOHBET',
+    type TEXT NOT NULL DEFAULT 'text',
+    position INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL,
+    FOREIGN KEY (guild_id) REFERENCES web_guilds(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS web_guild_members (
+    guild_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    role TEXT NOT NULL DEFAULT 'member',
+    joined_at INTEGER NOT NULL,
+    PRIMARY KEY (guild_id, user_id)
+  );
+
+  CREATE TABLE IF NOT EXISTS web_invites (
+    code TEXT PRIMARY KEY,
+    guild_id TEXT NOT NULL,
+    creator_id TEXT NOT NULL,
+    uses INTEGER NOT NULL DEFAULT 0,
+    max_uses INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL,
+    FOREIGN KEY (guild_id) REFERENCES web_guilds(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS web_boosts (
+    guild_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    PRIMARY KEY (guild_id, user_id)
+  );
 `);
+
+for (const [col, type] of [
+  ["nitro_tier", "TEXT"],
+  ["banner", "TEXT"],
+  ["badge", "TEXT"],
+  ["accent", "TEXT"],
+]) {
+  if (!userCols.includes(col)) {
+    db.exec(`ALTER TABLE web_users ADD COLUMN ${col} ${type}`);
+  }
+}
 
 const COLORS = [
   "#ed4245",
@@ -152,7 +212,109 @@ function mapUser(row) {
     muted: Boolean(row.muted),
     deafened: Boolean(row.deafened),
     lastSeen: row.last_seen,
+    nitroTier: row.nitro_tier || "none",
+    banner: row.banner || "",
+    badge: row.badge || "",
+    accent: row.accent || row.color,
   };
+}
+
+function shortFromName(name) {
+  const clean = String(name || "")
+    .replace(/[^a-zA-Z0-9ğüşıöçĞÜŞİÖÇ ]/g, "")
+    .trim();
+  const parts = clean.split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase().slice(0, 2);
+  return clean.slice(0, 2).toUpperCase() || "SV";
+}
+
+function inviteCode() {
+  return crypto.randomBytes(4).toString("hex");
+}
+
+function mapGuild(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    name: row.name,
+    short: row.short,
+    color: row.color,
+    ownerId: row.owner_id || null,
+    boostLevel: row.boost_level || 0,
+    boostCount: row.boost_count || 0,
+    banner: row.banner || "",
+    custom: !GUILDS.some((g) => g.id === row.id),
+  };
+}
+
+function mapChannel(row) {
+  return {
+    id: row.id,
+    guildId: row.guild_id,
+    name: row.name,
+    topic: row.topic || "",
+    category: row.category || "SOHBET",
+    type: row.type || "text",
+    custom: true,
+  };
+}
+
+function customGuildRows() {
+  return db.prepare("SELECT * FROM web_guilds ORDER BY created_at ASC").all();
+}
+
+function customChannelRows(guildId = null) {
+  if (guildId) {
+    return db
+      .prepare(
+        `SELECT * FROM web_guild_channels WHERE guild_id = ? ORDER BY position ASC, created_at ASC`,
+      )
+      .all(guildId);
+  }
+  return db
+    .prepare("SELECT * FROM web_guild_channels ORDER BY position ASC, created_at ASC")
+    .all();
+}
+
+function isStaticGuild(guildId) {
+  return GUILDS.some((g) => g.id === guildId);
+}
+
+export function userInGuild(userId, guildId) {
+  if (!guildId || guildId === "dm") return false;
+  if (isStaticGuild(guildId)) return true;
+  return Boolean(
+    db
+      .prepare("SELECT 1 FROM web_guild_members WHERE guild_id = ? AND user_id = ?")
+      .get(guildId, userId),
+  );
+}
+
+export function listGuildsForUser(userId) {
+  const customs = customGuildRows()
+    .filter((g) => userInGuild(userId, g.id))
+    .map(mapGuild);
+  return [
+    ...GUILDS.map((g) => ({
+      ...g,
+      ownerId: null,
+      boostLevel: 3,
+      boostCount: 14,
+      banner: "",
+      custom: false,
+    })),
+    ...customs,
+  ];
+}
+
+export function listChannelsForUser(userId) {
+  const customGuildIds = new Set(
+    customGuildRows().filter((g) => userInGuild(userId, g.id)).map((g) => g.id),
+  );
+  const customs = customChannelRows()
+    .filter((c) => customGuildIds.has(c.guild_id))
+    .map(mapChannel);
+  return [...WEB_CHANNELS, ...customs];
 }
 
 function ensureSystemUser() {
@@ -259,11 +421,22 @@ export function updateProfile(userId, patch = {}) {
       ? String(patch.customStatus).slice(0, 80)
       : user.customStatus;
 
+  const nitroTier = ["none", "classic", "full"].includes(patch.nitroTier)
+    ? patch.nitroTier
+    : user.nitroTier || "none";
+  const banner =
+    patch.banner !== undefined ? String(patch.banner).slice(0, 80) : user.banner || "";
+  const badge =
+    patch.badge !== undefined ? String(patch.badge).slice(0, 24) : user.badge || "";
+  const accent =
+    patch.accent !== undefined ? String(patch.accent).slice(0, 32) : user.accent || user.color;
+
   db.prepare(
     `UPDATE web_users
-     SET name = ?, bio = ?, status = ?, custom_status = ?, last_seen = ?
+     SET name = ?, bio = ?, status = ?, custom_status = ?, last_seen = ?,
+         nitro_tier = ?, banner = ?, badge = ?, accent = ?
      WHERE id = ?`,
-  ).run(name, bio, status, customStatus, now(), userId);
+  ).run(name, bio, status, customStatus, now(), nitroTier, banner, badge, accent, userId);
 
   // Keep message author names roughly in sync for recent identity
   db.prepare(
@@ -377,12 +550,16 @@ export function channelExists(channelId) {
   if (String(channelId).startsWith("dm:")) {
     return Boolean(db.prepare("SELECT channel_id FROM web_dm_peers WHERE channel_id = ?").get(channelId));
   }
-  return false;
+  return Boolean(
+    db.prepare("SELECT id FROM web_guild_channels WHERE id = ?").get(channelId),
+  );
 }
 
 export function getChannelMeta(channelId) {
   const ch = WEB_CHANNELS.find((c) => c.id === channelId);
   if (ch) return ch;
+  const custom = db.prepare("SELECT * FROM web_guild_channels WHERE id = ?").get(channelId);
+  if (custom) return mapChannel(custom);
   if (String(channelId).startsWith("dm:")) {
     const peer = db.prepare("SELECT * FROM web_dm_peers WHERE channel_id = ?").get(channelId);
     if (!peer) return null;
@@ -599,7 +776,9 @@ export function markRead(userId, channelId, at = now()) {
 
 export function getUnreadMap(userId) {
   const channels = [
-    ...WEB_CHANNELS.filter((c) => c.type === "text").map((c) => c.id),
+    ...listChannelsForUser(userId)
+      .filter((c) => c.type === "text")
+      .map((c) => c.id),
     ...db
       .prepare("SELECT channel_id AS id FROM web_dm_peers WHERE user_a = ? OR user_b = ?")
       .all(userId, userId)
@@ -733,5 +912,185 @@ export function voiceRoster() {
 }
 
 export function channelsForGuild(guildId) {
-  return WEB_CHANNELS.filter((c) => c.guildId === guildId);
+  return [
+    ...WEB_CHANNELS.filter((c) => c.guildId === guildId),
+    ...customChannelRows(guildId).map(mapChannel),
+  ];
+}
+
+export function createGuild(ownerId, { name, color } = {}) {
+  const clean = String(name || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .slice(0, 40);
+  if (clean.length < 2) throw new Error("Sunucu adı en az 2 karakter olmalı");
+  const id = `g_${crypto.randomBytes(6).toString("hex")}`;
+  const short = shortFromName(clean);
+  const tint = String(color || COLORS[Math.floor(Math.random() * COLORS.length)]).slice(0, 32);
+  const created = now();
+
+  db.prepare(
+    `INSERT INTO web_guilds (id, name, short, color, owner_id, boost_level, boost_count, banner, created_at)
+     VALUES (?, ?, ?, ?, ?, 0, 0, '', ?)`,
+  ).run(id, clean, short, tint, ownerId, created);
+
+  db.prepare(
+    `INSERT INTO web_guild_members (guild_id, user_id, role, joined_at) VALUES (?, ?, 'owner', ?)`,
+  ).run(id, ownerId, created);
+
+  const defaults = [
+    ["duyurular", "Resmi duyurular", "BİLGİ", "text", 0],
+    ["kurallar", "Sunucu kuralları", "BİLGİ", "text", 1],
+    ["genel", "Ana sohbet kanalı", "SOHBET", "text", 2],
+    ["sohbet", "Gündelik muhabbet", "SOHBET", "text", 3],
+    ["Lobby", "Sesli lobi", "SESLİ", "voice", 4],
+    ["Gaming", "Oyun sesi", "SESLİ", "voice", 5],
+  ];
+  const insertCh = db.prepare(
+    `INSERT INTO web_guild_channels
+      (id, guild_id, name, topic, category, type, position, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+  );
+  for (const [chName, topic, category, type, position] of defaults) {
+    const chId = `${id}:${chName.toLowerCase().replace(/\s+/g, "-")}`;
+    insertCh.run(chId, id, chName, topic, category, type, position, created);
+  }
+
+  const code = inviteCode();
+  db.prepare(
+    `INSERT INTO web_invites (code, guild_id, creator_id, uses, max_uses, created_at)
+     VALUES (?, ?, ?, 0, 0, ?)`,
+  ).run(code, id, ownerId, created);
+
+  const guild = mapGuild(db.prepare("SELECT * FROM web_guilds WHERE id = ?").get(id));
+  return {
+    guild,
+    channels: channelsForGuild(id),
+    invite: code,
+  };
+}
+
+export function createInvite(userId, guildId) {
+  if (!userInGuild(userId, guildId)) throw new Error("Bu sunucuda değilsin");
+  if (isStaticGuild(guildId)) {
+    const code = `xzon-${guildId}`;
+    return { code, guildId };
+  }
+  const code = inviteCode();
+  db.prepare(
+    `INSERT INTO web_invites (code, guild_id, creator_id, uses, max_uses, created_at)
+     VALUES (?, ?, ?, 0, 0, ?)`,
+  ).run(code, guildId, userId, now());
+  return { code, guildId };
+}
+
+export function joinByInvite(userId, rawCode) {
+  const code = String(rawCode || "")
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\/[^/]+\//, "")
+    .replace(/^invite\//, "");
+  if (!code) throw new Error("Davet kodu gerekli");
+
+  if (code.startsWith("xzon-")) {
+    const guildId = code.slice(5);
+    if (!isStaticGuild(guildId)) throw new Error("Geçersiz davet");
+    const guild = listGuildsForUser(userId).find((g) => g.id === guildId);
+    return { guild, channels: channelsForGuild(guildId), invite: code };
+  }
+
+  const invite = db.prepare("SELECT * FROM web_invites WHERE lower(code) = ?").get(code);
+  if (!invite) throw new Error("Davet bulunamadı");
+  if (invite.max_uses > 0 && invite.uses >= invite.max_uses) {
+    throw new Error("Davet limiti dolmuş");
+  }
+
+  const existing = db
+    .prepare("SELECT 1 FROM web_guild_members WHERE guild_id = ? AND user_id = ?")
+    .get(invite.guild_id, userId);
+  if (!existing) {
+    db.prepare(
+      `INSERT INTO web_guild_members (guild_id, user_id, role, joined_at) VALUES (?, ?, 'member', ?)`,
+    ).run(invite.guild_id, userId, now());
+  }
+  db.prepare("UPDATE web_invites SET uses = uses + 1 WHERE code = ?").run(invite.code);
+
+  const guild = mapGuild(db.prepare("SELECT * FROM web_guilds WHERE id = ?").get(invite.guild_id));
+  return {
+    guild,
+    channels: channelsForGuild(invite.guild_id),
+    invite: invite.code,
+  };
+}
+
+export function createChannel(userId, guildId, { name, type = "text", topic = "", category } = {}) {
+  if (!userInGuild(userId, guildId)) throw new Error("Bu sunucuda değilsin");
+  if (isStaticGuild(guildId)) throw new Error("Varsayılan sunucularda kanal açılamaz");
+  const member = db
+    .prepare("SELECT role FROM web_guild_members WHERE guild_id = ? AND user_id = ?")
+    .get(guildId, userId);
+  if (!member || !["owner", "admin"].includes(member.role)) {
+    throw new Error("Kanal oluşturmak için yetkin yok");
+  }
+  const clean = String(name || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9ğüşıöç\-]/gi, "")
+    .slice(0, 32);
+  if (clean.length < 2) throw new Error("Kanal adı geçersiz");
+  const chType = type === "voice" ? "voice" : "text";
+  const id = `${guildId}:${clean}-${crypto.randomBytes(2).toString("hex")}`;
+  const cat = category || (chType === "voice" ? "SESLİ" : "SOHBET");
+  const pos =
+    db.prepare("SELECT COUNT(*) AS c FROM web_guild_channels WHERE guild_id = ?").get(guildId).c;
+  db.prepare(
+    `INSERT INTO web_guild_channels
+      (id, guild_id, name, topic, category, type, position, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(id, guildId, clean, String(topic || "").slice(0, 120), cat, chType, pos, now());
+  return getChannelMeta(id);
+}
+
+export function boostGuild(userId, guildId) {
+  const user = getUserById(userId);
+  if (!user) throw new Error("Kullanıcı yok");
+  if ((user.nitroTier || "none") === "none") {
+    throw new Error("Boost için Nitro gerekli");
+  }
+  if (!userInGuild(userId, guildId)) throw new Error("Bu sunucuda değilsin");
+  if (isStaticGuild(guildId)) {
+    return { guild: listGuildsForUser(userId).find((g) => g.id === guildId), boosted: true };
+  }
+  const already = db
+    .prepare("SELECT 1 FROM web_boosts WHERE guild_id = ? AND user_id = ?")
+    .get(guildId, userId);
+  if (!already) {
+    db.prepare("INSERT INTO web_boosts (guild_id, user_id, created_at) VALUES (?, ?, ?)").run(
+      guildId,
+      userId,
+      now(),
+    );
+  }
+  const count = db.prepare("SELECT COUNT(*) AS c FROM web_boosts WHERE guild_id = ?").get(guildId).c;
+  const level = count >= 14 ? 3 : count >= 7 ? 2 : count >= 1 ? 1 : 0;
+  db.prepare("UPDATE web_guilds SET boost_count = ?, boost_level = ? WHERE id = ?").run(
+    count,
+    level,
+    guildId,
+  );
+  return {
+    guild: mapGuild(db.prepare("SELECT * FROM web_guilds WHERE id = ?").get(guildId)),
+    boosted: true,
+  };
+}
+
+export function activateNitro(userId, tier = "full") {
+  const next = ["classic", "full"].includes(tier) ? tier : "full";
+  const banner =
+    next === "full"
+      ? "aurora"
+      : "classic";
+  const badge = next === "full" ? "NITRO" : "CLASSIC";
+  return updateProfile(userId, { nitroTier: next, banner, badge });
 }

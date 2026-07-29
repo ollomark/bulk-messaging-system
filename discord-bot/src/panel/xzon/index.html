@@ -2,7 +2,7 @@
 <html lang="tr">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#07090d" />
     <meta name="description" content="XZON — premium canlı topluluk" />
     <title>XZON</title>
@@ -12,7 +12,7 @@
       href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="/xzon/css/app.css?v=6" />
+    <link rel="stylesheet" href="/xzon/css/app.css?v=7" />
   </head>
   <body>
     <div id="boot" class="boot">
@@ -25,11 +25,11 @@
             <span>XZ</span>
           </div>
           <h2>XZON</h2>
-          <p>Premium topluluk deneyimi. Anlık sohbet, ses odaları, DM — tek yerde.</p>
+          <p>Premium topluluk deneyimi. Sunucu kur, davet et, Nitro ile parlat — Discord köşesi senin uygulamanda.</p>
           <ul class="boot-points">
             <li>Gerçek zamanlı mesajlaşma</li>
-            <li>Çoklu sunucu & kanallar</li>
-            <li>Profil · tepki · sabitle · ses</li>
+            <li>Sunucu kur · davet · boost</li>
+            <li>Nitro · profil · ses odaları</li>
           </ul>
         </aside>
         <form id="joinForm" class="boot-card" autocomplete="nickname">
@@ -53,19 +53,22 @@
     <div id="app" class="app hidden">
       <div id="netBanner" class="net-banner hidden">Bağlantı yenileniyor…</div>
 
-      <nav class="rail" aria-label="Sunucular">
+      <nav class="rail" aria-label="Sunucular" id="railPane">
         <button class="guild-btn dm" id="dmHomeBtn" type="button" title="Direkt Mesajlar">
           <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
         </button>
         <div class="rail-sep"></div>
         <div id="guildRail" class="guild-stack"></div>
+        <button class="guild-btn add" id="addGuildBtn" type="button" title="Sunucu Ekle">+</button>
         <div class="rail-foot">
+          <button type="button" class="guild-btn nitro" id="nitroBtn" title="XZON Nitro">N</button>
           <div class="rail-live" id="railLive" title="Canlı"></div>
         </div>
       </nav>
 
-      <aside class="sidebar">
+      <aside class="sidebar" id="sidebarPane">
         <header class="sidebar-head" id="sidebarHead"></header>
+        <div class="sidebar-tools" id="sidebarTools"></div>
         <div class="sidebar-scroll" id="channelNav"></div>
         <div class="voice-dock hidden" id="voicePanel">
           <div class="voice-wave" aria-hidden="true"><i></i><i></i><i></i></div>
@@ -104,7 +107,7 @@
       <section class="chat">
         <header class="chat-bar">
           <div class="chat-left">
-            <button type="button" class="icon glass nav-open" id="navOpenBtn" title="Kanallar" aria-label="Kanallar">
+            <button type="button" class="icon glass nav-open" id="navOpenBtn" title="Menü" aria-label="Menü">
               <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 6h18v2H3V6zm0 5h18v2H3v-2zm0 5h18v2H3v-2z"/></svg>
             </button>
             <div class="chat-title">
@@ -143,7 +146,7 @@
           <form id="composer" class="composer">
             <div class="composer-shell">
               <button type="button" class="icon soft" id="emojiBtn" title="Emoji" aria-label="Emoji">☺</button>
-              <input id="messageInput" type="text" maxlength="1800" autocomplete="off" placeholder="Mesajını yaz…" />
+              <input id="messageInput" type="text" maxlength="1800" autocomplete="off" placeholder="Mesajını yaz…" enterkeyhint="send" />
               <button type="submit" class="send" id="sendBtn" aria-label="Gönder">
                 <svg viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
               </button>
@@ -156,9 +159,52 @@
         <div class="members-head">
           <strong>Üyeler</strong>
           <span id="memberCountLabel">0</span>
+          <button type="button" class="icon members-close" id="membersCloseBtn" aria-label="Kapat">✕</button>
         </div>
         <div id="membersContent"></div>
       </aside>
+    </div>
+
+    <!-- Always-on mobile nav control (outside app grid so send/keyboard never hides it) -->
+    <button type="button" id="mobileFab" class="mobile-fab hidden" aria-label="Menüyü aç">
+      <span class="fab-bars" aria-hidden="true"><i></i><i></i><i></i></span>
+      <span class="fab-label">Menü</span>
+    </button>
+
+    <div id="guildModal" class="overlay hidden">
+      <div class="modal-card guild-modal">
+        <button type="button" class="settings-x" id="closeGuildModal" aria-label="Kapat">✕</button>
+        <div class="modal-tabs" id="guildTabs">
+          <button type="button" class="on" data-gtab="create">Sunucu Kur</button>
+          <button type="button" data-gtab="join">Davet ile Katıl</button>
+        </div>
+        <div id="guildModalBody"></div>
+      </div>
+    </div>
+
+    <div id="nitroModal" class="overlay hidden">
+      <div class="modal-card nitro-modal">
+        <button type="button" class="settings-x" id="closeNitroModal" aria-label="Kapat">✕</button>
+        <div class="nitro-hero">
+          <span class="nitro-orb">N</span>
+          <div>
+            <p class="eyebrow">XZON NITRO</p>
+            <h2>Profilini parlat</h2>
+            <p>Rozet, özel banner, sunucu boost ve renkli tag — Discord Nitro hissi, XZON’da.</p>
+          </div>
+        </div>
+        <div class="nitro-plans">
+          <button type="button" class="nitro-plan" data-tier="classic">
+            <strong>Classic</strong>
+            <span>Rozet · klasik banner</span>
+          </button>
+          <button type="button" class="nitro-plan featured" data-tier="full">
+            <strong>Full Nitro</strong>
+            <span>Aurora banner · boost · accent</span>
+          </button>
+        </div>
+        <p class="nitro-note">Demo ortamında tek tıkla aktif edilir. Gerçek ödeme yok.</p>
+      </div>
     </div>
 
     <div id="statusMenu" class="menu hidden"></div>
@@ -179,6 +225,6 @@
       </div>
     </div>
     <div id="toast" class="toast hidden"></div>
-    <script src="/xzon/js/app.js?v=6" type="module"></script>
+    <script src="/xzon/js/app.js?v=7" type="module"></script>
   </body>
 </html>
