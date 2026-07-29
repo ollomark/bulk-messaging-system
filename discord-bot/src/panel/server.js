@@ -185,8 +185,14 @@ export function startPanelServer(client) {
     }
   });
 
-  app.get("*", (req, res) => {
+  app.get("/", (req, res) => {
     res.sendFile(path.join(__dirname, "public", "index.html"));
+  });
+
+  // Express 5 uyumlu SPA fallback
+  app.use((req, res, next) => {
+    if (req.method !== "GET" || req.path.startsWith("/api/")) return next();
+    return res.sendFile(path.join(__dirname, "public", "index.html"));
   });
 
   app.listen(port, "0.0.0.0", () => {

@@ -42,7 +42,12 @@ async function bootstrap() {
   await loadEvents(client, path.join(__dirname, "events"));
   startGiveawayScheduler(client);
   startReminderScheduler(client);
-  startPanelServer(client);
+
+  try {
+    startPanelServer(client);
+  } catch (error) {
+    console.error("Kontrol paneli başlatılamadı:", error);
+  }
 
   await client.login(config.token);
 }
