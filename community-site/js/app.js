@@ -458,9 +458,13 @@ function renderMembers() {
     els.memberCountLabel.textContent = String(state.online.length + state.offline.length);
   }
 
-  const nitro = state.online.filter((u) => u.nitroTier && u.nitroTier !== "none");
   const voice = state.online.filter((u) => u.voiceChannelId);
-  const rest = state.online.filter((u) => !u.voiceChannelId);
+  const nitro = state.online.filter(
+    (u) => !u.voiceChannelId && u.nitroTier && u.nitroTier !== "none",
+  );
+  const rest = state.online.filter(
+    (u) => !u.voiceChannelId && !(u.nitroTier && u.nitroTier !== "none"),
+  );
 
   els.membersContent.innerHTML = `
     ${voice.length ? `<h3>Seste — ${voice.length}</h3>${voice.map((u) => row(u)).join("")}` : ""}
