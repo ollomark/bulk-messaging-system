@@ -122,6 +122,11 @@ const els = {
   charCount: $("charCount"),
   sheetTitle: $("sheetTitle"),
   soundToggleBtn: $("soundToggleBtn"),
+  serverSettingsModal: $("serverSettingsModal"),
+  serverSettingsNav: $("serverSettingsNav"),
+  serverSettingsPane: $("serverSettingsPane"),
+  channelSettingsModal: $("channelSettingsModal"),
+  channelSettingsBody: $("channelSettingsBody"),
 };
 
 const GUILD_COLORS = ["#5865f2", "#ed4245", "#3ba55c", "#faa61a", "#eb459e", "#00a8fc", "#9b59b6", "#1abc9c"];
@@ -161,6 +166,9 @@ const state = {
   blocks: [],
   dmTab: "dms",
   quickIndex: 0,
+  guildMembers: [],
+  guildRoles: [],
+  serverTab: "overview",
 };
 
 function toast(text) {
@@ -316,13 +324,45 @@ function resizeComposer() {
   if (els.charCount) els.charCount.textContent = `${ta.value.length}/1800`;
 }
 
+function canManageGuild(guild = null) {
+  const g = guild || state.guilds.find((x) => x.id === state.guildId);
+  if (!g?.custom) return false;
+  return ["owner", "admin"].includes(g.myRole || "");
+}
+
 function userRole(userId) {
-  if (userId === "system") return { label: "BOT", cls: "owner" };
+  if (userId === "system") return { label: "BOT", cls: "bot" };
+  const mem = state.guildMembers.find((m) => m.id === userId);
+  if (mem?.displayRole?.name) {
+    return { label: mem.displayRole.name, cls: "custom", color: mem.displayRole.color };
+  }
+  if (mem?.guildRole === "owner") return { label: "OWNER", cls: "owner" };
+  if (mem?.guildRole === "admin") return { label: "ADMIN", cls: "admin" };
+  if (mem?.guildRole === "mod") return { label: "MOD", cls: "mod" };
   const guild = state.guilds.find((g) => g.id === state.guildId);
   if (guild?.ownerId && guild.ownerId === userId) return { label: "OWNER", cls: "owner" };
   const u = [...state.online, ...state.offline, state.user].find((x) => x?.id === userId);
   if (u?.nitroTier && u.nitroTier !== "none") return { label: u.badge || "NITRO", cls: "nitro" };
   return null;
+}
+
+async function refreshGuildMeta(guildId = state.guildId) {
+  if (!guildId || guildId === "dm") {
+    state.guildMembers = [];
+    state.guildRoles = [];
+    return;
+  }
+  try {
+    const [mem, roles] = await Promise.all([
+      api(`/xzon/api/guilds/${guildId}/members`),
+      api(`/xzon/api/guilds/${guildId}/roles`).catch(() => ({ roles: [] })),
+    ]);
+    state.guildMembers = mem.members || [];
+    state.guildRoles = roles.roles || [];
+  } catch {
+    state.guildMembers = [];
+    state.guildRoles = [];
+  }
 }
 
 function embedHtml(content) {
@@ -410,15 +450,19 @@ function renderSidebarTools(guild) {
     els.sidebarTools.innerHTML = "";
     return;
   }
-  const canChannel = Boolean(guild.custom);
+  const manage = canManageGuild(guild);
   els.sidebarTools.innerHTML = `
     <button type="button" class="tool-chip" id="inviteTool">Davet</button>
     <button type="button" class="tool-chip" id="boostTool">Boost ${guild.boostLevel ? `Lv.${guild.boostLevel}` : ""}</button>
-    ${canChannel ? `<button type="button" class="tool-chip" id="channelTool">+ Kanal</button>` : ""}
+    ${manage ? `<button type="button" class="tool-chip" id="channelTool">+ Kanal</button>` : ""}
+    ${manage ? `<button type="button" class="tool-chip" id="categoryTool">+ Kategori</button>` : ""}
+    ${guild.custom ? `<button type="button" class="tool-chip accent" id="serverTool">Ayarlar</button>` : ""}
   `;
   $("inviteTool")?.addEventListener("click", () => copyInvite(guild.id));
   $("boostTool")?.addEventListener("click", () => boostCurrentGuild(guild.id));
   $("channelTool")?.addEventListener("click", () => createChannelPrompt(guild.id));
+  $("categoryTool")?.addEventListener("click", () => createCategoryPrompt(guild.id));
+  $("serverTool")?.addEventListener("click", () => openServerSettings(guild.id));
 }
 
 function renderSidebar() {
@@ -572,6 +616,7 @@ function renderSidebar() {
 
   const list = state.channels.filter((c) => c.guildId === state.guildId);
   const cats = [...new Set(list.map((c) => c.category))];
+  const manage = canManageGuild(guild);
   const boostNote =
     guild?.boostLevel > 0
       ? `<div class="boost-banner"><span><strong>Sunucu Boost</strong> · Seviye ${guild.boostLevel} (${guild.boostCount || 0} boost)</span></div>`
@@ -581,11 +626,22 @@ function renderSidebar() {
     cats
       .map((cat) => {
         const items = list.filter((c) => c.category === cat);
-        return `<div class="cat"><button class="cat-name" type="button">▼ ${esc(cat)}</button><div>${items
+        return `<div class="cat">
+          <div class="cat-head">
+            <button class="cat-name" type="button">▼ ${esc(cat)}</button>
+            ${manage ? `<button type="button" class="cat-gear" data-rename-cat="${esc(cat)}" title="Kategoriyi yeniden adlandır">✎</button>` : ""}
+          </div>
+          <div>${items
           .map((ch) => {
+            const gear = manage && ch.custom
+              ? `<button type="button" class="ch-gear" data-edit-ch="${ch.id}" title="Kanal ayarları">⚙</button>`
+              : "";
             if (ch.type === "voice") {
               const people = state.voice.filter((v) => v.voiceChannelId === ch.id);
-              return `<button class="ch ${state.channelId === ch.id ? "active" : ""}" data-channel="${ch.id}" data-type="voice" type="button"><span class="hash">🔊</span><span>${esc(ch.name)}</span>${people.length ? `<span class="badge">${people.length}</span>` : ""}</button>
+              return `<div class="ch-row">
+                <button class="ch ${state.channelId === ch.id ? "active" : ""}" data-channel="${ch.id}" data-type="voice" type="button"><span class="hash">🔊</span><span>${esc(ch.name)}</span>${people.length ? `<span class="badge">${people.length}</span>` : ""}</button>
+                ${gear}
+              </div>
               ${
                 people.length
                   ? `<div class="voice-list">${people
@@ -599,16 +655,45 @@ function renderSidebar() {
             }
             const n = isChannelMuted(ch.id) ? 0 : state.unread[ch.id];
             const muted = isChannelMuted(ch.id) ? " muted" : "";
-            return `<button class="ch${muted} ${state.channelId === ch.id ? "active" : ""}" data-channel="${ch.id}" type="button"><span class="hash">#</span><span>${esc(ch.name)}</span>${ch.slowmode ? `<span class="slow-tag">${ch.slowmode}s</span>` : ""}${ch.nsfw ? `<span class="nsfw-tag">NSFW</span>` : ""}${n ? `<span class="badge">${n > 99 ? "99+" : n}</span>` : ""}</button>`;
+            return `<div class="ch-row">
+              <button class="ch${muted} ${state.channelId === ch.id ? "active" : ""}" data-channel="${ch.id}" type="button"><span class="hash">#</span><span>${esc(ch.name)}</span>${ch.slowmode ? `<span class="slow-tag">${ch.slowmode}s</span>` : ""}${ch.nsfw ? `<span class="nsfw-tag">NSFW</span>` : ""}${n ? `<span class="badge">${n > 99 ? "99+" : n}</span>` : ""}</button>
+              ${gear}
+            </div>`;
           })
           .join("")}</div></div>`;
       })
       .join("");
 
+  $("guestUpgradeBtn")?.addEventListener("click", () => openSettings("account"));
   els.channelNav.querySelectorAll("[data-channel]").forEach((btn) => {
     btn.addEventListener("click", () => {
       if (btn.dataset.type === "voice") joinVoice(btn.dataset.channel);
       else switchChannel(btn.dataset.channel);
+    });
+  });
+  els.channelNav.querySelectorAll("[data-edit-ch]").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      openChannelSettings(btn.dataset.editCh);
+    });
+  });
+  els.channelNav.querySelectorAll("[data-rename-cat]").forEach((btn) => {
+    btn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const from = btn.dataset.renameCat;
+      const to = prompt("Yeni kategori adı", from);
+      if (!to || to === from) return;
+      try {
+        const data = await api(`/xzon/api/guilds/${guild.id}/categories`, {
+          method: "PATCH",
+          body: { from, to },
+        });
+        state.channels = data.channels || state.channels;
+        renderSidebar();
+        toast(`Kategori: ${to}`);
+      } catch (error) {
+        toast(error.message);
+      }
     });
   });
 }
@@ -620,7 +705,7 @@ function renderMembers() {
     <button class="member ${dim ? "dim" : ""}" data-user="${u.id}" type="button">
       <div class="av ${u.status || "offline"}" style="background:${u.accent || u.color}">${initials(u.name)}</div>
       <div class="meta">
-        <span class="n" style="color:${u.color || "inherit"}">${esc(u.name)}${role ? ` <span class="role-tag ${role.cls}">${esc(role.label)}</span>` : ""}</span>
+        <span class="n" style="color:${role?.color || u.color || "inherit"}">${esc(u.name)}${role ? ` <span class="role-tag ${role.cls}" ${role.color ? `style="background:${esc(role.color)};color:#061018"` : ""}>${esc(role.label)}</span>` : ""}</span>
         <span class="a">${esc(
           u.voiceChannelId
             ? `🔊 ${state.channels.find((c) => c.id === u.voiceChannelId)?.name || "Ses"}`
@@ -658,6 +743,22 @@ function renderMembers() {
 function msgHtml(msg, compact, enter = false) {
   const mine = state.user && msg.userId === state.user.id;
   const role = userRole(msg.userId);
+  if (msg.userId === "system") {
+    return `
+      <article class="msg system ${enter ? "enter" : ""}" data-id="${msg.id}">
+        <div class="sys-line">
+          <span class="sys-dot"></span>
+          <div class="body">${md(msg.content)}</div>
+          <time class="time" title="${fmtTime(msg.createdAt)}">${fmtRelative(msg.createdAt)}</time>
+        </div>
+      </article>`;
+  }
+  const nameColor = role?.color || msg.userColor;
+  const canModDelete =
+    !mine &&
+    ["owner", "admin", "mod"].includes(
+      state.guilds.find((g) => g.id === state.guildId)?.myRole || "",
+    );
   const mentioned =
     state.user &&
     !mine &&
@@ -675,8 +776,8 @@ function msgHtml(msg, compact, enter = false) {
           compact
             ? `<time class="time compact-time" title="${fmtTime(msg.createdAt)}">${fmtTime(msg.createdAt)}</time>`
             : `<div class="head">
-                <span class="name" data-user="${msg.userId}" style="color:${esc(msg.userColor)}">${esc(msg.userName)}</span>
-                ${role ? `<span class="role-tag ${role.cls}">${esc(role.label)}</span>` : ""}
+                <span class="name" data-user="${msg.userId}" style="color:${esc(nameColor)}">${esc(msg.userName)}</span>
+                ${role ? `<span class="role-tag ${role.cls}" ${role.color ? `style="background:${esc(role.color)};color:#061018"` : ""}>${esc(role.label)}</span>` : ""}
                 <time class="time" title="${fmtTime(msg.createdAt)}">${fmtRelative(msg.createdAt)}</time>
                 ${msg.editedAt ? `<span class="edited">(düzenlendi)</span>` : ""}
                 ${msg.pinned ? `<span class="pin-tag">📌</span>` : ""}
@@ -701,7 +802,7 @@ function msgHtml(msg, compact, enter = false) {
               ${mine ? actBtn("edit", msg.id, "Düzenle", ICON.edit) : ""}
               ${actBtn("pin", msg.id, "Sabitle", ICON.pin)}
               ${actBtn("copy", msg.id, "Kopyala", ICON.copy)}
-              ${mine ? actBtn("delete", msg.id, "Sil", ICON.trash, true) : ""}
+              ${mine || canModDelete ? actBtn("delete", msg.id, "Sil", ICON.trash, true) : ""}
             </div>`
       }
     </article>`;
@@ -900,7 +1001,12 @@ async function openGuild(guildId) {
     state.channels.find((c) => c.guildId === guildId && c.type === "text" && c.id === "genel")?.id ||
     state.channels.find((c) => c.guildId === guildId && c.type === "text")?.id;
   renderRail();
+  await refreshGuildMeta(guildId);
   if (first) await switchChannel(first);
+  else {
+    renderSidebar();
+    renderMembers();
+  }
 }
 
 function isChannelMuted(channelId) {
@@ -1154,15 +1260,18 @@ function toggleGuildMenu(guild) {
     menu.classList.add("hidden");
     return;
   }
+  const manage = canManageGuild(guild);
   menu.innerHTML = `
     <button type="button" data-gact="invite">Davet bağlantısı oluştur</button>
     <button type="button" data-gact="boost">Sunucuyu boostla</button>
     <button type="button" data-gact="mute">Sunucuyu sessize al</button>
-    ${guild.custom ? `<button type="button" data-gact="channel">Kanal oluştur</button>` : ""}
-    ${guild.custom ? `<button type="button" data-gact="slow">Yavaş mod ayarla</button>` : ""}
+    ${guild.custom ? `<button type="button" data-gact="server">Sunucu ayarları</button>` : ""}
+    ${manage ? `<button type="button" data-gact="channel">Kanal oluştur</button>` : ""}
+    ${manage ? `<button type="button" data-gact="category">Kategori oluştur</button>` : ""}
     <button type="button" data-gact="nitro">XZON Nitro</button>
     <button type="button" data-gact="settings">Kullanıcı ayarları</button>
-    ${guild.custom ? `<button type="button" data-gact="leave">Sunucudan çık</button>` : ""}
+    ${guild.custom && guild.myRole !== "owner" ? `<button type="button" data-gact="leave">Sunucudan çık</button>` : ""}
+    ${guild.custom && guild.myRole === "owner" ? `<button type="button" data-gact="delete" class="danger">Sunucuyu sil</button>` : ""}
   `;
   menu.classList.remove("hidden");
   menu.querySelectorAll("[data-gact]").forEach((btn) => {
@@ -1172,6 +1281,8 @@ function toggleGuildMenu(guild) {
       if (a === "invite") await copyInvite(guild.id);
       if (a === "boost") await boostCurrentGuild(guild.id);
       if (a === "channel") await createChannelPrompt(guild.id);
+      if (a === "category") await createCategoryPrompt(guild.id);
+      if (a === "server") openServerSettings(guild.id);
       if (a === "nitro") openNitroModal();
       if (a === "settings") openSettings("account");
       if (a === "mute") {
@@ -1183,22 +1294,6 @@ function toggleGuildMenu(guild) {
         renderSidebar();
         toast(data.muted ? "Sunucu sessize alındı" : "Ses açıldı");
       }
-      if (a === "slow") {
-        const sec = Number(prompt("Yavaş mod (saniye)", "5") || 0);
-        try {
-          const ch = state.channels.find((c) => c.guildId === guild.id && c.type === "text");
-          if (!ch) throw new Error("Kanal yok");
-          const data = await api(`/xzon/api/channels/${ch.id}/settings`, {
-            method: "PATCH",
-            body: { slowmode: sec },
-          });
-          state.channels = data.channels || state.channels;
-          renderSidebar();
-          toast(`Yavaş mod: ${sec}s`);
-        } catch (error) {
-          toast(error.message);
-        }
-      }
       if (a === "leave") {
         if (!confirm("Sunucudan çıkılsın mı?")) return;
         try {
@@ -1207,6 +1302,18 @@ function toggleGuildMenu(guild) {
           state.channels = data.channels || [];
           await openGuild("xzon");
           toast("Sunucudan çıkıldı");
+        } catch (error) {
+          toast(error.message);
+        }
+      }
+      if (a === "delete") {
+        if (!confirm("Sunucu kalıcı silinsin mi? Bu geri alınamaz.")) return;
+        try {
+          const data = await api(`/xzon/api/guilds/${guild.id}`, { method: "DELETE" });
+          state.guilds = data.guilds || [];
+          state.channels = data.channels || [];
+          await openGuild("xzon");
+          toast("Sunucu silindi");
         } catch (error) {
           toast(error.message);
         }
@@ -1573,6 +1680,52 @@ function openStream() {
       state.typingUsers.set(`t:${p.user.id}`, t);
     } catch { /* ignore */ }
   });
+  es.addEventListener("channel_create", (ev) => {
+    try {
+      const { channel } = JSON.parse(ev.data);
+      if (!channel) return;
+      if (!state.channels.some((c) => c.id === channel.id)) state.channels.push(channel);
+      renderSidebar();
+    } catch { /* ignore */ }
+  });
+  es.addEventListener("channel_update", (ev) => {
+    try {
+      const { channel } = JSON.parse(ev.data);
+      if (!channel) return;
+      state.channels = state.channels.map((c) => (c.id === channel.id ? channel : c));
+      renderSidebar();
+    } catch { /* ignore */ }
+  });
+  es.addEventListener("channel_delete", (ev) => {
+    try {
+      const { channelId } = JSON.parse(ev.data);
+      state.channels = state.channels.filter((c) => c.id !== channelId);
+      renderSidebar();
+    } catch { /* ignore */ }
+  });
+  es.addEventListener("guild_update", (ev) => {
+    try {
+      const { guild } = JSON.parse(ev.data);
+      if (!guild) return;
+      state.guilds = state.guilds.map((g) =>
+        g.id === guild.id ? { ...g, ...guild, myRole: g.myRole } : g,
+      );
+      renderRail();
+      renderSidebar();
+    } catch { /* ignore */ }
+  });
+  es.addEventListener("guild_delete", (ev) => {
+    try {
+      const { guildId } = JSON.parse(ev.data);
+      state.guilds = state.guilds.filter((g) => g.id !== guildId);
+      state.channels = state.channels.filter((c) => c.guildId !== guildId);
+      if (state.guildId === guildId) openGuild("xzon");
+      else {
+        renderRail();
+        renderSidebar();
+      }
+    } catch { /* ignore */ }
+  });
   es.onerror = () => {
     setLive(false, "yeniden bağlanıyor…");
     es.close();
@@ -1818,10 +1971,16 @@ async function createChannelPrompt(guildId) {
   const name = prompt("Yeni kanal adı (ör. duyuru-2)");
   if (!name) return;
   const voice = confirm("Ses kanalı olsun mu? (İptal = metin)");
+  const cats = [
+    ...new Set(state.channels.filter((c) => c.guildId === guildId).map((c) => c.category)),
+  ];
+  const category =
+    prompt(`Kategori (${cats.join(", ") || "SOHBET"})`, cats[0] || (voice ? "SESLİ" : "SOHBET")) ||
+    undefined;
   try {
     const data = await api(`/xzon/api/guilds/${guildId}/channels`, {
       method: "POST",
-      body: { name, type: voice ? "voice" : "text" },
+      body: { name, type: voice ? "voice" : "text", category },
     });
     state.channels = data.channels || [...state.channels, data.channel];
     renderSidebar();
@@ -1830,6 +1989,435 @@ async function createChannelPrompt(guildId) {
   } catch (error) {
     toast(error.message);
   }
+}
+
+async function createCategoryPrompt(guildId) {
+  const name = prompt("Yeni kategori adı (ör. OYUN)");
+  if (!name) return;
+  try {
+    const data = await api(`/xzon/api/guilds/${guildId}/categories`, {
+      method: "POST",
+      body: { name },
+    });
+    state.channels = data.channels || state.channels;
+    renderSidebar();
+    toast(`Kategori: ${name.toUpperCase()}`);
+  } catch (error) {
+    toast(error.message);
+  }
+}
+
+function openChannelSettings(channelId) {
+  const ch = state.channels.find((c) => c.id === channelId);
+  if (!ch || !els.channelSettingsModal) return;
+  $("channelSettingsTitle").textContent = `#${ch.name}`;
+  els.channelSettingsBody.innerHTML = `
+    <label>Kanal adı<input id="chNameIn" value="${esc(ch.name)}" maxlength="32" /></label>
+    <label>Konu<input id="chTopicIn" value="${esc(ch.topic || "")}" maxlength="120" /></label>
+    <label>Kategori<input id="chCatIn" value="${esc(ch.category || "SOHBET")}" maxlength="24" /></label>
+    <label>Tür
+      <select id="chTypeIn">
+        <option value="text" ${ch.type === "text" ? "selected" : ""}>Metin</option>
+        <option value="voice" ${ch.type === "voice" ? "selected" : ""}>Ses</option>
+      </select>
+    </label>
+    <label>Yavaş mod (sn)<input id="chSlowIn" type="number" min="0" max="120" value="${ch.slowmode || 0}" /></label>
+    <label class="check-row"><input id="chNsfwIn" type="checkbox" ${ch.nsfw ? "checked" : ""} /> NSFW kanal</label>
+    <div class="modal-actions">
+      <button type="button" class="btn-primary" id="chSaveBtn">Kaydet</button>
+      <button type="button" class="btn-danger" id="chDelBtn">Sil</button>
+    </div>`;
+  els.channelSettingsModal.classList.remove("hidden");
+  $("chSaveBtn").onclick = async () => {
+    try {
+      const data = await api(`/xzon/api/channels/${ch.id}`, {
+        method: "PATCH",
+        body: {
+          name: $("chNameIn").value,
+          topic: $("chTopicIn").value,
+          category: $("chCatIn").value,
+          type: $("chTypeIn").value,
+          slowmode: Number($("chSlowIn").value) || 0,
+          nsfw: $("chNsfwIn").checked,
+        },
+      });
+      state.channels = data.channels || state.channels;
+      els.channelSettingsModal.classList.add("hidden");
+      renderSidebar();
+      if (state.channelId === ch.id) {
+        els.channelTitle.textContent = data.channel?.name || ch.name;
+        els.channelTopic.textContent = data.channel?.topic || "";
+      }
+      toast("Kanal güncellendi");
+    } catch (error) {
+      toast(error.message);
+    }
+  };
+  $("chDelBtn").onclick = async () => {
+    if (!confirm(`#${ch.name} silinsin mi?`)) return;
+    try {
+      const data = await api(`/xzon/api/channels/${ch.id}`, { method: "DELETE" });
+      state.channels = data.channels || state.channels.filter((c) => c.id !== ch.id);
+      els.channelSettingsModal.classList.add("hidden");
+      if (state.channelId === ch.id) {
+        const next = state.channels.find((c) => c.guildId === ch.guildId && c.type === "text");
+        if (next) await switchChannel(next.id);
+      }
+      renderSidebar();
+      toast("Kanal silindi");
+    } catch (error) {
+      toast(error.message);
+    }
+  };
+}
+
+async function openServerSettings(guildId, tab = "overview") {
+  const guild = state.guilds.find((g) => g.id === guildId);
+  if (!guild?.custom || !els.serverSettingsModal) return;
+  state.serverTab = tab;
+  await refreshGuildMeta(guildId);
+  const manage = canManageGuild(guild);
+  const tabs = [
+    ["overview", "Genel"],
+    ["channels", "Kanallar"],
+    ["roles", "Roller"],
+    ["members", "Üyeler"],
+    ["invites", "Davetler"],
+    ["danger", "Tehlike"],
+  ];
+  els.serverSettingsNav.innerHTML = `
+    <div class="ss-brand">
+      <div class="av" style="background:${esc(guild.color)}">${esc(guild.short || "SV")}</div>
+      <div><strong>${esc(guild.name)}</strong><small>Sunucu ayarları</small></div>
+    </div>
+    ${tabs
+      .map(
+        ([id, label]) =>
+          `<button type="button" data-stab="${id}" class="${state.serverTab === id ? "on" : ""}">${label}</button>`,
+      )
+      .join("")}`;
+  els.serverSettingsNav.querySelectorAll("[data-stab]").forEach((btn) => {
+    btn.onclick = () => openServerSettings(guildId, btn.dataset.stab);
+  });
+
+  let pane = "";
+  if (tab === "overview") {
+    pane = `
+      <h2>Sunucu Genel</h2>
+      <p class="sub">İsim, renk ve açıklama — Discord Server Settings tarzı.</p>
+      <label>Sunucu adı<input id="ssName" value="${esc(guild.name)}" maxlength="40" ${manage ? "" : "disabled"} /></label>
+      <label>Açıklama<textarea id="ssDesc" rows="3" maxlength="200" ${manage ? "" : "disabled"}>${esc(guild.description || "")}</textarea></label>
+      <div class="color-row" id="ssColors">
+        ${GUILD_COLORS.map(
+          (c) =>
+            `<button type="button" class="color-swatch ${c === guild.color ? "on" : ""}" data-c="${c}" style="background:${c}" ${manage ? "" : "disabled"}></button>`,
+        ).join("")}
+      </div>
+      ${manage ? `<div class="modal-actions"><button type="button" class="btn-primary" id="ssSave">Kaydet</button></div>` : `<p class="sub">Sadece owner/admin düzenleyebilir.</p>`}`;
+  } else if (tab === "channels") {
+    const list = state.channels.filter((c) => c.guildId === guildId);
+    pane = `
+      <h2>Kanallar</h2>
+      <p class="sub">${list.length} kanal · kategori ve yavaş mod</p>
+      <div class="ss-list">
+        ${list
+          .map(
+            (ch) => `<div class="ss-row">
+              <div><strong>${ch.type === "voice" ? "🔊" : "#"}${esc(ch.name)}</strong><small>${esc(ch.category)} · ${ch.slowmode || 0}s${ch.nsfw ? " · NSFW" : ""}</small></div>
+              ${manage ? `<button type="button" data-edch="${ch.id}">Düzenle</button>` : ""}
+            </div>`,
+          )
+          .join("")}
+      </div>
+      ${manage ? `<div class="modal-actions">
+        <button type="button" class="btn-primary" id="ssAddCh">+ Kanal</button>
+        <button type="button" class="btn-ghost" id="ssAddCat">+ Kategori</button>
+      </div>` : ""}`;
+  } else if (tab === "roles") {
+    pane = `
+      <h2>Roller</h2>
+      <p class="sub">Renkli display roller · yetki: owner / admin / mod / member</p>
+      <div class="ss-list">
+        ${
+          state.guildRoles.length
+            ? state.guildRoles
+                .map(
+                  (r) => `<div class="ss-row">
+                    <div class="role-pill" style="--rc:${esc(r.color)}"><i></i><strong>${esc(r.name)}</strong></div>
+                    ${manage ? `<button type="button" data-delrole="${r.id}">Sil</button>` : ""}
+                  </div>`,
+                )
+                .join("")
+            : `<p class="sub">Henüz özel rol yok.</p>`
+        }
+      </div>
+      ${manage ? `<div class="role-create">
+        <input id="ssRoleName" placeholder="Rol adı" maxlength="32" />
+        <input id="ssRoleColor" type="color" value="#5865f2" />
+        <button type="button" class="btn-primary" id="ssRoleAdd">Rol ekle</button>
+      </div>` : ""}`;
+  } else if (tab === "members") {
+    pane = `
+      <h2>Üyeler</h2>
+      <p class="sub">${state.guildMembers.length} üye · yetki ve display rol</p>
+      <div class="ss-list">
+        ${state.guildMembers
+          .map((m) => {
+            const roleOpts = ["admin", "mod", "member"]
+              .map(
+                (r) =>
+                  `<option value="${r}" ${m.guildRole === r ? "selected" : ""} ${m.guildRole === "owner" ? "disabled" : ""}>${r}</option>`,
+              )
+              .join("");
+            const displayOpts = `<option value="">—</option>${state.guildRoles
+              .map(
+                (r) =>
+                  `<option value="${r.id}" ${m.displayRole?.id === r.id ? "selected" : ""}>${esc(r.name)}</option>`,
+              )
+              .join("")}`;
+            return `<div class="ss-row member-manage">
+              <div class="av" style="background:${esc(m.color)}">${initials(m.name)}</div>
+              <div class="meta"><strong>${esc(m.name)}</strong><small>${esc(m.guildRole)}</small></div>
+              ${
+                manage && m.guildRole !== "owner"
+                  ? `<select data-mrole="${m.id}">${roleOpts}</select>
+                     <select data-drole="${m.id}">${displayOpts}</select>
+                     <button type="button" class="btn-danger-sm" data-kick="${m.id}">At</button>`
+                  : `<span class="role-tag owner">${esc(m.guildRole)}</span>`
+              }
+            </div>`;
+          })
+          .join("")}
+      </div>`;
+  } else if (tab === "invites") {
+    let invites = [];
+    try {
+      invites = (await api(`/xzon/api/guilds/${guildId}/invites`)).invites || [];
+    } catch {
+      invites = [];
+    }
+    pane = `
+      <h2>Davetler</h2>
+      <p class="sub">Davet kodlarını yönet</p>
+      <div class="ss-list">
+        ${invites
+          .map(
+            (inv) => `<div class="ss-row">
+              <div><strong>${esc(inv.code)}</strong><small>${inv.uses || 0} kullanım</small></div>
+              <button type="button" data-copyinv="${esc(inv.code)}">Kopyala</button>
+              ${manage && !String(inv.code).startsWith("xzon-") ? `<button type="button" data-revinv="${esc(inv.code)}">İptal</button>` : ""}
+            </div>`,
+          )
+          .join("") || `<p class="sub">Davet yok.</p>`}
+      </div>
+      <div class="modal-actions"><button type="button" class="btn-primary" id="ssNewInv">Yeni davet</button></div>`;
+  } else {
+    pane = `
+      <h2>Tehlikeli bölge</h2>
+      <p class="sub">Sahiplik devri veya sunucuyu kalıcı silme.</p>
+      ${
+        guild.myRole === "owner"
+          ? `<label>Sahipliği devret
+              <select id="ssTransfer">
+                <option value="">Üye seç…</option>
+                ${state.guildMembers
+                  .filter((m) => m.id !== state.user?.id)
+                  .map((m) => `<option value="${m.id}">${esc(m.name)}</option>`)
+                  .join("")}
+              </select>
+            </label>
+            <div class="modal-actions">
+              <button type="button" class="btn-ghost" id="ssDoTransfer">Devret</button>
+              <button type="button" class="btn-danger" id="ssDoDelete">Sunucuyu sil</button>
+            </div>`
+          : `<p class="sub">Bu işlemler sadece sahip için.</p>
+             <div class="modal-actions"><button type="button" class="btn-danger" id="ssDoLeave">Sunucudan çık</button></div>`
+      }`;
+  }
+
+  els.serverSettingsPane.innerHTML = pane;
+  els.serverSettingsModal.classList.remove("hidden");
+
+  let pickedColor = guild.color;
+  els.serverSettingsPane.querySelectorAll("[data-c]").forEach((btn) => {
+    btn.onclick = () => {
+      pickedColor = btn.dataset.c;
+      els.serverSettingsPane.querySelectorAll("[data-c]").forEach((b) => b.classList.toggle("on", b === btn));
+    };
+  });
+  $("ssSave")?.addEventListener("click", async () => {
+    try {
+      const data = await api(`/xzon/api/guilds/${guildId}`, {
+        method: "PATCH",
+        body: {
+          name: $("ssName").value,
+          description: $("ssDesc").value,
+          color: pickedColor,
+        },
+      });
+      state.guilds = data.guilds || state.guilds;
+      renderRail();
+      renderSidebar();
+      toast("Sunucu kaydedildi");
+      openServerSettings(guildId, "overview");
+    } catch (error) {
+      toast(error.message);
+    }
+  });
+  $("ssAddCh")?.addEventListener("click", () => createChannelPrompt(guildId));
+  $("ssAddCat")?.addEventListener("click", () => createCategoryPrompt(guildId));
+  els.serverSettingsPane.querySelectorAll("[data-edch]").forEach((btn) => {
+    btn.onclick = () => {
+      els.serverSettingsModal.classList.add("hidden");
+      openChannelSettings(btn.dataset.edch);
+    };
+  });
+  $("ssRoleAdd")?.addEventListener("click", async () => {
+    try {
+      const data = await api(`/xzon/api/guilds/${guildId}/roles`, {
+        method: "POST",
+        body: { name: $("ssRoleName").value, color: $("ssRoleColor").value },
+      });
+      state.guildRoles = data.roles || [];
+      toast("Rol eklendi");
+      openServerSettings(guildId, "roles");
+    } catch (error) {
+      toast(error.message);
+    }
+  });
+  els.serverSettingsPane.querySelectorAll("[data-delrole]").forEach((btn) => {
+    btn.onclick = async () => {
+      if (!confirm("Rol silinsin mi?")) return;
+      try {
+        const data = await api(`/xzon/api/guilds/${guildId}/roles/${btn.dataset.delrole}`, {
+          method: "DELETE",
+        });
+        state.guildRoles = data.roles || [];
+        openServerSettings(guildId, "roles");
+      } catch (error) {
+        toast(error.message);
+      }
+    };
+  });
+  els.serverSettingsPane.querySelectorAll("[data-mrole]").forEach((sel) => {
+    sel.onchange = async () => {
+      try {
+        const data = await api(`/xzon/api/guilds/${guildId}/members/${sel.dataset.mrole}`, {
+          method: "PATCH",
+          body: { guildRole: sel.value },
+        });
+        state.guildMembers = data.members || [];
+        renderMembers();
+        toast("Yetki güncellendi");
+      } catch (error) {
+        toast(error.message);
+        openServerSettings(guildId, "members");
+      }
+    };
+  });
+  els.serverSettingsPane.querySelectorAll("[data-drole]").forEach((sel) => {
+    sel.onchange = async () => {
+      try {
+        const data = await api(`/xzon/api/guilds/${guildId}/members/${sel.dataset.drole}`, {
+          method: "PATCH",
+          body: { roleId: sel.value || null },
+        });
+        state.guildMembers = data.members || [];
+        renderMembers();
+        renderMessages();
+        toast("Display rol atandı");
+      } catch (error) {
+        toast(error.message);
+      }
+    };
+  });
+  els.serverSettingsPane.querySelectorAll("[data-kick]").forEach((btn) => {
+    btn.onclick = async () => {
+      if (!confirm("Üye atılsın mı?")) return;
+      try {
+        const data = await api(
+          `/xzon/api/guilds/${guildId}/members/${btn.dataset.kick}/kick`,
+          { method: "POST", body: {} },
+        );
+        state.guildMembers = data.members || [];
+        openServerSettings(guildId, "members");
+        toast("Üye atıldı");
+      } catch (error) {
+        toast(error.message);
+      }
+    };
+  });
+  $("ssNewInv")?.addEventListener("click", async () => {
+    await copyInvite(guildId);
+    openServerSettings(guildId, "invites");
+  });
+  els.serverSettingsPane.querySelectorAll("[data-copyinv]").forEach((btn) => {
+    btn.onclick = async () => {
+      try {
+        await navigator.clipboard.writeText(btn.dataset.copyinv);
+        toast("Kopyalandı");
+      } catch {
+        toast(btn.dataset.copyinv);
+      }
+    };
+  });
+  els.serverSettingsPane.querySelectorAll("[data-revinv]").forEach((btn) => {
+    btn.onclick = async () => {
+      try {
+        await api(`/xzon/api/guilds/${guildId}/invites/${btn.dataset.revinv}`, {
+          method: "DELETE",
+        });
+        openServerSettings(guildId, "invites");
+        toast("Davet iptal");
+      } catch (error) {
+        toast(error.message);
+      }
+    };
+  });
+  $("ssDoTransfer")?.addEventListener("click", async () => {
+    const uid = $("ssTransfer")?.value;
+    if (!uid || !confirm("Sahiplik devredilsin mi?")) return;
+    try {
+      const data = await api(`/xzon/api/guilds/${guildId}/transfer`, {
+        method: "POST",
+        body: { userId: uid },
+      });
+      state.guilds = data.guilds || state.guilds;
+      state.guildMembers = data.members || [];
+      renderRail();
+      renderSidebar();
+      toast("Sahiplik devredildi");
+      els.serverSettingsModal.classList.add("hidden");
+    } catch (error) {
+      toast(error.message);
+    }
+  });
+  $("ssDoDelete")?.addEventListener("click", async () => {
+    if (!confirm("Sunucu KALICI silinsin mi?")) return;
+    try {
+      const data = await api(`/xzon/api/guilds/${guildId}`, { method: "DELETE" });
+      state.guilds = data.guilds || [];
+      state.channels = data.channels || [];
+      els.serverSettingsModal.classList.add("hidden");
+      await openGuild("xzon");
+      toast("Sunucu silindi");
+    } catch (error) {
+      toast(error.message);
+    }
+  });
+  $("ssDoLeave")?.addEventListener("click", async () => {
+    if (!confirm("Sunucudan çıkılsın mı?")) return;
+    try {
+      const data = await api(`/xzon/api/guilds/${guildId}/leave`, { method: "POST", body: {} });
+      state.guilds = data.guilds || [];
+      state.channels = data.channels || [];
+      els.serverSettingsModal.classList.add("hidden");
+      await openGuild("xzon");
+      toast("Çıkıldı");
+    } catch (error) {
+      toast(error.message);
+    }
+  });
 }
 
 function beginNitroCheckout(tier) {
@@ -2084,6 +2672,7 @@ async function bootstrap() {
   els.boot.classList.add("hidden");
   els.app.classList.remove("hidden");
   syncMe();
+  await refreshGuildMeta(state.guildId);
   renderRail();
   renderSidebar();
   renderMembers();
@@ -2302,6 +2891,18 @@ $("helpBtn")?.addEventListener("click", () => {
 $("quickSwitchBtn")?.addEventListener("click", () => openQuickSwitch());
 $("discoverBtn")?.addEventListener("click", () => openDiscover());
 $("closeDiscover")?.addEventListener("click", () => $("discoverModal")?.classList.add("hidden"));
+$("closeServerSettings")?.addEventListener("click", () =>
+  els.serverSettingsModal?.classList.add("hidden"),
+);
+$("closeChannelSettings")?.addEventListener("click", () =>
+  els.channelSettingsModal?.classList.add("hidden"),
+);
+els.serverSettingsModal?.addEventListener("click", (e) => {
+  if (e.target === els.serverSettingsModal) els.serverSettingsModal.classList.add("hidden");
+});
+els.channelSettingsModal?.addEventListener("click", (e) => {
+  if (e.target === els.channelSettingsModal) els.channelSettingsModal.classList.add("hidden");
+});
 $("muteChannelBtn")?.addEventListener("click", async () => {
   const data = await api("/xzon/api/mutes", {
     method: "POST",

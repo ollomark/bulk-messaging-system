@@ -190,6 +190,16 @@ db.exec(`
     created_at INTEGER NOT NULL,
     paid_at INTEGER
   );
+
+  CREATE TABLE IF NOT EXISTS web_guild_roles (
+    id TEXT PRIMARY KEY,
+    guild_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    color TEXT NOT NULL DEFAULT '#99aab5',
+    position INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL,
+    FOREIGN KEY (guild_id) REFERENCES web_guilds(id)
+  );
 `);
 
 for (const [col, type] of [
@@ -205,6 +215,21 @@ for (const [col, type] of [
   if (!userCols.includes(col)) {
     db.exec(`ALTER TABLE web_users ADD COLUMN ${col} ${type}`);
   }
+}
+
+const guildCols = db.prepare("PRAGMA table_info(web_guilds)").all().map((c) => c.name);
+for (const [col, type] of [
+  ["description", "TEXT"],
+  ["icon", "TEXT"],
+]) {
+  if (!guildCols.includes(col)) {
+    db.exec(`ALTER TABLE web_guilds ADD COLUMN ${col} ${type}`);
+  }
+}
+
+const memberCols = db.prepare("PRAGMA table_info(web_guild_members)").all().map((c) => c.name);
+if (!memberCols.includes("role_id")) {
+  db.exec(`ALTER TABLE web_guild_members ADD COLUMN role_id TEXT`);
 }
 
 try {
@@ -340,7 +365,7 @@ function inviteCode() {
   return crypto.randomBytes(4).toString("hex");
 }
 
-function mapGuild(row) {
+function mapGuild(row, myRole = null) {
   if (!row) return null;
   return {
     id: row.id,
@@ -351,8 +376,85 @@ function mapGuild(row) {
     boostLevel: row.boost_level || 0,
     boostCount: row.boost_count || 0,
     banner: row.banner || "",
+    description: row.description || "",
+    icon: row.icon || "",
     custom: !GUILDS.some((g) => g.id === row.id),
+    myRole: myRole || null,
   };
+}
+
+function memberRoleRow(guildId, userId) {
+  return db
+    .prepare("SELECT role, role_id FROM web_guild_members WHERE guild_id = ? AND user_id = ?")
+    .get(guildId, userId);
+}
+
+function requireGuildManage(userId, guildId, { ownerOnly = false } = {}) {
+  if (isStaticGuild(guildId)) throw new Error("Varsayılan sunucu yönetilemez");
+  if (!userInGuild(userId, guildId)) throw new Error("Bu sunucuda değilsin");
+  const member = memberRoleRow(guildId, userId);
+  if (!member) throw new Error("Üye kaydı yok");
+  if (ownerOnly && member.role !== "owner") throw new Error("Sadece sahip yapabilir");
+  if (!ownerOnly && !["owner", "admin"].includes(member.role)) {
+    throw new Error("Yönetim yetkin yok");
+  }
+  return member;
+}
+
+function mapRole(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    guildId: row.guild_id,
+    name: row.name,
+    color: row.color,
+    position: row.position || 0,
+  };
+}
+
+function seedDefaultRoles(guildId, createdAt) {
+  const defaults = [
+    ["Admin", "#ed4245", 100],
+    ["Moderatör", "#5865f2", 80],
+    ["VIP", "#faa61a", 60],
+    ["Üye", "#99aab5", 0],
+  ];
+  const insert = db.prepare(
+    `INSERT INTO web_guild_roles (id, guild_id, name, color, position, created_at)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+  );
+  for (const [name, color, position] of defaults) {
+    insert.run(`role_${crypto.randomBytes(4).toString("hex")}`, guildId, name, color, position, createdAt);
+  }
+}
+
+export function postSystemMessage(channelId, content) {
+  ensureSystemUser();
+  const text = String(content || "").trim().slice(0, 1800);
+  if (!text || !channelExists(channelId)) return null;
+  const messageId = crypto.randomUUID();
+  const createdAt = now();
+  db.prepare(
+    `INSERT INTO web_messages
+      (id, channel_id, user_id, user_name, user_color, content, created_at, reply_to_id, deleted, pinned)
+     VALUES (?, ?, 'system', 'XZON', '#3dffa8', ?, ?, NULL, 0, 0)`,
+  ).run(messageId, channelId, text, createdAt);
+  const [message] = hydrateMessages(
+    db.prepare("SELECT * FROM web_messages WHERE id = ?").all(messageId),
+    null,
+  );
+  return message;
+}
+
+function defaultTextChannelId(guildId) {
+  const row = db
+    .prepare(
+      `SELECT id FROM web_guild_channels
+       WHERE guild_id = ? AND type = 'text'
+       ORDER BY position ASC, created_at ASC LIMIT 1`,
+    )
+    .get(guildId);
+  return row?.id || null;
 }
 
 function channelSettings(channelId) {
@@ -414,7 +516,10 @@ export function userInGuild(userId, guildId) {
 export function listGuildsForUser(userId) {
   const customs = customGuildRows()
     .filter((g) => userInGuild(userId, g.id))
-    .map(mapGuild);
+    .map((g) => {
+      const mem = memberRoleRow(g.id, userId);
+      return mapGuild(g, mem?.role || "member");
+    });
   return [
     ...GUILDS.map((g) => ({
       ...g,
@@ -422,7 +527,10 @@ export function listGuildsForUser(userId) {
       boostLevel: 3,
       boostCount: 14,
       banner: "",
+      description: "",
+      icon: "",
       custom: false,
+      myRole: "member",
     })),
     ...customs,
   ];
@@ -1064,7 +1172,12 @@ export function deleteMessage(userId, messageId) {
   const row = db.prepare("SELECT * FROM web_messages WHERE id = ?").get(messageId);
   if (!row || row.deleted) throw new Error("Mesaj yok");
   if (row.user_id !== userId && userId !== "system") {
-    throw new Error("Sadece kendi mesajını silebilirsin");
+    const meta = getChannelMeta(row.channel_id);
+    const canMod =
+      meta?.custom &&
+      meta.guildId &&
+      ["owner", "admin", "mod"].includes(memberRoleRow(meta.guildId, userId)?.role || "");
+    if (!canMod) throw new Error("Sadece kendi mesajını silebilirsin");
   }
   db.prepare(
     `UPDATE web_messages SET deleted = 1, content = 'Bu mesaj silindi.', pinned = 0 WHERE id = ?`,
@@ -1299,13 +1412,18 @@ export function createGuild(ownerId, { name, color } = {}) {
     insertCh.run(chId, id, chName, topic, category, type, position, created);
   }
 
+  seedDefaultRoles(id, created);
+
   const code = inviteCode();
   db.prepare(
     `INSERT INTO web_invites (code, guild_id, creator_id, uses, max_uses, created_at)
      VALUES (?, ?, ?, 0, 0, ?)`,
   ).run(code, id, ownerId, created);
 
-  const guild = mapGuild(db.prepare("SELECT * FROM web_guilds WHERE id = ?").get(id));
+  const welcomeId = `${id}:duyurular`;
+  postSystemMessage(welcomeId, `✦ **${clean}** sunucusu kuruldu. Kanalları ve rolleri Sunucu Ayarları’ndan yönet.`);
+
+  const guild = mapGuild(db.prepare("SELECT * FROM web_guilds WHERE id = ?").get(id), "owner");
   return {
     guild,
     channels: channelsForGuild(id),
@@ -1351,18 +1469,28 @@ export function joinByInvite(userId, rawCode) {
   const existing = db
     .prepare("SELECT 1 FROM web_guild_members WHERE guild_id = ? AND user_id = ?")
     .get(invite.guild_id, userId);
+  let systemMessage = null;
   if (!existing) {
     db.prepare(
       `INSERT INTO web_guild_members (guild_id, user_id, role, joined_at) VALUES (?, ?, 'member', ?)`,
     ).run(invite.guild_id, userId, now());
+    const user = getUserById(userId);
+    const chId = defaultTextChannelId(invite.guild_id);
+    if (chId && user) {
+      systemMessage = postSystemMessage(chId, `✦ **${user.name}** sunucuya katıldı.`);
+    }
   }
   db.prepare("UPDATE web_invites SET uses = uses + 1 WHERE code = ?").run(invite.code);
 
-  const guild = mapGuild(db.prepare("SELECT * FROM web_guilds WHERE id = ?").get(invite.guild_id));
+  const guild = mapGuild(
+    db.prepare("SELECT * FROM web_guilds WHERE id = ?").get(invite.guild_id),
+    memberRoleRow(invite.guild_id, userId)?.role || "member",
+  );
   return {
     guild,
     channels: channelsForGuild(invite.guild_id),
     invite: invite.code,
+    systemMessage,
   };
 }
 
@@ -1710,10 +1838,388 @@ export function leaveGuild(userId, guildId) {
   if (isStaticGuild(guildId)) throw new Error("Varsayılan sunucudan çıkılamaz");
   const g = db.prepare("SELECT * FROM web_guilds WHERE id = ?").get(guildId);
   if (!g) throw new Error("Sunucu yok");
-  if (g.owner_id === userId) throw new Error("Sahip sunucudan çıkamaz — önce devret");
+  if (g.owner_id === userId) throw new Error("Sahip sunucudan çıkamaz — önce devret veya sil");
+  const user = getUserById(userId);
+  const chId = defaultTextChannelId(guildId);
   db.prepare("DELETE FROM web_guild_members WHERE guild_id = ? AND user_id = ?").run(
     guildId,
     userId,
   );
+  let systemMessage = null;
+  if (chId && user) {
+    systemMessage = postSystemMessage(chId, `✦ **${user.name}** sunucudan ayrıldı.`);
+  }
+  return { ok: true, systemChannelId: chId, systemMessage };
+}
+
+export function updateGuild(userId, guildId, { name, color, description, banner } = {}) {
+  requireGuildManage(userId, guildId);
+  const g = db.prepare("SELECT * FROM web_guilds WHERE id = ?").get(guildId);
+  if (!g) throw new Error("Sunucu yok");
+  const nextName =
+    name !== undefined
+      ? String(name || "")
+          .trim()
+          .replace(/\s+/g, " ")
+          .slice(0, 40)
+      : g.name;
+  if (nextName.length < 2) throw new Error("Sunucu adı en az 2 karakter");
+  const nextColor =
+    color !== undefined
+      ? String(color || COLORS[0]).slice(0, 32)
+      : g.color;
+  const nextDesc =
+    description !== undefined ? String(description || "").trim().slice(0, 200) : g.description || "";
+  const nextBanner =
+    banner !== undefined ? String(banner || "").trim().slice(0, 300) : g.banner || "";
+  const short = shortFromName(nextName);
+  db.prepare(
+    `UPDATE web_guilds SET name = ?, short = ?, color = ?, description = ?, banner = ? WHERE id = ?`,
+  ).run(nextName, short, nextColor, nextDesc, nextBanner, guildId);
+  return mapGuild(
+    db.prepare("SELECT * FROM web_guilds WHERE id = ?").get(guildId),
+    memberRoleRow(guildId, userId)?.role,
+  );
+}
+
+export function deleteGuild(userId, guildId) {
+  requireGuildManage(userId, guildId, { ownerOnly: true });
+  const channels = customChannelRows(guildId).map((c) => c.id);
+  for (const chId of channels) {
+    db.prepare("DELETE FROM web_messages WHERE channel_id = ?").run(chId);
+    db.prepare("DELETE FROM web_channel_settings WHERE channel_id = ?").run(chId);
+    db.prepare("DELETE FROM web_reads WHERE channel_id = ?").run(chId);
+  }
+  db.prepare("DELETE FROM web_guild_channels WHERE guild_id = ?").run(guildId);
+  db.prepare("DELETE FROM web_guild_roles WHERE guild_id = ?").run(guildId);
+  db.prepare("DELETE FROM web_guild_members WHERE guild_id = ?").run(guildId);
+  db.prepare("DELETE FROM web_invites WHERE guild_id = ?").run(guildId);
+  db.prepare("DELETE FROM web_boosts WHERE guild_id = ?").run(guildId);
+  db.prepare("DELETE FROM web_guilds WHERE id = ?").run(guildId);
   return { ok: true };
+}
+
+export function updateChannel(
+  userId,
+  channelId,
+  { name, topic, category, position, type, slowmode, nsfw } = {},
+) {
+  const meta = getChannelMeta(channelId);
+  if (!meta || meta.type === "dm") throw new Error("Kanal yok");
+  if (!meta.custom) throw new Error("Varsayılan kanallar düzenlenemez");
+  requireGuildManage(userId, meta.guildId);
+
+  const row = db.prepare("SELECT * FROM web_guild_channels WHERE id = ?").get(channelId);
+  if (!row) throw new Error("Kanal yok");
+
+  let nextName = row.name;
+  if (name !== undefined) {
+    nextName = String(name || "")
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, "-")
+      .replace(/[^a-z0-9ğüşıöç\-]/gi, "")
+      .slice(0, 32);
+    if (nextName.length < 2) throw new Error("Kanal adı geçersiz");
+  }
+  const nextTopic =
+    topic !== undefined ? String(topic || "").slice(0, 120) : row.topic || "";
+  const nextCat =
+    category !== undefined
+      ? String(category || "SOHBET")
+          .trim()
+          .toUpperCase()
+          .slice(0, 24) || "SOHBET"
+      : row.category;
+  const nextType =
+    type !== undefined ? (type === "voice" ? "voice" : "text") : row.type || "text";
+  const nextPos =
+    position !== undefined
+      ? Math.max(0, Math.min(999, Number(position) || 0))
+      : row.position;
+
+  db.prepare(
+    `UPDATE web_guild_channels
+     SET name = ?, topic = ?, category = ?, type = ?, position = ?
+     WHERE id = ?`,
+  ).run(nextName, nextTopic, nextCat, nextType, nextPos, channelId);
+
+  if (slowmode !== undefined || nsfw !== undefined) {
+    setChannelSettings(userId, channelId, { slowmode, nsfw });
+  }
+  return getChannelMeta(channelId);
+}
+
+export function deleteChannel(userId, channelId) {
+  const meta = getChannelMeta(channelId);
+  if (!meta || meta.type === "dm") throw new Error("Kanal yok");
+  if (!meta.custom) throw new Error("Varsayılan kanallar silinemez");
+  requireGuildManage(userId, meta.guildId);
+  const textCount = db
+    .prepare(
+      `SELECT COUNT(*) AS c FROM web_guild_channels WHERE guild_id = ? AND type = 'text'`,
+    )
+    .get(meta.guildId).c;
+  if (meta.type === "text" && textCount <= 1) {
+    throw new Error("Son metin kanalı silinemez");
+  }
+  db.prepare("DELETE FROM web_messages WHERE channel_id = ?").run(channelId);
+  db.prepare("DELETE FROM web_channel_settings WHERE channel_id = ?").run(channelId);
+  db.prepare("DELETE FROM web_reads WHERE channel_id = ?").run(channelId);
+  db.prepare("DELETE FROM web_guild_channels WHERE id = ?").run(channelId);
+  db.prepare("UPDATE web_users SET voice_channel_id = NULL WHERE voice_channel_id = ?").run(
+    channelId,
+  );
+  return { ok: true, guildId: meta.guildId };
+}
+
+export function renameCategory(userId, guildId, from, to) {
+  requireGuildManage(userId, guildId);
+  const src = String(from || "")
+    .trim()
+    .toUpperCase()
+    .slice(0, 24);
+  const dest = String(to || "")
+    .trim()
+    .toUpperCase()
+    .slice(0, 24);
+  if (!src || !dest) throw new Error("Kategori adı gerekli");
+  db.prepare(
+    `UPDATE web_guild_channels SET category = ? WHERE guild_id = ? AND upper(category) = ?`,
+  ).run(dest, guildId, src);
+  return channelsForGuild(guildId);
+}
+
+export function listGuildMembers(userId, guildId) {
+  if (!userInGuild(userId, guildId)) throw new Error("Bu sunucuda değilsin");
+  if (isStaticGuild(guildId)) {
+    return listOnlineUsers()
+      .concat(listOfflineRecent(40))
+      .map((u) => ({
+        ...u,
+        guildRole: "member",
+        displayRole: null,
+        joinedAt: null,
+      }));
+  }
+  const rows = db
+    .prepare(
+      `SELECT m.user_id, m.role, m.role_id, m.joined_at, r.name AS role_name, r.color AS role_color
+       FROM web_guild_members m
+       LEFT JOIN web_guild_roles r ON r.id = m.role_id
+       WHERE m.guild_id = ?
+       ORDER BY
+         CASE m.role WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 WHEN 'mod' THEN 2 ELSE 3 END,
+         m.joined_at ASC`,
+    )
+    .all(guildId);
+  return rows
+    .map((row) => {
+      const user = getUserById(row.user_id);
+      if (!user) return null;
+      return {
+        ...user,
+        guildRole: row.role,
+        displayRole: row.role_id
+          ? { id: row.role_id, name: row.role_name, color: row.role_color }
+          : null,
+        joinedAt: row.joined_at,
+      };
+    })
+    .filter(Boolean);
+}
+
+export function setMemberRole(userId, guildId, targetId, role) {
+  requireGuildManage(userId, guildId);
+  const next = String(role || "member").toLowerCase();
+  if (!["admin", "mod", "member"].includes(next)) {
+    throw new Error("Geçersiz rol (admin / mod / member)");
+  }
+  const target = memberRoleRow(guildId, targetId);
+  if (!target) throw new Error("Üye yok");
+  if (target.role === "owner") throw new Error("Sahibin yetkisi değiştirilemez");
+  const actor = memberRoleRow(guildId, userId);
+  if (actor.role === "admin" && target.role === "admin" && userId !== targetId) {
+    throw new Error("Admin başka admini değiştiremez");
+  }
+  if (actor.role !== "owner" && next === "admin") {
+    throw new Error("Admin atamak için sahip olmalısın");
+  }
+  db.prepare("UPDATE web_guild_members SET role = ? WHERE guild_id = ? AND user_id = ?").run(
+    next,
+    guildId,
+    targetId,
+  );
+  return listGuildMembers(userId, guildId);
+}
+
+export function setMemberDisplayRole(userId, guildId, targetId, roleId) {
+  requireGuildManage(userId, guildId);
+  const target = memberRoleRow(guildId, targetId);
+  if (!target) throw new Error("Üye yok");
+  if (roleId) {
+    const role = db
+      .prepare("SELECT id FROM web_guild_roles WHERE id = ? AND guild_id = ?")
+      .get(roleId, guildId);
+    if (!role) throw new Error("Rol yok");
+  }
+  db.prepare("UPDATE web_guild_members SET role_id = ? WHERE guild_id = ? AND user_id = ?").run(
+    roleId || null,
+    guildId,
+    targetId,
+  );
+  return listGuildMembers(userId, guildId);
+}
+
+export function kickMember(userId, guildId, targetId) {
+  requireGuildManage(userId, guildId);
+  if (userId === targetId) throw new Error("Kendini atamazsın");
+  const target = memberRoleRow(guildId, targetId);
+  if (!target) throw new Error("Üye yok");
+  if (target.role === "owner") throw new Error("Sahip atılamaz");
+  const actor = memberRoleRow(guildId, userId);
+  if (actor.role === "admin" && ["admin", "owner"].includes(target.role)) {
+    throw new Error("Bu üyeyi atamazsın");
+  }
+  const user = getUserById(targetId);
+  const chId = defaultTextChannelId(guildId);
+  db.prepare("DELETE FROM web_guild_members WHERE guild_id = ? AND user_id = ?").run(
+    guildId,
+    targetId,
+  );
+  let systemMessage = null;
+  if (chId && user) {
+    systemMessage = postSystemMessage(chId, `✦ **${user.name}** sunucudan atıldı.`);
+  }
+  return {
+    ok: true,
+    members: listGuildMembers(userId, guildId),
+    systemChannelId: chId,
+    systemMessage,
+  };
+}
+
+export function listRoles(userId, guildId) {
+  if (!userInGuild(userId, guildId)) throw new Error("Bu sunucuda değilsin");
+  if (isStaticGuild(guildId)) return [];
+  let rows = db
+    .prepare(
+      `SELECT * FROM web_guild_roles WHERE guild_id = ? ORDER BY position DESC, created_at ASC`,
+    )
+    .all(guildId);
+  if (!rows.length) {
+    seedDefaultRoles(guildId, now());
+    rows = db
+      .prepare(
+        `SELECT * FROM web_guild_roles WHERE guild_id = ? ORDER BY position DESC, created_at ASC`,
+      )
+      .all(guildId);
+  }
+  return rows.map(mapRole);
+}
+
+export function createRole(userId, guildId, { name, color } = {}) {
+  requireGuildManage(userId, guildId);
+  const clean = String(name || "")
+    .trim()
+    .slice(0, 32);
+  if (clean.length < 2) throw new Error("Rol adı en az 2 karakter");
+  const tint = String(color || "#99aab5").slice(0, 32);
+  const pos =
+    db.prepare("SELECT COALESCE(MAX(position), 0) AS m FROM web_guild_roles WHERE guild_id = ?").get(
+      guildId,
+    ).m + 10;
+  const id = `role_${crypto.randomBytes(5).toString("hex")}`;
+  db.prepare(
+    `INSERT INTO web_guild_roles (id, guild_id, name, color, position, created_at)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+  ).run(id, guildId, clean, tint, pos, now());
+  return { role: mapRole(db.prepare("SELECT * FROM web_guild_roles WHERE id = ?").get(id)), roles: listRoles(userId, guildId) };
+}
+
+export function updateRole(userId, guildId, roleId, { name, color, position } = {}) {
+  requireGuildManage(userId, guildId);
+  const row = db
+    .prepare("SELECT * FROM web_guild_roles WHERE id = ? AND guild_id = ?")
+    .get(roleId, guildId);
+  if (!row) throw new Error("Rol yok");
+  const nextName =
+    name !== undefined ? String(name || "").trim().slice(0, 32) : row.name;
+  if (nextName.length < 2) throw new Error("Rol adı geçersiz");
+  const nextColor = color !== undefined ? String(color || "#99aab5").slice(0, 32) : row.color;
+  const nextPos =
+    position !== undefined ? Math.max(0, Number(position) || 0) : row.position;
+  db.prepare(
+    `UPDATE web_guild_roles SET name = ?, color = ?, position = ? WHERE id = ?`,
+  ).run(nextName, nextColor, nextPos, roleId);
+  return {
+    role: mapRole(db.prepare("SELECT * FROM web_guild_roles WHERE id = ?").get(roleId)),
+    roles: listRoles(userId, guildId),
+  };
+}
+
+export function deleteRole(userId, guildId, roleId) {
+  requireGuildManage(userId, guildId);
+  const row = db
+    .prepare("SELECT * FROM web_guild_roles WHERE id = ? AND guild_id = ?")
+    .get(roleId, guildId);
+  if (!row) throw new Error("Rol yok");
+  db.prepare("UPDATE web_guild_members SET role_id = NULL WHERE guild_id = ? AND role_id = ?").run(
+    guildId,
+    roleId,
+  );
+  db.prepare("DELETE FROM web_guild_roles WHERE id = ?").run(roleId);
+  return { ok: true, roles: listRoles(userId, guildId) };
+}
+
+export function listInvites(userId, guildId) {
+  if (!userInGuild(userId, guildId)) throw new Error("Bu sunucuda değilsin");
+  if (isStaticGuild(guildId)) {
+    return [{ code: `xzon-${guildId}`, uses: 0, maxUses: 0, creatorId: null, createdAt: null }];
+  }
+  return db
+    .prepare(
+      `SELECT code, guild_id, creator_id, uses, max_uses, created_at
+       FROM web_invites WHERE guild_id = ? ORDER BY created_at DESC`,
+    )
+    .all(guildId)
+    .map((r) => ({
+      code: r.code,
+      guildId: r.guild_id,
+      creatorId: r.creator_id,
+      uses: r.uses,
+      maxUses: r.max_uses,
+      createdAt: r.created_at,
+    }));
+}
+
+export function revokeInvite(userId, guildId, code) {
+  requireGuildManage(userId, guildId);
+  if (isStaticGuild(guildId)) throw new Error("Varsayılan davet silinemez");
+  const row = db
+    .prepare("SELECT * FROM web_invites WHERE code = ? AND guild_id = ?")
+    .get(String(code || "").trim(), guildId);
+  if (!row) throw new Error("Davet yok");
+  db.prepare("DELETE FROM web_invites WHERE code = ?").run(row.code);
+  return { ok: true, invites: listInvites(userId, guildId) };
+}
+
+export function transferOwnership(userId, guildId, targetId) {
+  requireGuildManage(userId, guildId, { ownerOnly: true });
+  if (userId === targetId) throw new Error("Zaten sahipsin");
+  const target = memberRoleRow(guildId, targetId);
+  if (!target) throw new Error("Üye yok");
+  db.prepare("UPDATE web_guilds SET owner_id = ? WHERE id = ?").run(targetId, guildId);
+  db.prepare("UPDATE web_guild_members SET role = 'owner' WHERE guild_id = ? AND user_id = ?").run(
+    guildId,
+    targetId,
+  );
+  db.prepare("UPDATE web_guild_members SET role = 'admin' WHERE guild_id = ? AND user_id = ?").run(
+    guildId,
+    userId,
+  );
+  return {
+    guild: mapGuild(db.prepare("SELECT * FROM web_guilds WHERE id = ?").get(guildId), "admin"),
+    members: listGuildMembers(userId, guildId),
+  };
 }

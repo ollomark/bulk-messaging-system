@@ -12,7 +12,7 @@
       href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="/xzon/css/app.css?v=11" />
+    <link rel="stylesheet" href="/xzon/css/app.css?v=12" />
   </head>
   <body>
     <div id="boot" class="boot">
@@ -280,6 +280,23 @@
       </div>
     </div>
 
+    <div id="serverSettingsModal" class="overlay hidden">
+      <div class="settings server-settings">
+        <aside class="settings-nav" id="serverSettingsNav"></aside>
+        <section class="settings-pane" id="serverSettingsPane"></section>
+        <button type="button" class="settings-x" id="closeServerSettings" aria-label="Kapat">✕</button>
+      </div>
+    </div>
+
+    <div id="channelSettingsModal" class="overlay hidden">
+      <div class="modal-card channel-modal">
+        <button type="button" class="settings-x" id="closeChannelSettings" aria-label="Kapat">✕</button>
+        <h2 id="channelSettingsTitle">Kanal Ayarları</h2>
+        <p class="sub">Ad, konu, kategori, yavaş mod ve NSFW.</p>
+        <div id="channelSettingsBody"></div>
+      </div>
+    </div>
+
     <div id="statusMenu" class="menu hidden"></div>
     <div id="emojiPop" class="react-panel hidden"></div>
     <div id="profilePop" class="profile hidden"></div>
@@ -301,6 +318,6 @@
       </div>
     </div>
     <div id="toast" class="toast hidden"></div>
-    <script src="/xzon/js/app.js?v=11" type="module"></script>
+    <script src="/xzon/js/app.js?v=12" type="module"></script>
   </body>
 </html>

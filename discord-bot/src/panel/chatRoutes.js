@@ -10,13 +10,17 @@ import {
   createChannel,
   createGuild,
   createInvite,
+  createRole,
   createWebSession,
   loginAccount,
   listOrders,
   purchaseNitro,
   registerAccount,
   upgradeGuestToAccount,
+  deleteChannel,
+  deleteGuild,
   deleteMessage,
+  deleteRole,
   discoverGuilds,
   editMessage,
   forwardMessage,
@@ -29,8 +33,12 @@ import {
   getUnreadMap,
   getUserById,
   joinByInvite,
+  kickMember,
   leaveGuild,
   listMentions,
+  listGuildMembers,
+  listInvites,
+  listRoles,
   joinVoice,
   leaveVoice,
   listBlocks,
@@ -44,21 +52,30 @@ import {
   markAllRead,
   markRead,
   postMessage,
+  postSystemMessage,
   removeFriend,
+  renameCategory,
   reportMessage,
   respondFriendRequest,
+  revokeInvite,
   searchMessages,
   searchUsers,
   sendFriendRequest,
   setChannelSettings,
+  setMemberDisplayRole,
+  setMemberRole,
   setNote,
   setVoiceFlags,
   toggleMute,
   togglePin,
   toggleReaction,
   touchPresence,
+  transferOwnership,
   unblockUser,
+  updateChannel,
+  updateGuild,
   updateProfile,
+  updateRole,
   userInGuild,
   voiceRoster,
 } from "./chatStore.js";
@@ -98,9 +115,10 @@ export function mountChatRoutes(app) {
       clients: clientCount(),
       channels: WEB_CHANNELS.length,
       guilds: GUILDS.length,
-      version: "xzon-11",
+      version: "xzon-12",
       auth: "accounts",
       nitro: "paid",
+      manage: "guilds-channels-roles",
     });
   });
 
@@ -161,6 +179,13 @@ export function mountChatRoutes(app) {
     if (!user) return;
     try {
       const result = joinByInvite(user.id, req.body?.code);
+      if (result.systemMessage) {
+        broadcast(
+          "message",
+          { message: result.systemMessage },
+          { channelId: result.systemMessage.channelId },
+        );
+      }
       return res.json({
         ok: true,
         ...result,
@@ -189,9 +214,253 @@ export function mountChatRoutes(app) {
     try {
       const channel = createChannel(user.id, req.params.guildId, req.body || {});
       broadcast("channel_create", { channel });
+      const noticeCh =
+        channel.type === "text"
+          ? channel.id
+          : channelsForGuild(req.params.guildId).find((c) => c.type === "text")?.id;
+      if (noticeCh) {
+        const notice = postSystemMessage(noticeCh, `✦ #${channel.name} kanalı oluşturuldu.`);
+        if (notice) broadcast("message", { message: notice }, { channelId: notice.channelId });
+      }
       return res.json({
         ok: true,
         channel,
+        channels: listChannelsForUser(user.id),
+      });
+    } catch (error) {
+      return res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.patch("/xzon/api/guilds/:guildId", (req, res) => {
+    const user = chatUser(req, res);
+    if (!user) return;
+    try {
+      const guild = updateGuild(user.id, req.params.guildId, req.body || {});
+      broadcast("guild_update", { guild });
+      return res.json({
+        ok: true,
+        guild,
+        guilds: listGuildsForUser(user.id),
+      });
+    } catch (error) {
+      return res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.delete("/xzon/api/guilds/:guildId", (req, res) => {
+    const user = chatUser(req, res);
+    if (!user) return;
+    try {
+      deleteGuild(user.id, req.params.guildId);
+      broadcast("guild_delete", { guildId: req.params.guildId });
+      return res.json({
+        ok: true,
+        guilds: listGuildsForUser(user.id),
+        channels: listChannelsForUser(user.id),
+      });
+    } catch (error) {
+      return res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.get("/xzon/api/guilds/:guildId/members", (req, res) => {
+    const user = chatUser(req, res);
+    if (!user) return;
+    try {
+      return res.json({ members: listGuildMembers(user.id, req.params.guildId) });
+    } catch (error) {
+      return res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.patch("/xzon/api/guilds/:guildId/members/:targetId", (req, res) => {
+    const user = chatUser(req, res);
+    if (!user) return;
+    try {
+      const body = req.body || {};
+      let members;
+      if (body.guildRole) {
+        members = setMemberRole(user.id, req.params.guildId, req.params.targetId, body.guildRole);
+      } else if (body.roleId !== undefined) {
+        members = setMemberDisplayRole(
+          user.id,
+          req.params.guildId,
+          req.params.targetId,
+          body.roleId || null,
+        );
+      } else {
+        throw new Error("guildRole veya roleId gerekli");
+      }
+      return res.json({ ok: true, members });
+    } catch (error) {
+      return res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.post("/xzon/api/guilds/:guildId/members/:targetId/kick", (req, res) => {
+    const user = chatUser(req, res);
+    if (!user) return;
+    try {
+      const result = kickMember(user.id, req.params.guildId, req.params.targetId);
+      if (result.systemMessage) {
+        broadcast(
+          "message",
+          { message: result.systemMessage },
+          { channelId: result.systemMessage.channelId },
+        );
+      }
+      return res.json({ ok: true, members: result.members });
+    } catch (error) {
+      return res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.post("/xzon/api/guilds/:guildId/transfer", (req, res) => {
+    const user = chatUser(req, res);
+    if (!user) return;
+    try {
+      const result = transferOwnership(user.id, req.params.guildId, String(req.body?.userId || ""));
+      return res.json({
+        ok: true,
+        ...result,
+        guilds: listGuildsForUser(user.id),
+      });
+    } catch (error) {
+      return res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.get("/xzon/api/guilds/:guildId/roles", (req, res) => {
+    const user = chatUser(req, res);
+    if (!user) return;
+    try {
+      return res.json({ roles: listRoles(user.id, req.params.guildId) });
+    } catch (error) {
+      return res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.post("/xzon/api/guilds/:guildId/roles", (req, res) => {
+    const user = chatUser(req, res);
+    if (!user) return;
+    try {
+      const result = createRole(user.id, req.params.guildId, req.body || {});
+      return res.json({ ok: true, ...result });
+    } catch (error) {
+      return res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.patch("/xzon/api/guilds/:guildId/roles/:roleId", (req, res) => {
+    const user = chatUser(req, res);
+    if (!user) return;
+    try {
+      const result = updateRole(user.id, req.params.guildId, req.params.roleId, req.body || {});
+      return res.json({ ok: true, ...result });
+    } catch (error) {
+      return res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.delete("/xzon/api/guilds/:guildId/roles/:roleId", (req, res) => {
+    const user = chatUser(req, res);
+    if (!user) return;
+    try {
+      const result = deleteRole(user.id, req.params.guildId, req.params.roleId);
+      return res.json({ ok: true, ...result });
+    } catch (error) {
+      return res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.get("/xzon/api/guilds/:guildId/invites", (req, res) => {
+    const user = chatUser(req, res);
+    if (!user) return;
+    try {
+      return res.json({ invites: listInvites(user.id, req.params.guildId) });
+    } catch (error) {
+      return res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.delete("/xzon/api/guilds/:guildId/invites/:code", (req, res) => {
+    const user = chatUser(req, res);
+    if (!user) return;
+    try {
+      const result = revokeInvite(user.id, req.params.guildId, req.params.code);
+      return res.json({ ok: true, ...result });
+    } catch (error) {
+      return res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.post("/xzon/api/guilds/:guildId/categories", (req, res) => {
+    const user = chatUser(req, res);
+    if (!user) return;
+    try {
+      const name = String(req.body?.name || "YENİ").trim().toUpperCase().slice(0, 24);
+      const channel = createChannel(user.id, req.params.guildId, {
+        name: `${name.toLowerCase()}-genel`.slice(0, 28),
+        type: "text",
+        topic: `${name} kategorisi`,
+        category: name,
+      });
+      broadcast("channel_create", { channel });
+      return res.json({
+        ok: true,
+        channel,
+        channels: listChannelsForUser(user.id),
+      });
+    } catch (error) {
+      return res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.patch("/xzon/api/guilds/:guildId/categories", (req, res) => {
+    const user = chatUser(req, res);
+    if (!user) return;
+    try {
+      const channels = renameCategory(
+        user.id,
+        req.params.guildId,
+        req.body?.from,
+        req.body?.to,
+      );
+      return res.json({
+        ok: true,
+        channels: listChannelsForUser(user.id),
+        guildChannels: channels,
+      });
+    } catch (error) {
+      return res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.patch("/xzon/api/channels/:id", (req, res) => {
+    const user = chatUser(req, res);
+    if (!user) return;
+    try {
+      const channel = updateChannel(user.id, req.params.id, req.body || {});
+      broadcast("channel_update", { channel });
+      return res.json({
+        ok: true,
+        channel,
+        channels: listChannelsForUser(user.id),
+      });
+    } catch (error) {
+      return res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.delete("/xzon/api/channels/:id", (req, res) => {
+    const user = chatUser(req, res);
+    if (!user) return;
+    try {
+      const result = deleteChannel(user.id, req.params.id);
+      broadcast("channel_delete", { channelId: req.params.id, guildId: result.guildId });
+      return res.json({
+        ok: true,
         channels: listChannelsForUser(user.id),
       });
     } catch (error) {
@@ -718,7 +987,14 @@ export function mountChatRoutes(app) {
     const user = chatUser(req, res);
     if (!user) return;
     try {
-      leaveGuild(user.id, req.params.guildId);
+      const left = leaveGuild(user.id, req.params.guildId);
+      if (left.systemMessage) {
+        broadcast(
+          "message",
+          { message: left.systemMessage },
+          { channelId: left.systemMessage.channelId },
+        );
+      }
       return res.json({
         ok: true,
         guilds: listGuildsForUser(user.id),
