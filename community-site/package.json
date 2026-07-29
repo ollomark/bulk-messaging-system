@@ -1,0 +1,10 @@
+{
+  "name": "xzon-community-ui",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Discord-like community UI for XZON",
+  "scripts": {
+    "start": "npx --yes serve -l 4173 .",
+    "dev": "npx --yes serve -l 4173 ."
+  }
+}

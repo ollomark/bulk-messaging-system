@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>XZON — Sohbet</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Noto+Sans:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/css/app.css" />
+  </head>
+  <body>
+    <div class="app">
+      <nav class="servers" aria-label="Sunucular">
+        <button class="server home active" title="Direkt Mesajlar" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="M12 2C6.48 2 2 6.15 2 11.25c0 2.94 1.5 5.56 3.84 7.28L5 22l4.08-1.63c.94.26 1.93.4 2.92.4 5.52 0 10-4.15 10-9.25S17.52 2 12 2zm1.1 12.45-2.55-2.73-4.98 2.73L12.3 7.8l2.62 2.8 4.9-2.8-6.72 7.65z"
+            />
+          </svg>
+        </button>
+        <div class="sep"></div>
+        <button class="server pill active-guild" title="X Z O N #SORGU" type="button">XZ</button>
+        <button class="server pill" title="İFSAXD" type="button">IF</button>
+        <button class="server add" title="Sunucu Ekle" type="button">+</button>
+        <button class="server discover" title="Keşfet" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="M12 2a10 10 0 100 20 10 10 0 000-20zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"
+            />
+          </svg>
+        </button>
+      </nav>
+
+      <aside class="channels">
+        <header class="guild-header">
+          <button type="button">
+            <span>X Z O N #SORGU</span>
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+              <path d="M7 10l5 5 5-5H7z" />
+            </svg>
+          </button>
+        </header>
+
+        <div class="channel-scroll">
+          <div class="cat">
+            <button class="cat-toggle" data-cat="info" type="button">
+              <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor">
+                <path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z" />
+              </svg>
+              BİLGİ
+            </button>
+            <div class="cat-items" data-cat-items="info">
+              <button class="channel" data-channel="duyurular" type="button">
+                <span class="hash">#</span> duyurular
+              </button>
+              <button class="channel" data-channel="kurallar" type="button">
+                <span class="hash">#</span> kurallar
+              </button>
+            </div>
+          </div>
+
+          <div class="cat">
+            <button class="cat-toggle" data-cat="chat" type="button">
+              <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor">
+                <path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z" />
+              </svg>
+              SOHBET
+            </button>
+            <div class="cat-items" data-cat-items="chat">
+              <button class="channel active" data-channel="genel" type="button">
+                <span class="hash">#</span> genel
+              </button>
+              <button class="channel" data-channel="sohbet" type="button">
+                <span class="hash">#</span> sohbet-i-muhabbet
+              </button>
+              <button class="channel" data-channel="media" type="button">
+                <span class="hash">#</span> medya
+              </button>
+              <button class="channel" data-channel="bot" type="button">
+                <span class="hash">#</span> bot-komut
+              </button>
+            </div>
+          </div>
+
+          <div class="cat">
+            <button class="cat-toggle" data-cat="voice" type="button">
+              <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor">
+                <path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z" />
+              </svg>
+              SESLİ
+            </button>
+            <div class="cat-items" data-cat-items="voice">
+              <button class="channel voice" data-channel="lobby" type="button">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                  <path
+                    d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.49 6-3.31 6-6.72h-1.7z"
+                  />
+                </svg>
+                Lobby
+              </button>
+              <button class="channel voice" data-channel="music" type="button">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                  <path
+                    d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.49 6-3.31 6-6.72h-1.7z"
+                  />
+                </svg>
+                Music
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <footer class="user-bar">
+          <div class="me">
+            <div class="avatar online">S</div>
+            <div class="me-meta">
+              <strong>Sen</strong>
+              <small>Çevrimiçi</small>
+            </div>
+          </div>
+          <div class="user-actions">
+            <button title="Mikrofon" type="button" aria-label="Mikrofon">
+              <svg viewBox="0 0 24 24"><path d="M12 14a3 3 0 003-3V5a3 3 0 10-6 0v6a3 3 0 003 3zm5-3a5 5 0 01-10 0H5a7 7 0 006 6.92V21h2v-3.08A7 7 0 0019 11h-2z"/></svg>
+            </button>
+            <button title="Kulaklık" type="button" aria-label="Kulaklık">
+              <svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 00-9 9v7a2 2 0 002 2h3v-8H5v-1a7 7 0 0114 0v1h-3v8h3a2 2 0 002-2v-7a9 9 0 00-9-9z"/></svg>
+            </button>
+            <button title="Ayarlar" type="button" aria-label="Ayarlar">
+              <svg viewBox="0 0 24 24"><path d="M19.14 12.94a7.43 7.43 0 000-1.88l2.03-1.58a.5.5 0 00.12-.64l-1.92-3.32a.5.5 0 00-.6-.22l-2.39.96a7.2 7.2 0 00-1.62-.94l-.36-2.54A.5.5 0 0013.9 2h-3.8a.5.5 0 00-.5.42l-.36 2.54c-.58.23-1.12.54-1.62.94l-2.39-.96a.5.5 0 00-.6.22L2.71 8.84a.5.5 0 00.12.64l2.03 1.58c-.05.31-.08.63-.08.94s.03.63.08.94L2.83 14.5a.5.5 0 00-.12.64l1.92 3.32c.14.24.43.34.69.22l2.39-.96c.5.4 1.04.71 1.62.94l.36 2.54c.05.24.26.42.5.42h3.8c.24 0 .45-.18.5-.42l.36-2.54c.58-.23 1.12-.54 1.62-.94l2.39.96c.26.1.55 0 .69-.22l1.92-3.32a.5.5 0 00-.12-.64l-2.03-1.58zM12 15.5A3.5 3.5 0 1112 8a3.5 3.5 0 010 7.5z"/></svg>
+            </button>
+          </div>
+        </footer>
+      </aside>
+
+      <section class="chat">
+        <header class="chat-top">
+          <div class="chat-title">
+            <span class="hash">#</span>
+            <h1 id="channelTitle">genel</h1>
+            <div class="divider"></div>
+            <p id="channelTopic">Sunucunun ana sohbet kanalı — saygılı ol, spam yapma.</p>
+          </div>
+          <div class="chat-tools">
+            <button title="Sabitlemeler" type="button" aria-label="Sabitlemeler">
+              <svg viewBox="0 0 24 24"><path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"/></svg>
+            </button>
+            <button title="Üyeler" id="toggleMembers" type="button" aria-label="Üyeler">
+              <svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5s-3 1.34-3 3 1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5C15 14.17 10.33 13 8 13zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+            </button>
+            <input class="search" type="search" placeholder="Ara" />
+          </div>
+        </header>
+
+        <div class="messages" id="messages"></div>
+
+        <form class="composer" id="composer">
+          <button type="button" class="plus" title="Dosya ekle" aria-label="Dosya ekle">+</button>
+          <div class="input-wrap">
+            <input
+              id="messageInput"
+              type="text"
+              autocomplete="off"
+              placeholder="#genel kanalına mesaj gönder"
+            />
+          </div>
+          <button type="submit" class="send">Gönder</button>
+        </form>
+      </section>
+
+      <aside class="members" id="membersPanel">
+        <h3>ÇEVRİMİÇİ — <span id="onlineCount">8</span></h3>
+        <div class="member-group" id="onlineMembers"></div>
+        <h3>ÇEVRİMDIŞI — <span id="offlineCount">5</span></h3>
+        <div class="member-group offline" id="offlineMembers"></div>
+      </aside>
+    </div>
+
+    <div class="mobile-join">
+      <a href="https://discord.gg/TYhWxjGucH" target="_blank" rel="noreferrer">Discord’da Aç</a>
+    </div>
+
+    <script src="/js/app.js"></script>
+  </body>
+</html>
