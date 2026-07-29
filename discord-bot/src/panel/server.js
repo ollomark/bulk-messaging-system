@@ -5,6 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { ChannelType, EmbedBuilder, PermissionFlagsBits } from "discord.js";
 import { config } from "../config.js";
+import { mountChatRoutes } from "./chatRoutes.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const sessions = new Map();
@@ -45,7 +46,40 @@ export function startPanelServer(client) {
 
   app.use(express.json({ limit: "1mb" }));
   app.use(cookieParser());
-  app.use(express.static(path.join(__dirname, "public")));
+
+  // Public chat app (main product) + owner panel under /panel
+  const xzonDir = path.join(__dirname, "xzon");
+  const panelDir = path.join(__dirname, "public");
+  mountChatRoutes(app);
+
+  const sendXzon = (_req, res) => {
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+    res.sendFile(path.join(xzonDir, "index.html"));
+  };
+
+  // Chat is the homepage — panel moved to /panel
+  app.get("/", sendXzon);
+  app.get("/xzon", sendXzon);
+  app.get("/xzon/", sendXzon);
+  app.use(
+    "/xzon",
+    express.static(xzonDir, {
+      index: false,
+      redirect: false,
+      setHeaders(res) {
+        res.setHeader("Cache-Control", "no-cache");
+      },
+    }),
+  );
+
+  app.get("/panel", (_req, res) => {
+    res.sendFile(path.join(panelDir, "index.html"));
+  });
+  app.get("/panel/", (_req, res) => {
+    res.sendFile(path.join(panelDir, "index.html"));
+  });
+  // Panel assets also at root (/styles.css, /app.js) for existing absolute paths
+  app.use(express.static(panelDir, { index: false, redirect: false }));
 
   app.post("/api/login", (req, res) => {
     const { password } = req.body || {};
@@ -185,17 +219,20 @@ export function startPanelServer(client) {
     }
   });
 
-  app.get("/", (req, res) => {
-    res.sendFile(path.join(__dirname, "public", "index.html"));
-  });
-
-  // Express 5 uyumlu SPA fallback
+  // Panel SPA fallback under /panel only
   app.use((req, res, next) => {
-    if (req.method !== "GET" || req.path.startsWith("/api/")) return next();
-    return res.sendFile(path.join(__dirname, "public", "index.html"));
+    if (req.method !== "GET") return next();
+    if (req.path.startsWith("/api/") || req.path.startsWith("/xzon")) return next();
+    if (req.path === "/" || req.path.startsWith("/panel")) {
+      if (req.path.startsWith("/panel")) {
+        return res.sendFile(path.join(panelDir, "index.html"));
+      }
+    }
+    return next();
   });
 
   app.listen(port, "0.0.0.0", () => {
-    console.log(`🖥️  Kontrol paneli: http://0.0.0.0:${port}`);
+    console.log(`💬 XZON Chat: http://0.0.0.0:${port}/`);
+    console.log(`🖥️  Owner panel: http://0.0.0.0:${port}/panel`);
   });
 }
