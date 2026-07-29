@@ -768,8 +768,11 @@ export function togglePin(userId, messageId) {
 }
 
 export function toggleReaction(userId, messageId, emoji) {
-  const clean = String(emoji || "").trim().slice(0, 16);
-  if (!clean) throw new Error("Emoji gerekli");
+  const clean = String(emoji || "")
+    .trim()
+    .slice(0, 32)
+    .replace(/[^a-zA-Z0-9_:\-]/g, "");
+  if (!clean) throw new Error("Tepki gerekli");
   const row = db.prepare("SELECT * FROM web_messages WHERE id = ?").get(messageId);
   if (!row || row.deleted) throw new Error("Mesaj yok");
 

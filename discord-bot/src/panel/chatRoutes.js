@@ -74,7 +74,7 @@ export function mountChatRoutes(app) {
       clients: clientCount(),
       channels: WEB_CHANNELS.length,
       guilds: GUILDS.length,
-      version: "xzon-8",
+      version: "xzon-9",
     });
   });
 

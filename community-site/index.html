@@ -12,7 +12,7 @@
       href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="/xzon/css/app.css?v=8" />
+    <link rel="stylesheet" href="/xzon/css/app.css?v=9" />
   </head>
   <body>
     <div id="boot" class="boot">
@@ -159,8 +159,8 @@
               <span id="charCount">0/1800</span>
             </div>
             <div class="composer-shell">
-              <button type="button" class="icon soft" id="emojiBtn" title="Emoji" aria-label="Emoji">☺</button>
-              <button type="button" class="icon soft" id="attachBtn" title="Medya linki" aria-label="Medya">＋</button>
+              <button type="button" class="icon soft" id="emojiBtn" title="XZON tepkiler" aria-label="Tepkiler"></button>
+              <button type="button" class="icon soft" id="attachBtn" title="Medya linki" aria-label="Medya"></button>
               <textarea id="messageInput" rows="1" maxlength="1800" autocomplete="off" placeholder="Mesajını yaz…" enterkeyhint="send"></textarea>
               <button type="submit" class="send" id="sendBtn" aria-label="Gönder">
                 <svg viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
@@ -223,7 +223,7 @@
     </div>
 
     <div id="statusMenu" class="menu hidden"></div>
-    <div id="emojiPop" class="menu emoji hidden"></div>
+    <div id="emojiPop" class="react-panel hidden"></div>
     <div id="profilePop" class="profile hidden"></div>
     <div id="mentionPop" class="mention-pop hidden"></div>
     <div id="ctxMenu" class="ctx-menu hidden"></div>
@@ -243,6 +243,6 @@
       </div>
     </div>
     <div id="toast" class="toast hidden"></div>
-    <script src="/xzon/js/app.js?v=8" type="module"></script>
+    <script src="/xzon/js/app.js?v=9" type="module"></script>
   </body>
 </html>

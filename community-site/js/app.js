@@ -1,6 +1,66 @@
 const $ = (id) => document.getElementById(id);
-const EMOJIS = ["😀","😂","🥹","😍","🔥","👍","👎","❤️","💜","✨","🎉","💀","😭","😡","🤝","👀","✅","⚡","🎮","💬","📌","🚀","😎","🙌"];
 const STATUS = { online: "Çevrimiçi", idle: "Boşta", dnd: "Rahatsız Etmeyin", invisible: "Görünmez" };
+
+/** XZON branded SVG icon set — no phone emoji chrome */
+const ICON = {
+  reply: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 010 11H12"/></svg>`,
+  edit: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L8 18l-4 1 1-4 11.5-11.5z"/></svg>`,
+  trash: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16"/><path d="M9 7V5h6v2"/><path d="M7 7l1 13h8l1-13"/></svg>`,
+  pin: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 17v5"/><path d="M8 3h8l-1 7 3 3v2H6v-2l3-3L8 3z"/></svg>`,
+  copy: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M4 16V6a2 2 0 012-2h10"/></svg>`,
+  react: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M8.5 10.5h.01M15.5 10.5h.01"/><path d="M8.2 14c.9 1.4 2.3 2.2 3.8 2.2s2.9-.8 3.8-2.2"/></svg>`,
+  smile: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M8.5 10h.01M15.5 10h.01"/><path d="M8 14c1 1.6 2.5 2.4 4 2.4s3-1.8 4-2.4"/></svg>`,
+  plus: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M5 12h14"/></svg>`,
+  more: `<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg>`,
+  send: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M3.2 11.1l16.8-7.2c.7-.3 1.4.4 1.1 1.1L13.9 21.8c-.3.8-1.5.7-1.7-.1l-1.8-7.2-7.2-1.8c-.8-.2-.9-1.4-.1-1.7z"/></svg>`,
+  menu: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16"/></svg>`,
+  close: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 6l12 12M18 6L6 18"/></svg>`,
+};
+
+/** Custom XZON reaction stickers (shortcodes stored in DB) */
+const XZ_REACTIONS = [
+  { id: "xz_like", label: "Beğen", hue: "#6ea8ff" },
+  { id: "xz_love", label: "Kalp", hue: "#ff6bcb" },
+  { id: "xz_fire", label: "Ateş", hue: "#ff8a4a" },
+  { id: "xz_laugh", label: "Gül", hue: "#ffc14a" },
+  { id: "xz_wow", label: "Vay", hue: "#3dffa8" },
+  { id: "xz_sad", label: "Üzgün", hue: "#8b9bb3" },
+  { id: "xz_angry", label: "Kızgın", hue: "#ff5c6a" },
+  { id: "xz_clap", label: "Alkış", hue: "#c4a1ff" },
+  { id: "xz_check", label: "Onay", hue: "#57f287" },
+  { id: "xz_bolt", label: "Şimşek", hue: "#ffe66d" },
+  { id: "xz_game", label: "Oyun", hue: "#00a8fc" },
+  { id: "xz_mark", label: "XZON", hue: "#3dffa8" },
+];
+
+function xzGlyph(id) {
+  const map = {
+    xz_like: `<svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="#1a2740"/><path d="M10 18.5l3.2-8.2c.4-1 1.8-.8 1.9.3l.3 3.4h5.2c1.4 0 2.3 1.5 1.7 2.8l-2.2 5.2c-.3.7-1 1.1-1.7 1.1H12.2c-.7 0-1.3-.4-1.5-1.1L10 18.5z" fill="#6ea8ff"/><path d="M8.2 14.2h2.2v9.2H8.8c-.9 0-1.6-.7-1.6-1.6v-6c0-.9.7-1.6 1.6-1.6z" fill="#8eb8ff"/></svg>`,
+    xz_love: `<svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="#2a1630"/><path d="M16 24s-7.2-4.4-9-8.2C5.4 12.4 7 9 10.4 9c2 0 3.2 1.1 3.6 2 .4-.9 1.6-2 3.6-2C21 9 22.6 12.4 21 15.8 19.2 19.6 16 24 16 24z" fill="#ff6bcb"/></svg>`,
+    xz_fire: `<svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="#2a1a12"/><path d="M16 6c1.2 3.2-.2 5.2-1.4 6.6-1.4 1.6-2.2 2.8-1.8 4.8 2.2-1.2 3.4-2.2 4.2-4 1.4 2.4.8 5.2-1.2 7-.8.8-1.8 1.4-2.8 1.6 4.8.6 8.2-2.4 8.2-6.8C21.2 10.6 18.4 7.6 16 6z" fill="#ff8a4a"/><path d="M14.2 22.4c-1.4-1-2-2.6-1.6-4.2.8.6 1.6 1 2.4 1 .2 1.2-.2 2.2-.8 3.2z" fill="#ffe08a"/></svg>`,
+    xz_laugh: `<svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="#2a2410"/><circle cx="16" cy="16" r="9" fill="#ffc14a"/><path d="M11 14c.6-1 1.4-1.5 2.2-1.5M19 14c-.6-1-1.4-1.5-2.2-1.5" stroke="#1a1205" stroke-width="1.4" fill="none" stroke-linecap="round"/><path d="M11.2 17.2c.8 2.4 2.2 3.6 4.8 3.6s4-1.2 4.8-3.6H11.2z" fill="#1a1205"/></svg>`,
+    xz_wow: `<svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="#10261c"/><circle cx="16" cy="16" r="9" fill="#3dffa8"/><circle cx="12.5" cy="14" r="1.3" fill="#061018"/><circle cx="19.5" cy="14" r="1.3" fill="#061018"/><ellipse cx="16" cy="19.2" rx="2.2" ry="2.8" fill="#061018"/></svg>`,
+    xz_sad: `<svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="#1a2030"/><circle cx="16" cy="16" r="9" fill="#8b9bb3"/><circle cx="12.5" cy="14" r="1.2" fill="#0b0f16"/><circle cx="19.5" cy="14" r="1.2" fill="#0b0f16"/><path d="M11.5 20c1.2-1.4 2.6-2 4.5-2s3.3.6 4.5 2" stroke="#0b0f16" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg>`,
+    xz_angry: `<svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="#2a1418"/><circle cx="16" cy="16" r="9" fill="#ff5c6a"/><path d="M10 12.5l4 1.5M22 12.5l-4 1.5" stroke="#1a080a" stroke-width="1.6" stroke-linecap="round"/><path d="M11.5 20c1.2-1.2 2.6-1.8 4.5-1.8s3.3.6 4.5 1.8" stroke="#1a080a" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg>`,
+    xz_clap: `<svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="#221833"/><path d="M10 14l2-4 2 1-1.2 3.2L10 14zm4.2-.4l2.2-4.4 2 .8-1.6 4.2-2.6-.6zm4.1.6l2.4-3.8 1.8 1-1.8 4-2.4-1.2zM9.5 16.5l7.2 7.2c1.6 1.6 4.2 1.5 5.6-.2l.8-.9c1.2-1.4.8-3.5-.8-4.5l-3.4-2.1-9.4.5z" fill="#c4a1ff"/></svg>`,
+    xz_check: `<svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="#102618"/><circle cx="16" cy="16" r="9" fill="#57f287"/><path d="M11 16.2l3.1 3.1L21.4 12" stroke="#061018" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+    xz_bolt: `<svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="#262010"/><path d="M17.8 6L10 17.2h5l-1.2 8.8L22 14.6h-5L17.8 6z" fill="#ffe66d"/></svg>`,
+    xz_game: `<svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="#0f2030"/><rect x="7" y="12" width="18" height="10" rx="5" fill="#00a8fc"/><circle cx="12" cy="17" r="1.4" fill="#061018"/><path d="M12 15.2v3.6M10.2 17h3.6" stroke="#061018" stroke-width="1.3" stroke-linecap="round"/><circle cx="20" cy="15.8" r="1.1" fill="#ff6bcb"/><circle cx="22.2" cy="17.8" r="1.1" fill="#ffe66d"/></svg>`,
+    xz_mark: `<svg viewBox="0 0 32 32"><defs><linearGradient id="xzg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#3dffa8"/><stop offset="1" stop-color="#6ea8ff"/></linearGradient></defs><circle cx="16" cy="16" r="15" fill="#0d1520"/><rect x="7" y="7" width="18" height="18" rx="6" fill="url(#xzg)"/><text x="16" y="19.2" text-anchor="middle" font-size="9" font-family="Sora,Outfit,sans-serif" font-weight="800" fill="#061018">XZ</text></svg>`,
+  };
+  if (map[id]) return map[id];
+  // legacy unicode fallback — still wrap professionally
+  return `<span class="rx-fallback">${esc(id)}</span>`;
+}
+
+function reactionChip(emoji, count, mine, messageId) {
+  const custom = XZ_REACTIONS.some((r) => r.id === emoji);
+  return `<button class="reaction ${mine ? "mine" : ""} ${custom ? "xz" : ""}" data-react="${messageId}" data-emoji="${esc(emoji)}" type="button" title="${esc(emoji)}"><span class="rx">${custom ? xzGlyph(emoji) : esc(emoji)}</span><span class="rx-n">${count}</span></button>`;
+}
+
+function actBtn(act, id, label, icon, danger = false) {
+  return `<button type="button" class="tb ${danger ? "danger" : ""}" data-act="${act}" data-id="${id}" title="${label}" aria-label="${label}">${icon}<span class="tb-tip">${label}</span></button>`;
+}
 
 const els = {
   boot: $("boot"),
@@ -116,12 +176,13 @@ function esc(str) {
 
 function md(text) {
   let s = esc(text);
+  s = s.replace(/:(xz_[a-z]+):/g, (_, id) => `<span class="inline-rx" title="${id}">${xzGlyph(id)}</span>`);
   s = s.replace(/\|\|(.+?)\|\|/g, '<span class="spoiler">$1</span>');
   s = s.replace(/`([^`]+)`/g, "<code>$1</code>");
   s = s.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
   s = s.replace(/\*([^*]+)\*/g, "<em>$1</em>");
   s = s.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noreferrer">$1</a>');
-  s = s.replace(/@(\w+)/g, '<span class="mention">@$1</span>');
+  s = s.replace(/@([\wğüşıöçĞÜŞİÖÇ]+)/g, '<span class="mention">@$1</span>');
   return s.replaceAll("\n", "<br>");
 }
 
@@ -511,10 +572,7 @@ function msgHtml(msg, compact, enter = false) {
         ${
           msg.reactions?.length
             ? `<div class="reactions">${msg.reactions
-                .map(
-                  (r) =>
-                    `<button class="reaction ${r.mine ? "mine" : ""}" data-react="${msg.id}" data-emoji="${r.emoji}" type="button">${r.emoji} ${r.count}</button>`,
-                )
+                .map((r) => reactionChip(r.emoji, r.count, r.mine, msg.id))
                 .join("")}</div>`
             : ""
         }
@@ -522,13 +580,13 @@ function msgHtml(msg, compact, enter = false) {
       ${
         msg.deleted || msg.pending
           ? ""
-          : `<div class="toolbar">
-              <button type="button" data-act="react" data-id="${msg.id}" title="Tepki">😊</button>
-              <button type="button" data-act="reply" data-id="${msg.id}" title="Yanıtla">↩</button>
-              ${mine ? `<button type="button" data-act="edit" data-id="${msg.id}" title="Düzenle">✎</button>` : ""}
-              <button type="button" data-act="pin" data-id="${msg.id}" title="Sabitle">📌</button>
-              <button type="button" data-act="copy" data-id="${msg.id}" title="Kopyala">⧉</button>
-              ${mine ? `<button type="button" data-act="delete" data-id="${msg.id}" title="Sil">🗑</button>` : ""}
+          : `<div class="toolbar" role="toolbar" aria-label="Mesaj eylemleri">
+              ${actBtn("react", msg.id, "Tepki", ICON.react)}
+              ${actBtn("reply", msg.id, "Yanıtla", ICON.reply)}
+              ${mine ? actBtn("edit", msg.id, "Düzenle", ICON.edit) : ""}
+              ${actBtn("pin", msg.id, "Sabitle", ICON.pin)}
+              ${actBtn("copy", msg.id, "Kopyala", ICON.copy)}
+              ${mine ? actBtn("delete", msg.id, "Sil", ICON.trash, true) : ""}
             </div>`
       }
     </article>`;
@@ -951,17 +1009,19 @@ function openCtxMenu(messageId, x, y) {
   const msg = state.messages.find((m) => m.id === messageId);
   if (!msg || !els.ctxMenu) return;
   const mine = msg.userId === state.user?.id;
+  const item = (c, label, icon, danger = false) =>
+    `<button type="button" class="${danger ? "danger" : ""}" data-c="${c}"><span class="ctx-ic">${icon}</span><span>${label}</span></button>`;
   els.ctxMenu.innerHTML = `
-    <button type="button" data-c="reply">Yanıtla</button>
-    <button type="button" data-c="react">Tepki ekle</button>
-    <button type="button" data-c="pin">${msg.pinned ? "Sabiti kaldır" : "Sabitle"}</button>
-    <button type="button" data-c="copy">Mesajı kopyala</button>
-    ${mine ? `<button type="button" data-c="edit">Düzenle</button>` : ""}
-    ${mine ? `<button type="button" class="danger" data-c="delete">Sil</button>` : ""}
+    ${item("reply", "Yanıtla", ICON.reply)}
+    ${item("react", "Tepki ekle", ICON.react)}
+    ${item("pin", msg.pinned ? "Sabiti kaldır" : "Sabitle", ICON.pin)}
+    ${item("copy", "Mesajı kopyala", ICON.copy)}
+    ${mine ? item("edit", "Düzenle", ICON.edit) : ""}
+    ${mine ? item("delete", "Mesajı sil", ICON.trash, true) : ""}
   `;
   els.ctxMenu.classList.remove("hidden");
-  const w = 230;
-  const h = 240;
+  const w = 250;
+  const h = 280;
   els.ctxMenu.style.left = `${Math.min(window.innerWidth - w - 8, Math.max(8, x))}px`;
   els.ctxMenu.style.top = `${Math.min(window.innerHeight - h - 8, Math.max(8, y))}px`;
   els.ctxMenu.querySelectorAll("[data-c]").forEach((btn) => {
@@ -1336,13 +1396,41 @@ async function activateNitro(tier) {
   }
 }
 
-function showEmoji(anchor, onPick) {
+function showEmoji(anchor, onPick, { compose = false } = {}) {
   const pop = els.emojiPop;
-  pop.innerHTML = EMOJIS.map((e) => `<button type="button" data-e="${e}">${e}</button>`).join("");
+  pop.className = "react-panel";
+  pop.innerHTML = `
+    <header class="react-head">
+      <div>
+        <strong>XZON Tepkiler</strong>
+        <small>${compose ? "Mesaja ekle" : "Özel sticker seti"}</small>
+      </div>
+      <button type="button" class="icon" id="closeReactPanel" aria-label="Kapat">${ICON.close}</button>
+    </header>
+    <div class="react-grid">
+      ${XZ_REACTIONS.map(
+        (r) =>
+          `<button type="button" class="react-card" data-e="${r.id}" title="${r.label}" style="--rx:${r.hue}">
+            <span class="react-glyph">${xzGlyph(r.id)}</span>
+            <span class="react-label">${r.label}</span>
+          </button>`,
+      ).join("")}
+    </div>
+    ${
+      compose
+        ? `<footer class="react-foot">Sticker kısa kodu mesaja eklenir · örn. :xz_fire:</footer>`
+        : `<footer class="react-foot">Tepkiler XZON görselleriyle gösterilir</footer>`
+    }
+  `;
   const rect = anchor.getBoundingClientRect();
-  pop.style.left = `${Math.min(window.innerWidth - 300, rect.left)}px`;
-  pop.style.top = `${Math.max(8, rect.top - 190)}px`;
+  const width = Math.min(360, window.innerWidth - 16);
+  const left = Math.min(window.innerWidth - width - 8, Math.max(8, rect.left - 40));
+  const top = Math.max(8, rect.top - 320);
+  pop.style.left = `${left}px`;
+  pop.style.top = `${top}px`;
+  pop.style.width = `${width}px`;
   pop.classList.remove("hidden");
+  $("closeReactPanel")?.addEventListener("click", () => pop.classList.add("hidden"));
   pop.querySelectorAll("[data-e]").forEach((btn) => {
     btn.onclick = () => {
       pop.classList.add("hidden");
@@ -1621,11 +1709,25 @@ document.addEventListener("keydown", (e) => {
   }
 });
 $("emojiBtn").addEventListener("click", (e) => {
-  showEmoji(e.currentTarget, (emoji) => {
-    els.messageInput.value += emoji;
-    els.messageInput.focus();
-  });
+  showEmoji(
+    e.currentTarget,
+    (emoji) => {
+      const token = `:${emoji}:`;
+      const ta = els.messageInput;
+      const start = ta.selectionStart ?? ta.value.length;
+      const end = ta.selectionEnd ?? ta.value.length;
+      ta.value = `${ta.value.slice(0, start)}${token}${ta.value.slice(end)}`;
+      resizeComposer();
+      ta.focus();
+    },
+    { compose: true },
+  );
 });
+
+// Brand composer action icons
+if ($("emojiBtn")) $("emojiBtn").innerHTML = ICON.smile;
+if ($("attachBtn")) $("attachBtn").innerHTML = ICON.plus;
+if ($("sendBtn")) $("sendBtn").innerHTML = ICON.send;
 
 $("micBtn").addEventListener("click", async () => {
   state.user = (
