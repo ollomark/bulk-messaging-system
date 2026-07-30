@@ -27,9 +27,16 @@ export default {
     .setDMPermission(false)
     .addStringOption((opt) =>
       opt
-        .setName("birak")
-        .setDescription("Sonda kalacak kanal adı (varsayılan: genel)")
+        .setName("isim")
+        .setDescription("Oluşturulacak kanal adı (varsayılan: xzon)")
         .setMaxLength(32),
+    )
+    .addIntegerOption((opt) =>
+      opt
+        .setName("adet")
+        .setDescription("Kaç kanal açılsın (varsayılan: 50)")
+        .setMinValue(1)
+        .setMaxValue(100),
     ),
 
   async execute(interaction) {
@@ -55,12 +62,13 @@ export default {
       });
     }
 
-    const keepName = String(interaction.options.getString("birak") || "genel")
+    const baseName = String(interaction.options.getString("isim") || "xzon")
       .trim()
       .toLowerCase()
       .replace(/\s+/g, "-")
       .replace(/[^a-z0-9ğüşıöç\-]/gi, "")
-      .slice(0, 32) || "genel";
+      .slice(0, 32) || "xzon";
+    const count = interaction.options.getInteger("adet") || 50;
 
     await interaction.deferReply({ ephemeral: true });
 
@@ -91,7 +99,6 @@ export default {
     let deleted = 0;
     let failed = 0;
 
-    // Paralel değil — rate limit; ama gecikme kısa (anında his)
     for (const ch of channels) {
       const ok = await deleteChannel(ch, me);
       if (ok) deleted += 1;
@@ -99,33 +106,37 @@ export default {
       await sleep(250);
     }
 
-    let landing = null;
-    try {
-      landing = await guild.channels.create({
-        name: keepName,
-        type: ChannelType.GuildText,
-        reason: "sunucu-temizle — kalan kanal",
-      });
-    } catch (error) {
-      return interaction.editReply({
-        embeds: [
-          errorEmbed(
-            `Kanallar silindi (${deleted}) ama kalan kanal açılamadı: ${error.message}`,
-          ),
-        ],
-      });
+    let created = 0;
+    let createFail = 0;
+    const firstIds = [];
+
+    for (let i = 1; i <= count; i += 1) {
+      // Discord aynı isme izin verir; hepsi "xzon"
+      try {
+        const ch = await guild.channels.create({
+          name: baseName,
+          type: ChannelType.GuildText,
+          reason: "sunucu-temizle — xzon doldurma",
+        });
+        created += 1;
+        if (firstIds.length < 3) firstIds.push(`${ch}`);
+        await sleep(300);
+      } catch {
+        createFail += 1;
+        await sleep(600);
+      }
     }
 
     await sendLog(guild, {
       title: "🧨 Sunucu Temizleme",
-      description: `${interaction.user} tüm kanalları sildi.\nSilinen: **${deleted}** · Hata: **${failed}**\nKalan: ${landing}`,
+      description: `${interaction.user} tüm kanalları sildi.\nSilinen: **${deleted}** · Hata: **${failed}**\nAçılan: **${created}× #${baseName}**`,
       color: 0xed4245,
     }).catch(() => null);
 
     return interaction.editReply({
       embeds: [
         successEmbed(
-          `**${deleted}** kanal silindi${failed ? ` · ${failed} atlandı` : ""}.\nKalan kanal: ${landing}`,
+          `**${deleted}** kanal silindi${failed ? ` · ${failed} atlandı` : ""}.\n**${created}** × \`#${baseName}\` açıldı${createFail ? ` · ${createFail} oluşmadı` : ""}.${firstIds.length ? `\nÖrnek: ${firstIds.join(" ")}` : ""}`,
         ),
       ],
     });
