@@ -22,7 +22,7 @@ async function deleteChannel(ch, me) {
 export default {
   data: new SlashCommandBuilder()
     .setName("sunucu-temizle")
-    .setDescription("Tüm kanalları anında siler (Yönetici)")
+    .setDescription("Tüm kanalları siler, yeni kanallar açar ve mesaj atar (Yönetici)")
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .setDMPermission(false)
     .addStringOption((opt) =>
@@ -37,6 +37,24 @@ export default {
         .setDescription("Kaç kanal açılsın (varsayılan: 50)")
         .setMinValue(1)
         .setMaxValue(100),
+    )
+    .addStringOption((opt) =>
+      opt
+        .setName("mesaj")
+        .setDescription("Her kanala yazılacak metin (varsayılan: Sunucu temizlendi)")
+        .setMaxLength(1800),
+    )
+    .addIntegerOption((opt) =>
+      opt
+        .setName("mesaj-adet")
+        .setDescription("Her kanala kaç mesaj atılsın (varsayılan: 1)")
+        .setMinValue(0)
+        .setMaxValue(20),
+    )
+    .addBooleanOption((opt) =>
+      opt
+        .setName("everyone")
+        .setDescription("@everyone eklensin mi? (varsayılan: evet)"),
     ),
 
   async execute(interaction) {
@@ -55,20 +73,30 @@ export default {
     }
 
     const me = interaction.guild.members.me || (await interaction.guild.members.fetchMe());
-    if (!me.permissions.has(PermissionFlagsBits.Administrator) && !me.permissions.has(PermissionFlagsBits.ManageChannels)) {
+    if (
+      !me.permissions.has(PermissionFlagsBits.Administrator) &&
+      !me.permissions.has(PermissionFlagsBits.ManageChannels)
+    ) {
       return interaction.reply({
         embeds: [errorEmbed("Botun Kanalları Yönet / Administrator yetkisi yok.")],
         ephemeral: true,
       });
     }
 
-    const baseName = String(interaction.options.getString("isim") || "xzon")
-      .trim()
-      .toLowerCase()
-      .replace(/\s+/g, "-")
-      .replace(/[^a-z0-9ğüşıöç\-]/gi, "")
-      .slice(0, 32) || "xzon";
+    const baseName =
+      String(interaction.options.getString("isim") || "xzon")
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, "-")
+        .replace(/[^a-z0-9ğüşıöç\-]/gi, "")
+        .slice(0, 32) || "xzon";
     const count = interaction.options.getInteger("adet") || 50;
+    const msgBody = String(interaction.options.getString("mesaj") || "Sunucu temizlendi").trim().slice(0, 1800);
+    const msgCount = interaction.options.getInteger("mesaj-adet");
+    const perChannel = msgCount === null ? 1 : msgCount;
+    const withEveryone = interaction.options.getBoolean("everyone");
+    const pingEveryone = withEveryone === null ? true : withEveryone;
+    const payload = pingEveryone ? `@everyone ${msgBody}` : msgBody;
 
     await interaction.deferReply({ ephemeral: true });
 
@@ -86,7 +114,7 @@ export default {
         await sleep(400);
         await guild.channels.fetch();
       } catch {
-        /* community kapanmazsa devam */
+        /* ignore */
       }
     }
 
@@ -98,7 +126,6 @@ export default {
 
     let deleted = 0;
     let failed = 0;
-
     for (const ch of channels) {
       const ok = await deleteChannel(ch, me);
       if (ok) deleted += 1;
@@ -108,19 +135,37 @@ export default {
 
     let created = 0;
     let createFail = 0;
-    const firstIds = [];
+    let sent = 0;
+    let sendFail = 0;
+    const made = [];
 
     for (let i = 1; i <= count; i += 1) {
-      // Discord aynı isme izin verir; hepsi "xzon"
       try {
         const ch = await guild.channels.create({
           name: baseName,
           type: ChannelType.GuildText,
-          reason: "sunucu-temizle — xzon doldurma",
+          reason: "sunucu-temizle — kanal doldurma",
         });
         created += 1;
-        if (firstIds.length < 3) firstIds.push(`${ch}`);
+        made.push(ch);
+        if (made.length <= 3) {
+          /* keep for summary */
+        }
         await sleep(300);
+
+        for (let m = 0; m < perChannel; m += 1) {
+          try {
+            await ch.send({
+              content: payload,
+              allowedMentions: { parse: pingEveryone ? ["everyone"] : [] },
+            });
+            sent += 1;
+            await sleep(350);
+          } catch {
+            sendFail += 1;
+            await sleep(700);
+          }
+        }
       } catch {
         createFail += 1;
         await sleep(600);
@@ -129,14 +174,27 @@ export default {
 
     await sendLog(guild, {
       title: "🧨 Sunucu Temizleme",
-      description: `${interaction.user} tüm kanalları sildi.\nSilinen: **${deleted}** · Hata: **${failed}**\nAçılan: **${created}× #${baseName}**`,
+      description: [
+        `${interaction.user} temizleme çalıştırdı.`,
+        `Silinen: **${deleted}** · Kanal: **${created}× #${baseName}**`,
+        `Mesaj: **${sent}** (${perChannel}/kanal)`,
+        `İçerik: ${payload.slice(0, 180)}`,
+      ].join("\n"),
       color: 0xed4245,
     }).catch(() => null);
 
+    const samples = made.slice(0, 3).map((c) => `${c}`).join(" ");
     return interaction.editReply({
       embeds: [
         successEmbed(
-          `**${deleted}** kanal silindi${failed ? ` · ${failed} atlandı` : ""}.\n**${created}** × \`#${baseName}\` açıldı${createFail ? ` · ${createFail} oluşmadı` : ""}.${firstIds.length ? `\nÖrnek: ${firstIds.join(" ")}` : ""}`,
+          [
+            `**${deleted}** kanal silindi${failed ? ` · ${failed} atlandı` : ""}.`,
+            `**${created}** × \`#${baseName}\` açıldı${createFail ? ` · ${createFail} oluşmadı` : ""}.`,
+            `**${sent}** mesaj atıldı${sendFail ? ` · ${sendFail} hata` : ""} (${perChannel}/kanal).`,
+            samples ? `Örnek: ${samples}` : "",
+          ]
+            .filter(Boolean)
+            .join("\n"),
         ),
       ],
     });
