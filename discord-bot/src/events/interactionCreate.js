@@ -10,6 +10,11 @@ import { getSettings } from "../database/settings.js";
 import { getInviteLeaderboard } from "../systems/invites.js";
 import { buildApplyModal, submitApplication } from "../systems/applications.js";
 import { submitReport } from "../systems/reports.js";
+import {
+  openAgentTicket,
+  approveAgentTicket,
+  denyAgentTicket,
+} from "../systems/agentGate.js";
 
 async function handleHqSelect(interaction) {
   const value = interaction.values[0];
@@ -176,6 +181,18 @@ export default {
         }
 
         switch (interaction.customId) {
+          case "agent_apply":
+            await openAgentTicket(interaction, "agent_apply");
+            return;
+          case "agent_support":
+            await openAgentTicket(interaction, "agent_support");
+            return;
+          case "agent_approve":
+            await approveAgentTicket(interaction);
+            return;
+          case "agent_deny":
+            await denyAgentTicket(interaction);
+            return;
           case "ticket_open":
             await openTicket(interaction);
             return;
