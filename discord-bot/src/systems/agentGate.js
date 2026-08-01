@@ -148,41 +148,18 @@ export async function openAgentTicket(interaction, kind) {
     });
   }
 
-  const existing = db
-    .prepare("SELECT * FROM tickets WHERE guild_id = ? AND opener_id = ? AND status = 'open'")
-    .get(interaction.guild.id, interaction.user.id);
-
-  if (existing) {
-    return interaction.reply({
-      embeds: [errorEmbed(`Zaten açık bir ticketın var: <#${existing.channel_id}>`)],
-      ephemeral: true,
-    });
+  // Eski "open" ama kanalı silinmiş kayıtları temizle (yanlış uyarı vermesin)
+  const stale = db
+    .prepare("SELECT channel_id FROM tickets WHERE guild_id = ? AND opener_id = ? AND status = 'open'")
+    .all(interaction.guild.id, interaction.user.id);
+  for (const row of stale) {
+    const still = await interaction.guild.channels.fetch(row.channel_id).catch(() => null);
+    if (!still) {
+      db.prepare("UPDATE tickets SET status = 'closed' WHERE channel_id = ?").run(row.channel_id);
+    }
   }
 
-  if (settings.agent_access_role_id && interaction.member.roles.cache.has(settings.agent_access_role_id)) {
-    return interaction.reply({
-      embeds: [
-        errorEmbed(
-          kind === "agent_apply"
-            ? "Zaten içeri aldın. Tekrar başvuru yok. `/yemin` eksikse dene."
-            : "Destek için Handler’a yaz — tekrar ticket açmana gerek yok.",
-        ),
-      ],
-      ephemeral: true,
-    });
-  }
-
-  // Giriş rolü yoksa ticket yok (herkes rastgele açmasın)
-  if (
-    settings.agent_join_role_id &&
-    !interaction.member.roles.cache.has(settings.agent_join_role_id) &&
-    !interaction.member.roles.cache.has(settings.agent_handler_role_id || "")
-  ) {
-    return interaction.reply({
-      embeds: [errorEmbed("Giriş rolün yok. Sunucudan çıkıp tekrar gir veya yetkiliye söyle.")],
-      ephemeral: true,
-    });
-  }
+  // Limit yok — herkes istediği kadar ticket açabilir
 
   const overwrites = [
     { id: interaction.guild.id, deny: [PermissionFlagsBits.ViewChannel] },
@@ -219,8 +196,9 @@ export async function openAgentTicket(interaction, kind) {
   }
 
   const prefix = kind === "agent_apply" ? "basvuru" : "destek";
+  const suffix = Date.now().toString(36).slice(-4);
   const channel = await interaction.guild.channels.create({
-    name: `${prefix}-${interaction.user.username}`
+    name: `${prefix}-${interaction.user.username}-${suffix}`
       .slice(0, 90)
       .toLowerCase()
       .replace(/[^a-z0-9-]/g, "-"),
