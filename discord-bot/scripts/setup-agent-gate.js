@@ -80,6 +80,7 @@ async function ensureRole(name, color, hoist = true) {
   return role;
 }
 
+const rJoin = await ensureRole("Giriş", 0x64748b, true);
 const rAccess = await ensureRole("Operative", 0xed4245, true);
 const rSworn = await ensureRole("Sworn", 0xc4a35a, true);
 const rHandler = await ensureRole("Handler", 0x5865f2, true);
@@ -108,14 +109,13 @@ const BOT = [
 ];
 
 const entryOW = [
+  { id: guild.id, deny: [PermissionFlagsBits.ViewChannel] },
   {
-    id: guild.id,
-    allow: [
-      PermissionFlagsBits.ViewChannel,
-      PermissionFlagsBits.ReadMessageHistory,
-    ],
+    id: rJoin.id,
+    allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.ReadMessageHistory],
     deny: [PermissionFlagsBits.SendMessages],
   },
+  allow(rHandler.id, RW),
   allow(me.id, BOT),
 ];
 
@@ -225,6 +225,8 @@ await voice(catVoice, "Focus", [
 ]);
 
 updateSettings(guild.id, {
+  agent_join_role_id: rJoin.id,
+  auto_role_id: rJoin.id,
   agent_access_role_id: rAccess.id,
   agent_handler_role_id: rHandler.id,
   agent_sworn_role_id: rSworn.id,
@@ -235,6 +237,7 @@ updateSettings(guild.id, {
   ticket_log_channel_id: staffLog.id,
   announce_channel_id: anc.id,
   welcome_enabled: 0,
+  verify_enabled: 0,
 });
 
 await kurallar.send({
