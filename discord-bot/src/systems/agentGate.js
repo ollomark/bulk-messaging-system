@@ -12,6 +12,66 @@ import { baseEmbed, errorEmbed, successEmbed } from "../utils/embeds.js";
 const RED = 0xb91c1c;
 const GOLD = 0xc4a35a;
 
+/** Production self-heal: bind roles/channels by name if settings empty. */
+export async function ensureAgentSettings(guild) {
+  if (!guild) return getSettings("0");
+  await guild.roles.fetch().catch(() => null);
+  await guild.channels.fetch().catch(() => null);
+
+  const s = getSettings(guild.id);
+  const role = (name) => guild.roles.cache.find((r) => r.name === name);
+  const ch = (name) =>
+    [...guild.channels.cache.values()].find((c) => c.name === name && c.isTextBased?.());
+  const cat = (part) =>
+    [...guild.channels.cache.values()].find(
+      (c) => c.type === 4 && c.name.toUpperCase().includes(part),
+    );
+
+  const patch = {};
+  const join = role("Giriş");
+  const access = role("Operative");
+  const sworn = role("Sworn");
+  const handler = role("Handler");
+  const giris = ch("giriş");
+  const xzon = ch("xzon");
+  const handlerLog = ch("handler-log");
+  const ticketCat = cat("TICKET");
+
+  if (!s.agent_join_role_id && join) {
+    patch.agent_join_role_id = join.id;
+    patch.auto_role_id = join.id;
+  }
+  if (!s.agent_access_role_id && access) patch.agent_access_role_id = access.id;
+  if (!s.agent_sworn_role_id && sworn) patch.agent_sworn_role_id = sworn.id;
+  if (!s.agent_handler_role_id && handler) {
+    patch.agent_handler_role_id = handler.id;
+    patch.ticket_support_role_id = handler.id;
+  }
+  if (!s.agent_entry_channel_id && giris) patch.agent_entry_channel_id = giris.id;
+  if (!s.agent_oath_channel_id && xzon) patch.agent_oath_channel_id = xzon.id;
+  if (!s.ticket_category_id && ticketCat) patch.ticket_category_id = ticketCat.id;
+  if (!s.ticket_log_channel_id && handlerLog) patch.ticket_log_channel_id = handlerLog.id;
+
+  // Always refresh critical IDs from live names (roles renamed? keep names canonical)
+  if (access) patch.agent_access_role_id = access.id;
+  if (join) {
+    patch.agent_join_role_id = join.id;
+    patch.auto_role_id = join.id;
+  }
+  if (handler) {
+    patch.agent_handler_role_id = handler.id;
+    patch.ticket_support_role_id = handler.id;
+  }
+  if (sworn) patch.agent_sworn_role_id = sworn.id;
+  if (giris) patch.agent_entry_channel_id = giris.id;
+  if (xzon) patch.agent_oath_channel_id = xzon.id;
+  if (ticketCat) patch.ticket_category_id = ticketCat.id;
+  if (handlerLog) patch.ticket_log_channel_id = handlerLog.id;
+
+  if (Object.keys(patch).length) updateSettings(guild.id, patch);
+  return getSettings(guild.id);
+}
+
 export function buildAgentEntryPanel() {
   const embed = baseEmbed(
     "XZON · GİRİŞ",
@@ -73,7 +133,7 @@ function ticketControls(kind) {
 }
 
 export async function openAgentTicket(interaction, kind) {
-  const settings = getSettings(interaction.guild.id);
+  const settings = await ensureAgentSettings(interaction.guild);
 
   // Panel sadece giriş kanalından
   if (
@@ -205,7 +265,7 @@ function isHandler(interaction, settings) {
 }
 
 export async function approveAgentTicket(interaction) {
-  const settings = getSettings(interaction.guild.id);
+  const settings = await ensureAgentSettings(interaction.guild);
   if (!isHandler(interaction, settings)) {
     return interaction.reply({ embeds: [errorEmbed("Bunu sadece Handler yapabilir.")], ephemeral: true });
   }
@@ -224,7 +284,11 @@ export async function approveAgentTicket(interaction) {
   const roleId = settings.agent_access_role_id;
   if (!roleId) {
     return interaction.reply({
-      embeds: [errorEmbed("Erişim rolü ayarlı değil. `/ajan kur` çalıştırın.")],
+      embeds: [
+        errorEmbed(
+          "Operative rolü sunucuda yok. Rol adının tam olarak `Operative` olduğundan emin ol.",
+        ),
+      ],
       ephemeral: true,
     });
   }
@@ -266,7 +330,7 @@ export async function approveAgentTicket(interaction) {
 }
 
 export async function denyAgentTicket(interaction) {
-  const settings = getSettings(interaction.guild.id);
+  const settings = await ensureAgentSettings(interaction.guild);
   if (!isHandler(interaction, settings)) {
     return interaction.reply({ embeds: [errorEmbed("Bunu sadece Handler yapabilir.")], ephemeral: true });
   }
@@ -289,11 +353,11 @@ export async function denyAgentTicket(interaction) {
 }
 
 export async function swearOath(interaction) {
-  const settings = getSettings(interaction.guild.id);
+  const settings = await ensureAgentSettings(interaction.guild);
   const accessRole = settings.agent_access_role_id;
   if (!accessRole) {
     return interaction.reply({
-      embeds: [errorEmbed("Sistem kurulu değil. Yetkili `/ajan kur` çalıştırsın.")],
+      embeds: [errorEmbed("Operative rolü bulunamadı. Rol adı `Operative` olmalı.")],
       ephemeral: true,
     });
   }

@@ -5,6 +5,7 @@ import { sendLog } from "../systems/logger.js";
 import { premiumEmbed, brand } from "../utils/brand.js";
 import { config } from "../config.js";
 import { resolveInviter, trackInvite } from "../systems/invites.js";
+import { ensureAgentSettings } from "../systems/agentGate.js";
 
 function formatWelcome(template, member) {
   return template
@@ -20,7 +21,7 @@ export default {
   async execute(member) {
     await handleRaidJoin(member);
 
-    const settings = getSettings(member.guild.id);
+    const settings = await ensureAgentSettings(member.guild);
     const inviter = await resolveInviter(member);
     if (inviter) {
       trackInvite(member.guild.id, inviter.id, member.id, null);

@@ -4,6 +4,7 @@ import { ensureLogChannelFromEnv, sendLog } from "../systems/logger.js";
 import { startVoiceKeepAlive } from "../systems/voice.js";
 import { cacheAllInvites } from "../systems/invites.js";
 import { brand } from "../utils/brand.js";
+import { ensureAgentSettings } from "../systems/agentGate.js";
 
 export default {
   name: Events.ClientReady,
@@ -19,6 +20,17 @@ export default {
       ensureLogChannelFromEnv(guild.id);
     }
     if (config.guildId) ensureLogChannelFromEnv(config.guildId);
+
+    // Ajan kapısı ayarlarını rol/kanal adlarından production DB'ye yaz
+    if (config.guildId) {
+      const agentGuild = client.guilds.cache.get(config.guildId);
+      if (agentGuild) {
+        const agent = await ensureAgentSettings(agentGuild);
+        console.log(
+          `Ajan ayar: access=${agent.agent_access_role_id || "-"} join=${agent.agent_join_role_id || "-"} entry=${agent.agent_entry_channel_id || "-"}`,
+        );
+      }
+    }
 
     await cacheAllInvites(client);
     await startVoiceKeepAlive(client);
