@@ -33,7 +33,6 @@ export async function ensureAgentSettings(guild) {
   const sworn = role("Sworn");
   const handler = role("Handler");
   const giris = ch("giriş");
-  const xzon = ch("xzon");
   const handlerLog = ch("handler-log");
   const ticketCat = cat("TICKET");
 
@@ -48,11 +47,12 @@ export async function ensureAgentSettings(guild) {
     patch.ticket_support_role_id = handler.id;
   }
   if (!s.agent_entry_channel_id && giris) patch.agent_entry_channel_id = giris.id;
-  if (!s.agent_oath_channel_id && xzon) patch.agent_oath_channel_id = xzon.id;
+  // Yeminler sadece Handler'ın gördüğü kanala
+  if (!s.agent_oath_channel_id && handlerLog) patch.agent_oath_channel_id = handlerLog.id;
   if (!s.ticket_category_id && ticketCat) patch.ticket_category_id = ticketCat.id;
   if (!s.ticket_log_channel_id && handlerLog) patch.ticket_log_channel_id = handlerLog.id;
 
-  // Always refresh critical IDs from live names (roles renamed? keep names canonical)
+  // Always refresh critical IDs from live names
   if (access) patch.agent_access_role_id = access.id;
   if (join) {
     patch.agent_join_role_id = join.id;
@@ -64,9 +64,11 @@ export async function ensureAgentSettings(guild) {
   }
   if (sworn) patch.agent_sworn_role_id = sworn.id;
   if (giris) patch.agent_entry_channel_id = giris.id;
-  if (xzon) patch.agent_oath_channel_id = xzon.id;
+  if (handlerLog) {
+    patch.agent_oath_channel_id = handlerLog.id;
+    patch.ticket_log_channel_id = handlerLog.id;
+  }
   if (ticketCat) patch.ticket_category_id = ticketCat.id;
-  if (handlerLog) patch.ticket_log_channel_id = handlerLog.id;
 
   if (Object.keys(patch).length) updateSettings(guild.id, patch);
   return getSettings(guild.id);
@@ -395,34 +397,37 @@ export async function swearOath(interaction) {
   }
 
   const oathText = [
-    `**${interaction.user} yemin etti.**`,
-    "",
-    "```",
-    " YEMİN",
-    " 1. Legal only — izinsiz hedef yok",
-    " 2. Birlik — ekibi satmam",
-    " 3. Sır — token/client sızdırmaz",
-    " 4. Saygı — ego yok",
-    "```",
-    "Artık tam operatif.",
+    `**${interaction.user}** (\`${interaction.user.id}\`) yemin etti.`,
+    `<t:${Math.floor(Date.now() / 1000)}:F>`,
   ].join("\n");
 
-  const oathChannelId = settings.agent_oath_channel_id;
+  // Sadece Handler kanalı (+ owner DM) — public'e düşmez
+  const oathChannelId = settings.agent_oath_channel_id || settings.ticket_log_channel_id;
   if (oathChannelId) {
-    const ch = await interaction.guild.channels.fetch(oathChannelId).catch(() => null);
-    if (ch?.isTextBased()) {
-      await ch.send({
-        embeds: [baseEmbed("YEMİN", oathText).setColor(GOLD)],
+    const logCh = await interaction.guild.channels.fetch(oathChannelId).catch(() => null);
+    if (logCh?.isTextBased()) {
+      await logCh.send({
+        embeds: [baseEmbed("YEMİN · gizli", oathText).setColor(GOLD)],
       });
     }
   }
 
+  try {
+    const owner = await interaction.guild.fetchOwner();
+    if (owner.id !== interaction.user.id) {
+      await owner
+        .send(`Yemin: **${interaction.user.tag}** (\`${interaction.user.id}\`) · ${interaction.guild.name}`)
+        .catch(() => null);
+    }
+  } catch {
+    /* ignore */
+  }
+
   return interaction.reply({
     embeds: [
-      successEmbed(
-        "Yemin kaydedildi. Hoş geldin, Operative.\nKanallar artık senin.",
-      ),
+      successEmbed("Yemin kaydedildi. Hoş geldin, Operative.\nKanallar artık senin."),
     ],
+    ephemeral: true,
   });
 }
 

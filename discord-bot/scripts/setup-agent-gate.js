@@ -231,7 +231,7 @@ updateSettings(guild.id, {
   agent_handler_role_id: rHandler.id,
   agent_sworn_role_id: rSworn.id,
   agent_entry_channel_id: giris.id,
-  agent_oath_channel_id: xzon.id,
+  agent_oath_channel_id: staffLog.id,
   ticket_category_id: catTickets.id,
   ticket_support_role_id: rHandler.id,
   ticket_log_channel_id: staffLog.id,
