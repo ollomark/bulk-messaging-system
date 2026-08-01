@@ -26,8 +26,12 @@ export default {
       trackInvite(member.guild.id, inviter.id, member.id, null);
     }
 
-    // verify aktifken auto_role verme (verify rolü ayrı)
-    if (settings.auto_role_id && !settings.verify_enabled) {
+    // Ajan kapısı: herkese giriş rolü (sadece #giriş görür)
+    if (settings.agent_join_role_id) {
+      const joinRole = member.guild.roles.cache.get(settings.agent_join_role_id);
+      if (joinRole) await member.roles.add(joinRole, "Agent giriş rolü").catch(() => null);
+    } else if (settings.auto_role_id && !settings.verify_enabled) {
+      // verify aktifken auto_role verme (verify rolü ayrı)
       const role = member.guild.roles.cache.get(settings.auto_role_id);
       if (role) await member.roles.add(role).catch(() => null);
     }

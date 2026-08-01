@@ -16,6 +16,9 @@ export default {
         .setName("ayarla")
         .setDescription("Ajan rollerini / kanalları kaydet")
         .addRoleOption((opt) =>
+          opt.setName("giris-rol").setDescription("Sunucuya girince verilen rol").setRequired(true),
+        )
+        .addRoleOption((opt) =>
           opt.setName("erisim").setDescription("Onay sonrası erişim rolü").setRequired(true),
         )
         .addRoleOption((opt) =>
@@ -59,6 +62,7 @@ export default {
     }
 
     if (sub === "ayarla") {
+      const joinRole = interaction.options.getRole("giris-rol", true);
       const access = interaction.options.getRole("erisim", true);
       const handler = interaction.options.getRole("handler", true);
       const sworn = interaction.options.getRole("yeminli");
@@ -67,6 +71,8 @@ export default {
       const ticketCat = interaction.options.getChannel("ticket-kategori");
 
       const patch = {
+        agent_join_role_id: joinRole.id,
+        auto_role_id: joinRole.id,
         agent_access_role_id: access.id,
         agent_handler_role_id: handler.id,
         ticket_support_role_id: handler.id,
@@ -81,6 +87,7 @@ export default {
         embeds: [
           successEmbed(
             [
+              `Giriş rolü: ${joinRole}`,
               `Erişim: ${access}`,
               `Handler: ${handler}`,
               sworn ? `Yeminli: ${sworn}` : "Yeminli: —",
@@ -99,10 +106,11 @@ export default {
         embeds: [
           successEmbed(
             [
+              `Giriş rolü: ${s.agent_join_role_id ? `<@&${s.agent_join_role_id}>` : "Yok"}`,
               `Erişim: ${s.agent_access_role_id ? `<@&${s.agent_access_role_id}>` : "Yok"}`,
               `Handler: ${s.agent_handler_role_id ? `<@&${s.agent_handler_role_id}>` : "Yok"}`,
               `Yeminli: ${s.agent_sworn_role_id ? `<@&${s.agent_sworn_role_id}>` : "Yok"}`,
-              `Giriş: ${s.agent_entry_channel_id ? `<#${s.agent_entry_channel_id}>` : "Yok"}`,
+              `Giriş kanal: ${s.agent_entry_channel_id ? `<#${s.agent_entry_channel_id}>` : "Yok"}`,
               `Yemin log: ${s.agent_oath_channel_id ? `<#${s.agent_oath_channel_id}>` : "Yok"}`,
               `Ticket kategori: ${s.ticket_category_id ? `<#${s.ticket_category_id}>` : "Yok"}`,
             ].join("\n"),

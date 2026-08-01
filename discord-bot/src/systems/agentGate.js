@@ -16,16 +16,12 @@ export function buildAgentEntryPanel() {
   const embed = baseEmbed(
     "XZON · GİRİŞ",
     [
-      "Burası bir **ajan birimi**.",
-      "İçerideki kanallar yalnızca onaylı operatiflere açıktır.",
+      "İçeri sadece onaylılar girer.",
       "",
-      "**Başvur** — ekibe katılmak için ticket açılır, Handler’larla konuşursun.",
-      "**Destek** — sorun / soru için ticket.",
+      "**Başvur** — ticket açılır, Handler konuşur.",
+      "**Destek** — yardım ticket’ı.",
       "",
-      "Onaylanırsan erişim rolü verilir.",
-      "Ardından `/yemin` komutu ile yemini tamamlarısın.",
-      "",
-      "Legal only. İzinsiz / illegal iş yok.",
+      "Onay → erişim rolü → `/yemin`",
     ].join("\n"),
   ).setColor(RED);
 
@@ -78,6 +74,18 @@ function ticketControls(kind) {
 
 export async function openAgentTicket(interaction, kind) {
   const settings = getSettings(interaction.guild.id);
+
+  // Panel sadece giriş kanalından
+  if (
+    settings.agent_entry_channel_id &&
+    interaction.channelId !== settings.agent_entry_channel_id
+  ) {
+    return interaction.reply({
+      embeds: [errorEmbed("Bu panel sadece `#giriş` kanalında kullanılır.")],
+      ephemeral: true,
+    });
+  }
+
   const existing = db
     .prepare("SELECT * FROM tickets WHERE guild_id = ? AND opener_id = ? AND status = 'open'")
     .get(interaction.guild.id, interaction.user.id);
@@ -89,17 +97,29 @@ export async function openAgentTicket(interaction, kind) {
     });
   }
 
-  if (kind === "agent_apply" && settings.agent_access_role_id) {
-    if (interaction.member.roles.cache.has(settings.agent_access_role_id)) {
-      return interaction.reply({
-        embeds: [
-          errorEmbed(
-            "Zaten erişim rolün var. Yemini tamamlamak için `/yemin` kullan.",
-          ),
-        ],
-        ephemeral: true,
-      });
-    }
+  if (settings.agent_access_role_id && interaction.member.roles.cache.has(settings.agent_access_role_id)) {
+    return interaction.reply({
+      embeds: [
+        errorEmbed(
+          kind === "agent_apply"
+            ? "Zaten içeri aldın. Tekrar başvuru yok. `/yemin` eksikse dene."
+            : "Destek için Handler’a yaz — tekrar ticket açmana gerek yok.",
+        ),
+      ],
+      ephemeral: true,
+    });
+  }
+
+  // Giriş rolü yoksa ticket yok (herkes rastgele açmasın)
+  if (
+    settings.agent_join_role_id &&
+    !interaction.member.roles.cache.has(settings.agent_join_role_id) &&
+    !interaction.member.roles.cache.has(settings.agent_handler_role_id || "")
+  ) {
+    return interaction.reply({
+      embeds: [errorEmbed("Giriş rolün yok. Sunucudan çıkıp tekrar gir veya yetkiliye söyle.")],
+      ephemeral: true,
+    });
   }
 
   const overwrites = [
@@ -159,19 +179,10 @@ export async function openAgentTicket(interaction, kind) {
       ? [
           `${interaction.user} başvuru açtı.`,
           "",
-          "**Aday şunları yazsın:**",
-          "• Yaş / timezone",
-          "• Güçlü yan (kod / AI / başka)",
-          "• Portfolyo / GitHub (varsa)",
-          "• Neden XZON?",
-          "",
-          "Handler: konuşun → **Onayla** veya **Reddet**.",
+          "Handler burada konuşur → **Onayla** / **Reddet**.",
           "Onay sonrası aday `/yemin` kullanır.",
         ].join("\n")
-      : [
-          `${interaction.user} destek istedi.`,
-          "Sorunu detaylı yazın. Handler yardımcı olacak.",
-        ].join("\n");
+      : [`${interaction.user} destek istedi.`, "Handler burada yardımcı olur."].join("\n");
 
   await channel.send({
     content: handlerRole
@@ -224,6 +235,12 @@ export async function approveAgentTicket(interaction) {
   }
 
   await member.roles.add(roleId, `Agent onay · ${interaction.user.tag}`);
+  // Giriş rolünü kaldır — kapıda kalmasın / tekrar başvurmaya çalışmasın
+  if (settings.agent_join_role_id && member.roles.cache.has(settings.agent_join_role_id)) {
+    await member.roles
+      .remove(settings.agent_join_role_id, "Agent onay — giriş rolü alındı")
+      .catch(() => null);
+  }
 
   await interaction.reply({
     embeds: [
@@ -231,8 +248,7 @@ export async function approveAgentTicket(interaction) {
         [
           `${member} **onaylandı** → erişim rolü verildi.`,
           "",
-          `${member}: şimdi **/yemin** yaz ve yemini tamamla.`,
-          "Yeminsiz tam operatif sayılmazsın.",
+          `${member}: şimdi **/yemin** yaz.`,
         ].join("\n"),
       ),
     ],
