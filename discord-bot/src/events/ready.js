@@ -27,7 +27,7 @@ export default {
       if (agentGuild) {
         const agent = await ensureAgentSettings(agentGuild);
         console.log(
-          `Ajan ayar: access=${agent.agent_access_role_id || "-"} join=${agent.agent_join_role_id || "-"} entry=${agent.agent_entry_channel_id || "-"}`,
+          `Ajan ayar: access=${agent.agent_access_role_id || "-"} join=${agent.agent_join_role_id || "-"} entry=${agent.agent_entry_channel_id || "-"} tickets=${agent.ticket_category_id || "-"} oath=${agent.agent_oath_channel_id || "-"}`,
         );
       }
     }
