@@ -4,15 +4,18 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const dataDir = path.join(__dirname, "../../data");
+const dataDir = process.env.DATA_DIR || path.join(__dirname, "../../data");
 
 if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });
 }
 
-const db = new Database(path.join(dataDir, "guardian.db"));
+const dbPath = process.env.SQLITE_PATH || path.join(dataDir, "guardian.db");
+const db = new Database(dbPath);
 db.pragma("journal_mode = WAL");
+db.pragma("synchronous = NORMAL");
 db.pragma("foreign_keys = ON");
+db.pragma("busy_timeout = 5000");
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS guild_settings (

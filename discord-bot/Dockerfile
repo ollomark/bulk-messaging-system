@@ -14,5 +14,6 @@ COPY . .
 RUN mkdir -p /app/data
 
 ENV NODE_ENV=production
+ENV DATA_DIR=/app/data
 
 CMD ["node", "src/index.js"]
