@@ -30,29 +30,14 @@ export async function ensureAgentSettings(guild) {
   const patch = {};
   const join = role("Giriş");
   const access = role("Operative");
-  const sworn = role("Sworn");
+  const sworn = role("Sworn") || role("Ghost");
   const handler = role("Handler");
   const giris = ch("giriş");
   const handlerLog = ch("handler-log");
-  const ticketCat = cat("TICKET");
+  const ticketCat =
+    cat("BURN BAG") || cat("DEAD DROPS") || cat("TICKET") || cat("BURN");
 
-  if (!s.agent_join_role_id && join) {
-    patch.agent_join_role_id = join.id;
-    patch.auto_role_id = join.id;
-  }
-  if (!s.agent_access_role_id && access) patch.agent_access_role_id = access.id;
-  if (!s.agent_sworn_role_id && sworn) patch.agent_sworn_role_id = sworn.id;
-  if (!s.agent_handler_role_id && handler) {
-    patch.agent_handler_role_id = handler.id;
-    patch.ticket_support_role_id = handler.id;
-  }
-  if (!s.agent_entry_channel_id && giris) patch.agent_entry_channel_id = giris.id;
-  // Yeminler sadece Handler'ın gördüğü kanala
-  if (!s.agent_oath_channel_id && handlerLog) patch.agent_oath_channel_id = handlerLog.id;
-  if (!s.ticket_category_id && ticketCat) patch.ticket_category_id = ticketCat.id;
-  if (!s.ticket_log_channel_id && handlerLog) patch.ticket_log_channel_id = handlerLog.id;
-
-  // Always refresh critical IDs from live names
+  // Always refresh critical IDs from live names (production volume self-heal)
   if (access) patch.agent_access_role_id = access.id;
   if (join) {
     patch.agent_join_role_id = join.id;
@@ -76,14 +61,22 @@ export async function ensureAgentSettings(guild) {
 
 export function buildAgentEntryPanel() {
   const embed = baseEmbed(
-    "XZON · GİRİŞ",
+    "BLACKSITE · ENTRY",
     [
-      "İçeri sadece onaylılar girer.",
+      "```",
+      " ██ ACCESS DENIED",
+      " ██ CLEARANCE: NONE",
+      " ██ LOCATION: UNKNOWN",
+      "```",
       "",
-      "**Başvur** — ticket açılır, Handler konuşur.",
-      "**Destek** — yardım ticket’ı.",
+      "Bu kapının arkasını görmüyorsun.",
+      "Görmen de gerekmiyor.",
       "",
-      "Onay → erişim rolü → `/yemin`",
+      "**Başvur** — burn bag açılır. Handler dinler. Sessiz kal.",
+      "**Destek** — sinyal koptuysa.",
+      "",
+      "Onay → Operative → `/yemin`",
+      "Yemin asla public düşmez. IMF seni tanır.",
     ].join("\n"),
   ).setColor(RED);
 
@@ -91,12 +84,10 @@ export function buildAgentEntryPanel() {
     new ButtonBuilder()
       .setCustomId("agent_apply")
       .setLabel("Başvur")
-      .setEmoji("🛰️")
       .setStyle(ButtonStyle.Danger),
     new ButtonBuilder()
       .setCustomId("agent_support")
       .setLabel("Destek")
-      .setEmoji("🎫")
       .setStyle(ButtonStyle.Secondary),
   );
 
