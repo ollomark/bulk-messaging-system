@@ -28,16 +28,19 @@ export function buildTicketPanel() {
 
 export async function openTicket(interaction) {
   const settings = getSettings(interaction.guild.id);
-  const existing = db
-    .prepare("SELECT * FROM tickets WHERE guild_id = ? AND opener_id = ? AND status = 'open'")
-    .get(interaction.guild.id, interaction.user.id);
 
-  if (existing) {
-    return interaction.reply({
-      embeds: [errorEmbed(`Zaten açık bir ticketın var: <#${existing.channel_id}>`)],
-      ephemeral: true,
-    });
+  // Silinmiş kanallı "open" kayıtları kapat
+  const stale = db
+    .prepare("SELECT channel_id FROM tickets WHERE guild_id = ? AND opener_id = ? AND status = 'open'")
+    .all(interaction.guild.id, interaction.user.id);
+  for (const row of stale) {
+    const still = await interaction.guild.channels.fetch(row.channel_id).catch(() => null);
+    if (!still) {
+      db.prepare("UPDATE tickets SET status = 'closed' WHERE channel_id = ?").run(row.channel_id);
+    }
   }
+
+  // Limit yok — istediği kadar açabilir
 
   const overwrites = [
     {
@@ -74,8 +77,12 @@ export async function openTicket(interaction) {
     });
   }
 
+  const suffix = Date.now().toString(36).slice(-4);
   const channel = await interaction.guild.channels.create({
-    name: `ticket-${interaction.user.username}`.slice(0, 90).toLowerCase().replace(/[^a-z0-9-]/g, "-"),
+    name: `ticket-${interaction.user.username}-${suffix}`
+      .slice(0, 90)
+      .toLowerCase()
+      .replace(/[^a-z0-9-]/g, "-"),
     type: ChannelType.GuildText,
     parent: settings.ticket_category_id || undefined,
     permissionOverwrites: overwrites,

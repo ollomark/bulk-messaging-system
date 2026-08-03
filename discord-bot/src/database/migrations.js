@@ -22,9 +22,25 @@ export function runMigrations() {
   addColumn("guild_settings", "brand_footer", "TEXT");
   addColumn("guild_settings", "report_channel_id", "TEXT");
   addColumn("guild_settings", "apply_channel_id", "TEXT");
+  addColumn("guild_settings", "agent_access_role_id", "TEXT");
+  addColumn("guild_settings", "agent_handler_role_id", "TEXT");
+  addColumn("guild_settings", "agent_sworn_role_id", "TEXT");
+  addColumn("guild_settings", "agent_join_role_id", "TEXT");
+  addColumn("guild_settings", "agent_entry_channel_id", "TEXT");
+  addColumn("guild_settings", "agent_oath_channel_id", "TEXT");
+  addColumn("tickets", "kind", "TEXT DEFAULT 'support'");
 
   // Oto yanıt tamamen kaldırıldı
   db.exec("DROP TABLE IF EXISTS autoresponders;");
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS agent_oaths (
+      guild_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      sworn_at INTEGER NOT NULL,
+      PRIMARY KEY (guild_id, user_id)
+    );
+  `);
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS mod_cases (
