@@ -1,10 +1,8 @@
 import { ChannelType, SlashCommandBuilder } from "discord.js";
 import {
-  DEFAULT_STREAM,
   leaveMusic,
   musicStatus,
   playInChannel,
-  playUrl,
   stopMusic,
 } from "../../systems/music.js";
 import { errorEmbed, infoEmbed, successEmbed } from "../../utils/embeds.js";
@@ -16,11 +14,12 @@ export default {
     .addSubcommand((sub) =>
       sub
         .setName("cal")
-        .setDescription("Bulunduğun sese girip müzik açar")
+        .setDescription("Şarkı adı veya link ile çal (boşsa lofi radyo)")
         .addStringOption((opt) =>
           opt
-            .setName("url")
-            .setDescription("Direkt mp3/radyo linki (boşsa lofi radyo)"),
+            .setName("sarki")
+            .setDescription("Şarkı adı (örn: Duman Senden Daha Güzel) veya URL")
+            .setRequired(false),
         ),
     )
     .addSubcommand((sub) => sub.setName("durdur").setDescription("Müziği durdurur"))
@@ -38,8 +37,8 @@ export default {
             [
               `**Bağlı:** ${s.connected ? "Evet" : "Hayır"}`,
               `**Çalıyor:** ${s.playing ? "Evet" : "Hayır"}`,
+              `**Şarkı:** ${s.title || "—"}`,
               `**Player:** ${s.playerStatus}`,
-              `**Kaynak:** ${s.url || "—"}`,
             ].join("\n"),
             "Müzik",
           ),
@@ -58,28 +57,31 @@ export default {
       return interaction.reply({ embeds: [successEmbed("Sesten çıktım.")] });
     }
 
-    // cal
-    const channel =
-      interaction.member.voice?.channel ||
-      interaction.options.getChannel?.("kanal") ||
-      null;
-
-    if (!channel || (channel.type !== ChannelType.GuildVoice && channel.type !== ChannelType.GuildStageVoice)) {
+    const channel = interaction.member.voice?.channel || null;
+    if (
+      !channel ||
+      (channel.type !== ChannelType.GuildVoice && channel.type !== ChannelType.GuildStageVoice)
+    ) {
       return interaction.reply({
         embeds: [errorEmbed("Önce bir ses kanalına gir, sonra `/muzik cal` yaz.")],
         ephemeral: true,
       });
     }
 
-    const url = interaction.options.getString("url")?.trim() || DEFAULT_STREAM;
+    const query = interaction.options.getString("sarki")?.trim() || "";
     await interaction.deferReply();
 
     try {
-      await playInChannel(channel, url);
+      const playing = await playInChannel(channel, query);
       return interaction.editReply({
         embeds: [
           successEmbed(
-            `${channel} kanalında çalıyor.\nKaynak: \`${url.slice(0, 80)}\`\n\n\`/muzik durdur\` · \`/muzik ayril\``,
+            [
+              `${channel} · **${playing.title}**`,
+              query ? `Arama: \`${query.slice(0, 80)}\`` : "Lo-fi radyo",
+              "",
+              "`/muzik durdur` · `/muzik ayril`",
+            ].join("\n"),
           ),
         ],
       });
