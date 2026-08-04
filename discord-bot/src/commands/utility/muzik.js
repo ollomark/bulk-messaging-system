@@ -18,7 +18,7 @@ export default {
         .addStringOption((opt) =>
           opt
             .setName("sarki")
-            .setDescription("Şarkı adı (örn: Duman Senden Daha Güzel) veya URL")
+            .setDescription("Şarkı adı yazman yeter — URL şart değil")
             .setRequired(false),
         ),
     )
