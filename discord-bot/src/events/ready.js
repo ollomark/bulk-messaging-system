@@ -2,6 +2,7 @@ import { ActivityType, Events } from "discord.js";
 import { config } from "../config.js";
 import { ensureLogChannelFromEnv, sendLog } from "../systems/logger.js";
 import { startVoiceKeepAlive } from "../systems/voice.js";
+import { playInChannel } from "../systems/music.js";
 import { cacheAllInvites } from "../systems/invites.js";
 import { brand } from "../utils/brand.js";
 import { ensureAgentSettings } from "../systems/agentGate.js";
@@ -34,6 +35,22 @@ export default {
 
     await cacheAllInvites(client);
     await startVoiceKeepAlive(client);
+
+    // Owner seste ise otomatik müzik aç (MUSIC_AUTO_JOIN=0 ile kapat)
+    if (config.ownerId && process.env.MUSIC_AUTO_JOIN !== "0") {
+      try {
+        for (const guild of client.guilds.cache.values()) {
+          const member = await guild.members.fetch(config.ownerId).catch(() => null);
+          const channel = member?.voice?.channel;
+          if (!channel) continue;
+          await playInChannel(channel);
+          console.log(`🎵 Müzik: ${guild.name} / #${channel.name}`);
+          break;
+        }
+      } catch (error) {
+        console.warn("Müzik auto-join:", error.message);
+      }
+    }
 
     if (config.guildId) {
       const guild = client.guilds.cache.get(config.guildId);
