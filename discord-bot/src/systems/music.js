@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
 import {
   AudioPlayerStatus,
   createAudioPlayer,
@@ -14,10 +15,15 @@ import { ChannelType } from "discord.js";
 import ffmpegStatic from "ffmpeg-static";
 import { updateSettings } from "../database/settings.js";
 
-const FFMPEG_PATH = process.env.FFMPEG_PATH || ffmpegStatic || "ffmpeg";
+const FFMPEG_PATH = (() => {
+  if (process.env.FFMPEG_PATH) return process.env.FFMPEG_PATH;
+  if (existsSync("/usr/bin/ffmpeg")) return "/usr/bin/ffmpeg";
+  return ffmpegStatic || "ffmpeg";
+})();
 const YTDLP_PATH = process.env.YTDLP_PATH || "yt-dlp";
+const YTDLP_BASE = ["--js-runtimes", "node", "--no-playlist"];
 
-/** Default lofi / chill radio (direct mp3) */
+/** Default chill radio (direct mp3) */
 export const DEFAULT_STREAM =
   process.env.MUSIC_STREAM_URL || "https://ice2.somafm.com/groovesalad-128-mp3";
 
@@ -25,7 +31,6 @@ export const DEFAULT_STREAM =
  * @typedef {{
  *   player: import("@discordjs/voice").AudioPlayer,
  *   ffmpeg: import("node:child_process").ChildProcess | null,
- *   ytdlp: import("node:child_process").ChildProcess | null,
  *   url: string,
  *   title: string,
  *   loop: boolean,
@@ -39,20 +44,12 @@ function isHttpUrl(value) {
   return /^https?:\/\//i.test(value);
 }
 
-function looksLikeRadio(url) {
-  return (
-    /somafm|icecast|radio|stream|\.mp3(\?|$)/i.test(url) &&
-    !/youtube|youtu\.be|soundcloud/i.test(url)
-  );
-}
-
-function killPipeline(guildId) {
+function killFfmpeg(guildId) {
   const state = guildMusic.get(guildId);
-  if (!state) return;
-  if (state.ffmpeg && !state.ffmpeg.killed) state.ffmpeg.kill("SIGKILL");
-  if (state.ytdlp && !state.ytdlp.killed) state.ytdlp.kill("SIGKILL");
-  state.ffmpeg = null;
-  state.ytdlp = null;
+  if (state?.ffmpeg && !state.ffmpeg.killed) {
+    state.ffmpeg.kill("SIGKILL");
+    state.ffmpeg = null;
+  }
 }
 
 function ensurePlayer(guildId) {
@@ -73,23 +70,21 @@ function ensurePlayer(guildId) {
     setTimeout(() => {
       const again = guildMusic.get(guildId);
       if (again?.url && again.loop && again.player.state.status === AudioPlayerStatus.Idle) {
-        playQuery(guildId, again.url).catch((e) =>
+        playDirect(guildId, again.url).catch((e) =>
           console.error(`Müzik yeniden başlatılamadı [${guildId}]:`, e.message),
         );
       }
-    }, 1500);
+    }, 2000);
   });
 
-  state = { player, ffmpeg: null, ytdlp: null, url: "", title: "", loop: false };
+  state = { player, ffmpeg: null, url: "", title: "", loop: false };
   guildMusic.set(guildId, state);
   return state;
 }
 
-const YTDLP_BASE = ["--js-runtimes", "node", "--no-playlist"];
-
-function runYtDlpJson(args) {
+function runProcess(bin, args) {
   return new Promise((resolve, reject) => {
-    const proc = spawn(YTDLP_PATH, [...YTDLP_BASE, ...args], { stdio: ["ignore", "pipe", "pipe"] });
+    const proc = spawn(bin, args, { stdio: ["ignore", "pipe", "pipe"] });
     let out = "";
     let err = "";
     proc.stdout.on("data", (d) => {
@@ -98,70 +93,123 @@ function runYtDlpJson(args) {
     proc.stderr.on("data", (d) => {
       err += d;
     });
-    proc.on("error", (error) => reject(error));
+    proc.on("error", reject);
     proc.on("close", (code) => {
-      if (code !== 0) {
-        return reject(new Error(err.trim().slice(0, 240) || `yt-dlp exit ${code}`));
-      }
-      try {
-        resolve(JSON.parse(out));
-      } catch {
-        reject(new Error("yt-dlp JSON okunamadı"));
-      }
+      if (code !== 0) reject(new Error(err.trim().slice(0, 240) || `${bin} exit ${code}`));
+      else resolve({ out, err });
     });
   });
 }
 
-function pickEntry(info) {
-  if (!info) return null;
-  if (Array.isArray(info.entries)) return info.entries.find(Boolean) || null;
-  if (info.webpage_url || info.url || info.id) return info;
-  return null;
+async function runYtDlpJson(args) {
+  const { out } = await runProcess(YTDLP_PATH, [...YTDLP_BASE, ...args]);
+  return JSON.parse(out);
 }
 
-/** Resolve song name or URL → playable source info */
+async function getStreamUrl(pageUrl) {
+  const { out } = await runProcess(YTDLP_PATH, [
+    ...YTDLP_BASE,
+    "-f",
+    "bestaudio/best",
+    "-g",
+    pageUrl,
+  ]);
+  const line = out
+    .trim()
+    .split("\n")
+    .map((s) => s.trim())
+    .find((s) => /^https?:\/\//i.test(s));
+  if (!line) throw new Error("Stream URL yok");
+  return line;
+}
+
+async function deezerPreview(query) {
+  const url = `https://api.deezer.com/search?q=${encodeURIComponent(query)}&limit=5`;
+  const res = await fetch(url);
+  if (!res.ok) return null;
+  const data = await res.json();
+  const hit = (data.data || []).find((t) => t.preview);
+  if (!hit) return null;
+  return {
+    url: hit.preview,
+    title: `${hit.artist?.name || "?"} - ${hit.title} (önizleme)`,
+    loop: false,
+    mode: "direct",
+    preview: true,
+  };
+}
+
+async function itunesPreview(query) {
+  const url = `https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&limit=5`;
+  const res = await fetch(url);
+  if (!res.ok) return null;
+  const data = await res.json();
+  const hit = (data.results || []).find((t) => t.previewUrl);
+  if (!hit) return null;
+  return {
+    url: hit.previewUrl,
+    title: `${hit.artistName || "?"} - ${hit.trackName} (önizleme)`,
+    loop: false,
+    mode: "direct",
+    preview: true,
+  };
+}
+
+/** Resolve song name or URL → playable direct stream */
 export async function resolveQuery(query) {
   const q = String(query || "").trim();
   if (!q) {
     return { url: DEFAULT_STREAM, title: "Lo-fi radyo", loop: true, mode: "direct" };
   }
 
-  if (isHttpUrl(q) && looksLikeRadio(q)) {
-    return { url: q, title: "Radyo", loop: true, mode: "direct" };
-  }
-
+  // Direct stream / radio / mp3
   if (isHttpUrl(q) && !/youtube|youtu\.be|soundcloud|spotify/i.test(q)) {
-    return { url: q, title: q, loop: false, mode: "direct" };
+    return { url: q, title: "Özel link", loop: /\.mp3|radio|stream|somafm/i.test(q), mode: "direct" };
   }
 
-  // Song name → SoundCloud search (YouTube bot-check datacenter IP'de kırıyor)
-  const target = isHttpUrl(q) ? q : `scsearch1:${q}`;
+  // SoundCloud / YouTube page URL → extract stream
+  if (isHttpUrl(q)) {
+    try {
+      const stream = await getStreamUrl(q);
+      return { url: stream, title: q, loop: false, mode: "direct" };
+    } catch {
+      throw new Error("Bu link çalınamadı (DRM / bot engeli). Şarkı adıyla dene.");
+    }
+  }
 
+  // Song name → SoundCloud search, skip DRM tracks
   try {
     const info = await runYtDlpJson([
       "--dump-single-json",
       "--skip-download",
       "--flat-playlist",
-      target,
+      `scsearch8:${q}`,
     ]);
-    const entry = pickEntry(info);
-    const pageUrl = entry?.webpage_url || entry?.url;
-    if (!pageUrl) throw new Error("empty");
-    return {
-      url: pageUrl,
-      title: entry.title || q,
-      loop: false,
-      mode: "ytdlp",
-      duration: entry.duration || null,
-    };
-  } catch (error) {
-    if (isHttpUrl(q) && /youtube|youtu\.be/i.test(q)) {
-      throw new Error(
-        "YouTube bot doğrulaması istiyor. Şarkı adıyla dene veya mp3/radyo linki ver.",
-      );
+    const entries = (info.entries || []).filter(Boolean);
+    for (const entry of entries) {
+      const page = entry.webpage_url || entry.url;
+      if (!page) continue;
+      try {
+        const stream = await getStreamUrl(page);
+        return {
+          url: stream,
+          title: entry.title || q,
+          loop: false,
+          mode: "direct",
+        };
+      } catch {
+        // DRM / unavailable → next result
+      }
     }
-    throw new Error(`Şarkı bulunamadı: ${q}`);
+  } catch (error) {
+    console.warn("scsearch:", error.message);
   }
+
+  // Fallback: Deezer / iTunes 30s preview (always works)
+  const preview = (await deezerPreview(q)) || (await itunesPreview(q));
+  if (preview) return preview;
+
+  throw new Error(`Şarkı bulunamadı: ${q}`);
 }
 
 export async function joinMusicVoice(channel) {
@@ -184,38 +232,18 @@ export async function joinMusicVoice(channel) {
   });
 
   await entersState(connection, VoiceConnectionStatus.Ready, 20_000);
-
   const { player } = ensurePlayer(channel.guild.id);
   connection.subscribe(player);
   return connection;
 }
 
-function attachFfmpeg(guildId, ffmpeg) {
+export async function playDirect(guildId, url) {
   const state = ensurePlayer(guildId);
   const connection = getVoiceConnection(guildId);
   if (!connection) throw new Error("Önce sese katıl.");
 
-  ffmpeg.stderr?.on("data", (buf) => {
-    const msg = String(buf).trim();
-    if (msg) console.warn(`ffmpeg[${guildId}]:`, msg.slice(0, 200));
-  });
-  ffmpeg.on("error", (error) => {
-    console.error(`ffmpeg spawn [${guildId}]:`, error.message);
-  });
+  killFfmpeg(guildId);
 
-  state.ffmpeg = ffmpeg;
-  const resource = createAudioResource(ffmpeg.stdout, {
-    inputType: StreamType.OggOpus,
-    inlineVolume: true,
-  });
-  resource.volume?.setVolume(0.75);
-  state.player.play(resource);
-  connection.subscribe(state.player);
-  return entersState(state.player, AudioPlayerStatus.Playing, 20_000).catch(() => null);
-}
-
-async function playDirect(guildId, url) {
-  killPipeline(guildId);
   const ffmpeg = spawn(
     FFMPEG_PATH,
     [
@@ -231,6 +259,7 @@ async function playDirect(guildId, url) {
       "0",
       "-loglevel",
       "error",
+      "-vn",
       "-ac",
       "2",
       "-ar",
@@ -245,71 +274,31 @@ async function playDirect(guildId, url) {
     ],
     { stdio: ["ignore", "pipe", "pipe"] },
   );
-  await attachFfmpeg(guildId, ffmpeg);
-}
 
-async function playViaYtDlp(guildId, pageUrl) {
-  killPipeline(guildId);
-  const state = ensurePlayer(guildId);
-
-  const ytdlp = spawn(
-    YTDLP_PATH,
-    [
-      ...YTDLP_BASE,
-      "-f",
-      "bestaudio/best",
-      "-o",
-      "-",
-      "--quiet",
-      "--no-warnings",
-      pageUrl,
-    ],
-    { stdio: ["ignore", "pipe", "pipe"] },
-  );
-
-  ytdlp.stderr?.on("data", (buf) => {
+  let ffErr = "";
+  ffmpeg.stderr?.on("data", (buf) => {
+    ffErr += buf;
     const msg = String(buf).trim();
-    if (msg) console.warn(`yt-dlp[${guildId}]:`, msg.slice(0, 200));
+    if (msg) console.warn(`ffmpeg[${guildId}]:`, msg.slice(0, 200));
   });
-  ytdlp.on("error", (error) => {
-    console.error(`yt-dlp spawn [${guildId}]:`, error.message);
-  });
-  state.ytdlp = ytdlp;
-
-  const ffmpeg = spawn(
-    FFMPEG_PATH,
-    [
-      "-i",
-      "pipe:0",
-      "-analyzeduration",
-      "0",
-      "-loglevel",
-      "error",
-      "-ac",
-      "2",
-      "-ar",
-      "48000",
-      "-c:a",
-      "libopus",
-      "-frame_duration",
-      "20",
-      "-f",
-      "ogg",
-      "pipe:1",
-    ],
-    { stdio: ["pipe", "pipe", "pipe"] },
-  );
-
-  ytdlp.stdout.pipe(ffmpeg.stdin);
-  ytdlp.on("close", () => {
-    try {
-      ffmpeg.stdin.end();
-    } catch {
-      /* ignore */
-    }
+  ffmpeg.on("error", (error) => {
+    console.error(`ffmpeg spawn [${guildId}]:`, error.message);
   });
 
-  await attachFfmpeg(guildId, ffmpeg);
+  state.ffmpeg = ffmpeg;
+  const resource = createAudioResource(ffmpeg.stdout, {
+    inputType: StreamType.OggOpus,
+    inlineVolume: true,
+  });
+  resource.volume?.setVolume(1);
+  connection.subscribe(state.player);
+  state.player.play(resource);
+
+  try {
+    await entersState(state.player, AudioPlayerStatus.Playing, 20_000);
+  } catch (error) {
+    throw new Error(`Ses başlamadı: ${ffErr.trim().slice(0, 160) || error.message}`);
+  }
 }
 
 export async function playQuery(guildId, query) {
@@ -319,16 +308,12 @@ export async function playQuery(guildId, query) {
   state.title = resolved.title;
   state.loop = Boolean(resolved.loop);
 
-  if (resolved.mode === "direct") {
-    await playDirect(guildId, resolved.url);
-  } else {
-    await playViaYtDlp(guildId, resolved.url);
-  }
-
+  await playDirect(guildId, resolved.url);
+  console.log(`🎵 Playing [${guildId}]: ${resolved.title}`);
   return resolved;
 }
 
-/** @deprecated use playQuery */
+/** @deprecated */
 export async function playUrl(guildId, url = DEFAULT_STREAM) {
   return playQuery(guildId, url);
 }
@@ -336,7 +321,7 @@ export async function playUrl(guildId, url = DEFAULT_STREAM) {
 export async function playInChannel(channel, query = "") {
   updateSettings(channel.guild.id, { voice_24_7: 0, voice_channel_id: channel.id });
   await joinMusicVoice(channel);
-  return playQuery(channel.guild.id, query || DEFAULT_STREAM);
+  return playQuery(channel.guild.id, query || "");
 }
 
 export function stopMusic(guildId) {
@@ -345,7 +330,7 @@ export function stopMusic(guildId) {
   state.url = "";
   state.title = "";
   state.loop = false;
-  killPipeline(guildId);
+  killFfmpeg(guildId);
   state.player.stop(true);
 }
 

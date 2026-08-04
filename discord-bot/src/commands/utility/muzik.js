@@ -73,15 +73,17 @@ export default {
 
     try {
       const playing = await playInChannel(channel, query);
+      const note = playing.preview
+        ? "_(Kaynak kısıtı · 30sn önizleme)_"
+        : query
+          ? `Arama: \`${query.slice(0, 80)}\``
+          : "Lo-fi radyo";
       return interaction.editReply({
         embeds: [
           successEmbed(
-            [
-              `${channel} · **${playing.title}**`,
-              query ? `Arama: \`${query.slice(0, 80)}\`` : "Lo-fi radyo",
-              "",
-              "`/muzik durdur` · `/muzik ayril`",
-            ].join("\n"),
+            [`${channel} · **${playing.title}**`, note, "", "`/muzik durdur` · `/muzik ayril`"].join(
+              "\n",
+            ),
           ),
         ],
       });
