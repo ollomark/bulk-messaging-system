@@ -23,9 +23,12 @@ const FFMPEG_PATH = (() => {
 const YTDLP_PATH = process.env.YTDLP_PATH || "yt-dlp";
 const YTDLP_BASE = ["--js-runtimes", "node", "--no-playlist"];
 
-/** Default chill radio (direct mp3) */
+/** Default chill radio — 256 kbps */
 export const DEFAULT_STREAM =
-  process.env.MUSIC_STREAM_URL || "https://ice2.somafm.com/groovesalad-128-mp3";
+  process.env.MUSIC_STREAM_URL || "https://ice2.somafm.com/groovesalad-256-mp3";
+
+/** Discord voice encode target (kbps). Channel bitrate is raised to match. */
+const OPUS_BITRATE = Number(process.env.MUSIC_OPUS_BITRATE || 128);
 
 /**
  * @typedef {{
@@ -107,10 +110,11 @@ async function runYtDlpJson(args) {
 }
 
 async function getStreamUrl(pageUrl) {
+  // Prefer highest audio bitrate available
   const { out } = await runProcess(YTDLP_PATH, [
     ...YTDLP_BASE,
     "-f",
-    "bestaudio/best",
+    "bestaudio[abr>=256]/bestaudio[abr>=160]/bestaudio/best",
     "-g",
     pageUrl,
   ]);
@@ -220,6 +224,13 @@ export async function joinMusicVoice(channel) {
     throw new Error("Geçerli bir ses kanalı gerekli.");
   }
 
+  // Boost channel bitrate as high as the server allows (better Discord encode)
+  const maxBitrate = channel.guild.maximumBitrate || 96000;
+  const target = Math.min(Math.max(OPUS_BITRATE * 1000, 96000), maxBitrate);
+  if (channel.bitrate < target) {
+    await channel.setBitrate(target).catch((e) => console.warn("bitrate:", e.message));
+  }
+
   const existing = getVoiceConnection(channel.guild.id);
   if (existing) existing.destroy();
 
@@ -260,14 +271,26 @@ export async function playDirect(guildId, url) {
       "-loglevel",
       "error",
       "-vn",
+      "-af",
+      "aresample=48000:resampler=swr:precision=28",
       "-ac",
       "2",
       "-ar",
       "48000",
       "-c:a",
       "libopus",
+      "-b:a",
+      `${OPUS_BITRATE}k`,
+      "-vbr",
+      "on",
+      "-compression_level",
+      "10",
+      "-application",
+      "audio",
       "-frame_duration",
       "20",
+      "-packet_loss",
+      "5",
       "-f",
       "ogg",
       "pipe:1",
@@ -286,11 +309,11 @@ export async function playDirect(guildId, url) {
   });
 
   state.ffmpeg = ffmpeg;
+  // inlineVolume kapalı — kalite kaybı olmasın
   const resource = createAudioResource(ffmpeg.stdout, {
     inputType: StreamType.OggOpus,
-    inlineVolume: true,
+    inlineVolume: false,
   });
-  resource.volume?.setVolume(1);
   connection.subscribe(state.player);
   state.player.play(resource);
 
