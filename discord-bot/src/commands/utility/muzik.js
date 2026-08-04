@@ -18,7 +18,7 @@ export default {
         .addStringOption((opt) =>
           opt
             .setName("sarki")
-            .setDescription("Şarkı adı yazman yeter — URL şart değil")
+            .setDescription("Sanatçı + şarkı yaz (örn: Duman Senden Daha Güzel)")
             .setRequired(false),
         ),
     )
