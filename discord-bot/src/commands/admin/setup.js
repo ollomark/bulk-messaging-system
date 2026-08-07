@@ -1,6 +1,7 @@
 import { ChannelType, PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
 import { updateSettings, getSettings } from "../../database/settings.js";
 import { successEmbed, infoEmbed } from "../../utils/embeds.js";
+import { sendLog } from "../../systems/logger.js";
 
 export default {
   data: new SlashCommandBuilder()
@@ -114,22 +115,32 @@ export default {
 
     if (sub === "goruntule") {
       const s = getSettings(interaction.guild.id);
+      const envLog = process.env.LOG_CHANNEL_ID;
       return interaction.reply({
         embeds: [
           infoEmbed(
             [
               `**Log:** ${s.log_channel_id ? `<#${s.log_channel_id}>` : "Yok"}`,
+              envLog && s.log_channel_id !== envLog
+                ? `_(Env LOG_CHANNEL_ID var ama slash ayarı öncelikli)_`
+                : envLog && !s.log_channel_id
+                  ? `_(Env seed: <#${envLog}>)_`
+                  : null,
               `**Hoş geldin:** ${s.welcome_channel_id ? `<#${s.welcome_channel_id}>` : "Yok"} (sil: ${s.welcome_delete_after}s)`,
               `**Veda:** ${s.goodbye_channel_id ? `<#${s.goodbye_channel_id}>` : "Yok"}`,
               `**Oto rol:** ${s.auto_role_id ? `<@&${s.auto_role_id}>` : "Yok"}`,
               `**Duyuru:** ${s.announce_channel_id ? `<#${s.announce_channel_id}>` : "Yok"}`,
               `**Seviye kanal:** ${s.level_channel_id ? `<#${s.level_channel_id}>` : "Mesaj kanalı"}`,
               `**Ticket kategori:** ${s.ticket_category_id ? `<#${s.ticket_category_id}>` : "Yok"}`,
+              `**Ticket log:** ${s.ticket_log_channel_id ? `<#${s.ticket_log_channel_id}>` : "Yok"}`,
               `**Destek rolü:** ${s.ticket_support_role_id ? `<@&${s.ticket_support_role_id}>` : "Yok"}`,
+              `**Ticket panel:** ${s.ticket_panel_title || "varsayılan"}`,
               `**Koruma:** spam=${s.anti_spam} invite=${s.anti_invite} link=${s.anti_link} raid=${s.anti_raid} caps=${s.anti_caps}`,
               `**Mod modu:** ${s.mod_mode ? "AÇIK" : "Kapalı"}`,
               `**Ses 7/24:** ${s.voice_24_7 ? "Açık" : "Kapalı"} ${s.voice_channel_id ? `<#${s.voice_channel_id}>` : ""}`,
-            ].join("\n"),
+            ]
+              .filter(Boolean)
+              .join("\n"),
             "Sunucu Ayarları",
           ),
         ],
@@ -140,7 +151,31 @@ export default {
     if (sub === "log") {
       const channel = interaction.options.getChannel("kanal", true);
       updateSettings(interaction.guild.id, { log_channel_id: channel.id });
-      return interaction.reply({ embeds: [successEmbed(`Log kanalı ${channel} olarak ayarlandı.`)] });
+
+      const me = interaction.guild.members.me;
+      const perms = channel.permissionsFor(me);
+      const canWrite = perms?.has(["ViewChannel", "SendMessages", "EmbedLinks"]);
+
+      // Smoke test — immediately write a log so user sees it works
+      const ok = await sendLog(interaction.guild, {
+        title: "✅ Log kanalı ayarlandı",
+        description: `${channel} artık log kanalı.\nAyarlayan: ${interaction.user}`,
+        color: 0x57f287,
+      });
+
+      return interaction.reply({
+        embeds: [
+          successEmbed(
+            [
+              `Log kanalı ${channel} olarak ayarlandı.`,
+              canWrite ? null : "⚠️ Botun bu kanalda **Görüntüle / Mesaj Gönder / Embed** izni yok.",
+              ok ? "Test log gönderildi." : "⚠️ Test log gönderilemedi — kanalı / izinleri kontrol et.",
+            ]
+              .filter(Boolean)
+              .join("\n"),
+          ),
+        ],
+      });
     }
 
     if (sub === "hosgeldin") {

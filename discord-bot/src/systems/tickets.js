@@ -6,19 +6,37 @@ import {
   PermissionFlagsBits,
 } from "discord.js";
 import db from "../database/db.js";
-import { getSettings } from "../database/settings.js";
+import { getSettings, updateSettings } from "../database/settings.js";
 import { baseEmbed, errorEmbed, successEmbed } from "../utils/embeds.js";
 
-export function buildTicketPanel() {
-  const embed = baseEmbed(
-    "🎫 Destek Talebi",
+const DEFAULT_PANEL = {
+  title: "🎫 Destek Talebi",
+  description:
     "Yardım veya destek için aşağıdaki butona tıklayarak ticket açabilirsin.\nDestek ekibi en kısa sürede dönüş yapacaktır.",
-  );
+  button: "Ticket Aç",
+};
+
+/** Build ticket panel from guild settings + optional overrides. */
+export function buildTicketPanel(guildIdOrSettings = null, overrides = {}) {
+  const settings =
+    typeof guildIdOrSettings === "string"
+      ? getSettings(guildIdOrSettings)
+      : guildIdOrSettings && typeof guildIdOrSettings === "object"
+        ? guildIdOrSettings
+        : {};
+
+  const title = overrides.title || settings.ticket_panel_title || DEFAULT_PANEL.title;
+  const description =
+    overrides.description || settings.ticket_panel_description || DEFAULT_PANEL.description;
+  const buttonLabel =
+    (overrides.button || settings.ticket_panel_button || DEFAULT_PANEL.button).slice(0, 80);
+
+  const embed = baseEmbed(title.slice(0, 256), description.slice(0, 4096));
 
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId("ticket_open")
-      .setLabel("Ticket Aç")
+      .setLabel(buttonLabel)
       .setEmoji("🎟️")
       .setStyle(ButtonStyle.Primary),
   );
@@ -26,18 +44,30 @@ export function buildTicketPanel() {
   return { embeds: [embed], components: [row] };
 }
 
+export function saveTicketPanelText(guildId, { title, description, button } = {}) {
+  const patch = {};
+  if (title != null) patch.ticket_panel_title = title.slice(0, 256);
+  if (description != null) patch.ticket_panel_description = description.slice(0, 4000);
+  if (button != null) patch.ticket_panel_button = button.slice(0, 80);
+  if (Object.keys(patch).length) updateSettings(guildId, patch);
+  return getSettings(guildId);
+}
+
 export async function openTicket(interaction) {
   const settings = getSettings(interaction.guild.id);
-  const existing = db
-    .prepare("SELECT * FROM tickets WHERE guild_id = ? AND opener_id = ? AND status = 'open'")
-    .get(interaction.guild.id, interaction.user.id);
 
-  if (existing) {
-    return interaction.reply({
-      embeds: [errorEmbed(`Zaten açık bir ticketın var: <#${existing.channel_id}>`)],
-      ephemeral: true,
-    });
+  // Silinmiş kanallı "open" kayıtları kapat
+  const stale = db
+    .prepare("SELECT channel_id FROM tickets WHERE guild_id = ? AND opener_id = ? AND status = 'open'")
+    .all(interaction.guild.id, interaction.user.id);
+  for (const row of stale) {
+    const still = await interaction.guild.channels.fetch(row.channel_id).catch(() => null);
+    if (!still) {
+      db.prepare("UPDATE tickets SET status = 'closed' WHERE channel_id = ?").run(row.channel_id);
+    }
   }
+
+  // Limit yok — istediği kadar açabilir
 
   const overwrites = [
     {
@@ -74,8 +104,12 @@ export async function openTicket(interaction) {
     });
   }
 
+  const suffix = Date.now().toString(36).slice(-4);
   const channel = await interaction.guild.channels.create({
-    name: `ticket-${interaction.user.username}`.slice(0, 90).toLowerCase().replace(/[^a-z0-9-]/g, "-"),
+    name: `ticket-${interaction.user.username}-${suffix}`
+      .slice(0, 90)
+      .toLowerCase()
+      .replace(/[^a-z0-9-]/g, "-"),
     type: ChannelType.GuildText,
     parent: settings.ticket_category_id || undefined,
     permissionOverwrites: overwrites,
