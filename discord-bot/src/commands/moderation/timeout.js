@@ -2,6 +2,7 @@ import { PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
 import { errorEmbed, successEmbed } from "../../utils/embeds.js";
 import { parseDuration, formatDuration } from "../../utils/time.js";
 import { sendLog } from "../../systems/logger.js";
+import { createCase } from "../../systems/cases.js";
 
 export default {
   data: new SlashCommandBuilder()
@@ -27,22 +28,39 @@ export default {
       });
     }
     if (!member?.moderatable) {
-      return interaction.reply({ embeds: [errorEmbed("Bu üyeye timeout uygulayamıyorum.")], ephemeral: true });
+      return interaction.reply({
+        embeds: [errorEmbed("Bu üyeye timeout uygulayamıyorum.")],
+        ephemeral: true,
+      });
     }
 
     await member.timeout(duration, `${interaction.user.tag}: ${reason}`);
+
+    const caseNo = createCase({
+      guildId: interaction.guild.id,
+      type: "timeout",
+      userId: user.id,
+      moderatorId: interaction.user.id,
+      reason: `${formatDuration(duration)} · ${reason}`,
+    });
+
     await sendLog(interaction.guild, {
-      title: "⏳ Timeout",
+      title: `⏳ Timeout · Case #${caseNo}`,
       description: `${user} ${formatDuration(duration)} susturuldu.`,
       color: 0xfee75c,
       fields: [
         { name: "Moderatör", value: `${interaction.user}`, inline: true },
+        { name: "Case", value: `#${caseNo}`, inline: true },
         { name: "Sebep", value: reason },
       ],
     });
 
     return interaction.reply({
-      embeds: [successEmbed(`${user} ${formatDuration(duration)} süreyle timeout aldı.`)],
+      embeds: [
+        successEmbed(
+          `${user} ${formatDuration(duration)} timeout.\nCase **#${caseNo}** · ${reason}`,
+        ),
+      ],
     });
   },
 };

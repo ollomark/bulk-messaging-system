@@ -288,7 +288,7 @@ await panelCh.send({
   ],
 });
 
-await destek.send(buildTicketPanel());
+await destek.send(buildTicketPanel(guild.id));
 
 await xzon.send({
   embeds: [

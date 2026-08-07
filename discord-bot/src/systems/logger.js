@@ -4,13 +4,16 @@ import { config } from "../config.js";
 
 let warnedMissing = new Set();
 
+/**
+ * Seed log channel from env ONLY when guild has none set.
+ * Never overwrite `/ayarlar log` — that was breaking logs after set.
+ */
 export function ensureLogChannelFromEnv(guildId) {
   if (!process.env.LOG_CHANNEL_ID || !guildId) return;
+  if (config.guildId && guildId !== config.guildId) return;
+
   const settings = getSettings(guildId);
   if (!settings.log_channel_id) {
-    updateSettings(guildId, { log_channel_id: process.env.LOG_CHANNEL_ID });
-  } else if (settings.log_channel_id !== process.env.LOG_CHANNEL_ID) {
-    // Env her zaman öncelikli (Railway kalıcılığı)
     updateSettings(guildId, { log_channel_id: process.env.LOG_CHANNEL_ID });
   }
 }
@@ -19,7 +22,8 @@ export async function sendLog(guild, payload) {
   try {
     if (!guild) return;
 
-    if (config.guildId === guild.id || process.env.LOG_CHANNEL_ID) {
+    // Only seed empty settings from env for the primary guild
+    if (config.guildId === guild.id) {
       ensureLogChannelFromEnv(guild.id);
     }
 
@@ -28,7 +32,7 @@ export async function sendLog(guild, payload) {
       if (!warnedMissing.has(guild.id)) {
         warnedMissing.add(guild.id);
         console.warn(
-          `⚠️ Log kanalı ayarlı değil (${guild.name}). /ayarlar log veya LOG_CHANNEL_ID kullan.`,
+          `⚠️ Log kanalı ayarlı değil (${guild.name}). /ayarlar log kullan.`,
         );
       }
       return;
@@ -37,7 +41,14 @@ export async function sendLog(guild, payload) {
     const channel = await guild.channels.fetch(settings.log_channel_id).catch(() => null);
     if (!channel?.isTextBased()) {
       console.warn(`⚠️ Log kanalı bulunamadı: ${settings.log_channel_id}`);
-      return;
+      return false;
+    }
+
+    const me = guild.members.me || (await guild.members.fetchMe().catch(() => null));
+    const perms = me && channel.permissionsFor(me);
+    if (perms && !perms.has(["ViewChannel", "SendMessages", "EmbedLinks"])) {
+      console.warn(`⚠️ Log kanalına yazma izni yok: #${channel.name}`);
+      return false;
     }
 
     const embed = new EmbedBuilder()
@@ -60,8 +71,10 @@ export async function sendLog(guild, payload) {
     if (payload.image) embed.setImage(payload.image);
 
     await channel.send({ embeds: [embed] });
+    return true;
   } catch (error) {
     console.error("Log gönderilemedi:", error.message);
+    return false;
   }
 }
 

@@ -1,6 +1,7 @@
 import { PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
 import { errorEmbed, successEmbed } from "../../utils/embeds.js";
 import { sendLog } from "../../systems/logger.js";
+import { createCase } from "../../systems/cases.js";
 
 export default {
   data: new SlashCommandBuilder()
@@ -17,21 +18,36 @@ export default {
     if (!member) {
       return interaction.reply({ embeds: [errorEmbed("Üye bulunamadı.")], ephemeral: true });
     }
+    if (user.id === interaction.user.id) {
+      return interaction.reply({ embeds: [errorEmbed("Kendini atamazsın.")], ephemeral: true });
+    }
     if (!member.kickable) {
       return interaction.reply({ embeds: [errorEmbed("Bu üyeyi atamıyorum.")], ephemeral: true });
     }
 
     await member.kick(`${interaction.user.tag}: ${reason}`);
+
+    const caseNo = createCase({
+      guildId: interaction.guild.id,
+      type: "kick",
+      userId: user.id,
+      moderatorId: interaction.user.id,
+      reason,
+    });
+
     await sendLog(interaction.guild, {
-      title: "👢 Kick",
-      description: `${user.tag} atıldı.`,
+      title: `👢 Kick · Case #${caseNo}`,
+      description: `${user} (\`${user.tag}\`) atıldı.`,
       color: 0xfaa61a,
       fields: [
         { name: "Moderatör", value: `${interaction.user}`, inline: true },
+        { name: "Case", value: `#${caseNo}`, inline: true },
         { name: "Sebep", value: reason },
       ],
     });
 
-    return interaction.reply({ embeds: [successEmbed(`${user.tag} atıldı.\nSebep: ${reason}`)] });
+    return interaction.reply({
+      embeds: [successEmbed(`${user.tag} atıldı.\nCase **#${caseNo}** · ${reason}`)],
+    });
   },
 };
