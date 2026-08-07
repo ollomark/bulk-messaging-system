@@ -9,26 +9,25 @@ export default {
     return interaction.reply({
       embeds: [
         premiumEmbed({
-          title: `${brand.name} · Ultra Command Deck`,
+          title: `${brand.name} · Komutlar`,
           description: brand.tagline,
           color: brand.colors.gold,
           fields: [
-            { name: "🎛️ HQ", value: "`/panel` `/istatistik` `/embed`" },
+            { name: "⚙️ Ayarlar", value: "`/ayarlar` `/panel` `/embed` `/istatistik`" },
             {
-              name: "🛡️ Security",
-              value: "`/koruma` `/dogrulama` `/rapor` `/case` + moderasyon",
+              name: "🛡️ Moderasyon",
+              value:
+                "`/ban` `/kick` `/timeout` `/warn` `/temizle` `/kilitle` `/kilidiac` `/yavasmod` `/rol` `/case`",
+            },
+            { name: "🎫 Destek", value: "`/ticket panel` `/ticket yazi` `/ticket kapat`" },
+            {
+              name: "📈 Topluluk",
+              value:
+                "`/davetler` `/duyuru` `/dogrulama` `/emojirol` `/butonrol` `/cekilis` `/seviye` `/starboard`",
             },
             {
-              name: "📈 Growth",
-              value: "`/davetler` `/duyuru` `/dm` `/oneri` `/starboard` `/basvuru`",
-            },
-            {
-              name: "🎧 Experience",
-              value: "`/ses` `/gecicises` `/ticket` `/cekilis` `/seviye` `/emojirol` `/butonrol`",
-            },
-            {
-              name: "✨ Lifestyle",
-              value: "`/afk` `/hatirlat` `/anket`",
+              name: "✨ Utility",
+              value: "`/afk` `/hatirlat` `/anket` `/ping` `/snipe` `/avatar` `/kullanici` `/sunucu`",
             },
           ],
         }),

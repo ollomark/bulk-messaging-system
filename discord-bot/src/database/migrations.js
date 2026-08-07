@@ -22,6 +22,9 @@ export function runMigrations() {
   addColumn("guild_settings", "brand_footer", "TEXT");
   addColumn("guild_settings", "report_channel_id", "TEXT");
   addColumn("guild_settings", "apply_channel_id", "TEXT");
+  addColumn("guild_settings", "ticket_panel_title", "TEXT");
+  addColumn("guild_settings", "ticket_panel_description", "TEXT");
+  addColumn("guild_settings", "ticket_panel_button", "TEXT");
 
   // Oto yanıt tamamen kaldırıldı
   db.exec("DROP TABLE IF EXISTS autoresponders;");

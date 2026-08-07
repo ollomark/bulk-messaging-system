@@ -1,6 +1,7 @@
 import { ChannelType, PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
 import { updateSettings, getSettings } from "../../database/settings.js";
 import { successEmbed, infoEmbed } from "../../utils/embeds.js";
+import { sendLog } from "../../systems/logger.js";
 
 export default {
   data: new SlashCommandBuilder()

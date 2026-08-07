@@ -6,24 +6,54 @@ import {
   PermissionFlagsBits,
 } from "discord.js";
 import db from "../database/db.js";
-import { getSettings } from "../database/settings.js";
+import { getSettings, updateSettings } from "../database/settings.js";
 import { baseEmbed, errorEmbed, successEmbed } from "../utils/embeds.js";
 
-export function buildTicketPanel() {
-  const embed = baseEmbed(
-    "🎫 Destek Talebi",
+const DEFAULT_PANEL = {
+  title: "🎫 Destek Talebi",
+  description:
     "Yardım veya destek için aşağıdaki butona tıklayarak ticket açabilirsin.\nDestek ekibi en kısa sürede dönüş yapacaktır.",
-  );
+  button: "Ticket Aç",
+};
+
+/** Build ticket panel from guild settings + optional overrides. */
+export function buildTicketPanel(guildIdOrSettings = null, overrides = {}) {
+  const settings =
+    typeof guildIdOrSettings === "string"
+      ? getSettings(guildIdOrSettings)
+      : guildIdOrSettings && typeof guildIdOrSettings === "object"
+        ? guildIdOrSettings
+        : {};
+
+  const title = overrides.title || settings.ticket_panel_title || DEFAULT_PANEL.title;
+  const description =
+    overrides.description || settings.ticket_panel_description || DEFAULT_PANEL.description;
+  const buttonLabel = (
+    overrides.button ||
+    settings.ticket_panel_button ||
+    DEFAULT_PANEL.button
+  ).slice(0, 80);
+
+  const embed = baseEmbed(title.slice(0, 256), description.slice(0, 4096));
 
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId("ticket_open")
-      .setLabel("Ticket Aç")
+      .setLabel(buttonLabel)
       .setEmoji("🎟️")
       .setStyle(ButtonStyle.Primary),
   );
 
   return { embeds: [embed], components: [row] };
+}
+
+export function saveTicketPanelText(guildId, { title, description, button } = {}) {
+  const patch = {};
+  if (title != null) patch.ticket_panel_title = title.slice(0, 256);
+  if (description != null) patch.ticket_panel_description = description.slice(0, 4000);
+  if (button != null) patch.ticket_panel_button = button.slice(0, 80);
+  if (Object.keys(patch).length) updateSettings(guildId, patch);
+  return getSettings(guildId);
 }
 
 export async function openTicket(interaction) {
