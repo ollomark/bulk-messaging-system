@@ -10,7 +10,7 @@ import { config } from "../config.js";
 export const brand = {
   name: "Lexyxzon",
   tagline: "Ultra Premium Discord Operating System",
-  invite: "discord.gg/1965",
+  invite: "discord.gg/1758",
   color: config.embedColor || 0x7c3aed,
   colors: {
     primary: 0x7c3aed,
