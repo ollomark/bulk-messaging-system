@@ -10,6 +10,7 @@ import { config } from "../config.js";
 export const brand = {
   name: "Lexyxzon",
   tagline: "Ultra Premium Discord Operating System",
+  invite: "discord.gg/1965",
   color: config.embedColor || 0x7c3aed,
   colors: {
     primary: 0x7c3aed,
@@ -30,7 +31,7 @@ export function premiumEmbed({
   fields = [],
   thumbnail,
   image,
-  footer = `${brand.name} · Ultra Premium`,
+  footer = `${brand.name} · ${brand.invite}`,
   author,
 }) {
   const embed = new EmbedBuilder().setColor(color).setTimestamp();

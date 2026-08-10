@@ -11,7 +11,7 @@ export default {
   async execute(client) {
     console.log(`✅ ${client.user.tag} olarak giriş yapıldı. ${client.guilds.cache.size} sunucu.`);
     client.user.setPresence({
-      activities: [{ name: `${brand.name} · /panel`, type: ActivityType.Watching }],
+      activities: [{ name: "discord.gg/1965", type: ActivityType.Watching }],
       status: "online",
     });
 
