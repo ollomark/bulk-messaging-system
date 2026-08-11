@@ -13,16 +13,24 @@ import { config } from "../config.js";
 const BTN_PREFIX = "dmform_btn_";
 const MODAL_PREFIX = "dmform_modal_";
 
+const INPUT_TYPES = {
+  metin: { key: "metin", label: "Serbest metin" },
+  sayi: { key: "sayi", label: "Sadece sayı" },
+  harf: { key: "harf", label: "Sadece harf" },
+};
+
 export function saveDmFormPanel(row) {
   db.prepare(
     `INSERT INTO dm_form_panels (
       message_id, guild_id, channel_id, owner_id,
       panel_title, panel_description,
-      btn1_label, btn2_label, field_label, modal_title, created_at
+      btn1_label, btn2_label, field_label, modal_title,
+      min_length, max_length, input_type, placeholder, created_at
     ) VALUES (
       @message_id, @guild_id, @channel_id, @owner_id,
       @panel_title, @panel_description,
-      @btn1_label, @btn2_label, @field_label, @modal_title, @created_at
+      @btn1_label, @btn2_label, @field_label, @modal_title,
+      @min_length, @max_length, @input_type, @placeholder, @created_at
     )
     ON CONFLICT(message_id) DO UPDATE SET
       panel_title = excluded.panel_title,
@@ -30,7 +38,11 @@ export function saveDmFormPanel(row) {
       btn1_label = excluded.btn1_label,
       btn2_label = excluded.btn2_label,
       field_label = excluded.field_label,
-      modal_title = excluded.modal_title`,
+      modal_title = excluded.modal_title,
+      min_length = excluded.min_length,
+      max_length = excluded.max_length,
+      input_type = excluded.input_type,
+      placeholder = excluded.placeholder`,
   ).run(row);
 }
 
@@ -38,56 +50,54 @@ export function getDmFormPanel(messageId) {
   return db.prepare("SELECT * FROM dm_form_panels WHERE message_id = ?").get(messageId);
 }
 
-export function buildDmFormPanelPayload({
-  title,
-  description,
-  btn1Label,
-  btn2Label,
-  messageIdPlaceholder = "pending",
-}) {
-  const embed = new EmbedBuilder()
-    .setColor(0x111111)
-    .setTitle(title)
-    .setDescription(description)
-    .setFooter({ text: "Form · yanıtlar sadece sahibe iletilir" })
-    .setTimestamp();
+function buttonStyle(index) {
+  return index === 0 ? ButtonStyle.Secondary : ButtonStyle.Primary;
+}
+
+export function buildDmFormPanelPayload({ title, description, btn1Label, btn2Label }) {
+  const content = [
+    `# ${title}`,
+    "",
+    description,
+  ].join("\n");
 
   const buttons = [
     new ButtonBuilder()
-      .setCustomId(`${BTN_PREFIX}${messageIdPlaceholder}_0`)
+      .setCustomId(`${BTN_PREFIX}pending_0`)
       .setLabel(btn1Label.slice(0, 80))
-      .setStyle(ButtonStyle.Primary),
+      .setStyle(buttonStyle(0)),
   ];
 
   if (btn2Label) {
     buttons.push(
       new ButtonBuilder()
-        .setCustomId(`${BTN_PREFIX}${messageIdPlaceholder}_1`)
+        .setCustomId(`${BTN_PREFIX}pending_1`)
         .setLabel(btn2Label.slice(0, 80))
-        .setStyle(ButtonStyle.Secondary),
+        .setStyle(buttonStyle(1)),
     );
   }
 
   return {
-    embeds: [embed],
+    content,
+    embeds: [],
     components: [new ActionRowBuilder().addComponents(...buttons)],
+    allowedMentions: { parse: [] },
   };
 }
 
-/** After message is sent, rewrite customIds with real message id. */
 export function buildDmFormComponents(messageId, btn1Label, btn2Label) {
   const buttons = [
     new ButtonBuilder()
       .setCustomId(`${BTN_PREFIX}${messageId}_0`)
       .setLabel(btn1Label.slice(0, 80))
-      .setStyle(ButtonStyle.Primary),
+      .setStyle(buttonStyle(0)),
   ];
   if (btn2Label) {
     buttons.push(
       new ButtonBuilder()
         .setCustomId(`${BTN_PREFIX}${messageId}_1`)
         .setLabel(btn2Label.slice(0, 80))
-        .setStyle(ButtonStyle.Secondary),
+        .setStyle(buttonStyle(1)),
     );
   }
   return [new ActionRowBuilder().addComponents(...buttons)];
@@ -115,11 +125,30 @@ export function parseDmFormModalId(customId) {
   return { messageId, buttonIndex };
 }
 
+function panelLimits(panel) {
+  const min = Math.max(1, Math.min(Number(panel.min_length) || 1, 1900));
+  let max = Math.max(1, Math.min(Number(panel.max_length) || 500, 1900));
+  if (max < min) max = min;
+  const inputType = panel.input_type || "metin";
+  return { min, max, inputType };
+}
+
 export function buildDmFormModal(panel, buttonIndex) {
   const btnLabel =
     buttonIndex === 1 && panel.btn2_label ? panel.btn2_label : panel.btn1_label;
-  const modalTitle = (panel.modal_title || btnLabel || "Form").slice(0, 45);
+  const modalTitle = (panel.modal_title || btnLabel || "Yaz").slice(0, 45);
   const fieldLabel = (panel.field_label || "Mesajın").slice(0, 45);
+  const { min, max, inputType } = panelLimits(panel);
+  const placeholder =
+    panel.placeholder ||
+    (inputType === "sayi"
+      ? "Örn: 1234"
+      : inputType === "harf"
+        ? "Sadece harf"
+        : "Buraya yaz…");
+
+  const style =
+    inputType === "sayi" || max <= 80 ? TextInputStyle.Short : TextInputStyle.Paragraph;
 
   return new ModalBuilder()
     .setCustomId(`${MODAL_PREFIX}${panel.message_id}_${buttonIndex}`)
@@ -129,13 +158,30 @@ export function buildDmFormModal(panel, buttonIndex) {
         new TextInputBuilder()
           .setCustomId("dmform_text")
           .setLabel(fieldLabel)
-          .setStyle(TextInputStyle.Paragraph)
+          .setStyle(style)
           .setRequired(true)
-          .setMinLength(1)
-          .setMaxLength(1900)
-          .setPlaceholder("Buraya yaz..."),
+          .setMinLength(min)
+          .setMaxLength(max)
+          .setPlaceholder(placeholder.slice(0, 100)),
       ),
     );
+}
+
+function validateInput(text, panel) {
+  const { min, max, inputType } = panelLimits(panel);
+  if (text.length < min) {
+    return `En az **${min}** karakter yazmalısın.`;
+  }
+  if (text.length > max) {
+    return `En fazla **${max}** karakter yazabilirsin.`;
+  }
+  if (inputType === "sayi" && !/^\d+$/.test(text)) {
+    return "Sadece sayı girebilirsin.";
+  }
+  if (inputType === "harf" && !/^[\p{L}\s]+$/u.test(text)) {
+    return "Sadece harf girebilirsin.";
+  }
+  return null;
 }
 
 export async function handleDmFormButton(interaction) {
@@ -145,7 +191,7 @@ export async function handleDmFormButton(interaction) {
   const panel = getDmFormPanel(parsed.messageId);
   if (!panel) {
     await interaction.reply({
-      content: "Bu form artık aktif değil.",
+      content: "Bu panel artık aktif değil.",
       ephemeral: true,
     });
     return true;
@@ -167,7 +213,7 @@ export async function handleDmFormModal(interaction, client) {
   const panel = getDmFormPanel(parsed.messageId);
   if (!panel) {
     await interaction.reply({
-      content: "Bu form artık aktif değil.",
+      content: "Bu panel artık aktif değil.",
       ephemeral: true,
     });
     return true;
@@ -175,7 +221,13 @@ export async function handleDmFormModal(interaction, client) {
 
   const text = interaction.fields.getTextInputValue("dmform_text")?.trim();
   if (!text) {
-    await interaction.reply({ content: "Boş mesaj gönderilemez.", ephemeral: true });
+    await interaction.reply({ content: "Boş bırakılamaz.", ephemeral: true });
+    return true;
+  }
+
+  const invalid = validateInput(text, panel);
+  if (invalid) {
+    await interaction.reply({ content: invalid, ephemeral: true });
     return true;
   }
 
@@ -188,51 +240,49 @@ export async function handleDmFormModal(interaction, client) {
   const owner = await client.users.fetch(ownerId).catch(() => null);
   if (!owner) {
     await interaction.reply({
-      content: "Sahip bulunamadı — mesaj iletilemedi.",
+      content: "Yanıt iletilemedi.",
       ephemeral: true,
     });
     return true;
   }
 
-  const embed = new EmbedBuilder()
-    .setColor(0xb91c1c)
-    .setTitle(`Form yanıtı · ${btnLabel}`)
+  const { inputType } = panelLimits(panel);
+  const typeLabel = INPUT_TYPES[inputType]?.label || "Metin";
+
+  // Owner DM: compact, no "form" branding
+  const dm = new EmbedBuilder()
+    .setColor(0x1e1f22)
+    .setAuthor({
+      name: interaction.user.tag,
+      iconURL: interaction.user.displayAvatarURL({ size: 64 }),
+    })
     .setDescription(text)
     .addFields(
-      {
-        name: "Gönderen",
-        value: `${interaction.user} (\`${interaction.user.tag}\` · \`${interaction.user.id}\`)`,
-        inline: false,
-      },
-      {
-        name: "Sunucu",
-        value: interaction.guild
-          ? `${interaction.guild.name} (\`${interaction.guild.id}\`)`
-          : "DM",
-        inline: true,
-      },
-      {
-        name: "Panel",
-        value: panel.panel_title || "Form",
-        inline: true,
-      },
+      { name: "Buton", value: btnLabel, inline: true },
+      { name: "Tip", value: typeLabel, inline: true },
+      { name: "ID", value: `\`${interaction.user.id}\``, inline: true },
     )
-    .setThumbnail(interaction.user.displayAvatarURL({ size: 128 }))
     .setTimestamp();
 
+  if (interaction.guild) {
+    dm.setFooter({ text: interaction.guild.name });
+  }
+
   try {
-    await owner.send({ embeds: [embed] });
+    await owner.send({ embeds: [dm] });
   } catch {
     await interaction.reply({
-      content: "Sahibe DM atılamadı (DM kapalı olabilir).",
+      content: "DM kapalı — yanıt iletilemedi.",
       ephemeral: true,
     });
     return true;
   }
 
   await interaction.reply({
-    content: "Mesajın iletildi ✅",
+    content: "Gönderildi.",
     ephemeral: true,
   });
   return true;
 }
+
+export { INPUT_TYPES };

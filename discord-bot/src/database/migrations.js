@@ -113,7 +113,16 @@ export function runMigrations() {
       btn2_label TEXT,
       field_label TEXT NOT NULL,
       modal_title TEXT,
+      min_length INTEGER DEFAULT 1,
+      max_length INTEGER DEFAULT 500,
+      input_type TEXT DEFAULT 'metin',
+      placeholder TEXT,
       created_at INTEGER NOT NULL
     );
   `);
+
+  addColumn("dm_form_panels", "min_length", "INTEGER DEFAULT 1");
+  addColumn("dm_form_panels", "max_length", "INTEGER DEFAULT 500");
+  addColumn("dm_form_panels", "input_type", "TEXT DEFAULT 'metin'");
+  addColumn("dm_form_panels", "placeholder", "TEXT");
 }
