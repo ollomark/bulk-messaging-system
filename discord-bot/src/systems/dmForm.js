@@ -55,17 +55,53 @@ function buttonStyle(index) {
 }
 
 export function buildDmFormPanelPayload({ title, description, btn1Label, btn2Label }) {
-  const content = [
-    `# ${title}`,
-    "",
-    description,
-  ].join("\n");
+  const embed = new EmbedBuilder()
+    .setColor(0x111214)
+    .setAuthor({ name: "PANEL" })
+    .setTitle(title.slice(0, 256))
+    .setDescription(
+      [
+        "",
+        description,
+        "",
+        "",
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+        "",
+        "**Nasıl çalışır?**",
+        "1️⃣ Alttaki butona tıkla",
+        "2️⃣ Açılan kutuya yaz",
+        "3️⃣ Gönder",
+        "",
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+        "",
+      ].join("\n"),
+    )
+    .addFields(
+      {
+        name: "Butonlar",
+        value: btn2Label
+          ? `**${btn1Label}**\n**${btn2Label}**`
+          : `**${btn1Label}**`,
+        inline: true,
+      },
+      {
+        name: "\u200b",
+        value: "\u200b",
+        inline: true,
+      },
+      {
+        name: "Durum",
+        value: "🟢 Aktif",
+        inline: true,
+      },
+    )
+    .setTimestamp();
 
   const buttons = [
     new ButtonBuilder()
       .setCustomId(`${BTN_PREFIX}pending_0`)
       .setLabel(btn1Label.slice(0, 80))
-      .setStyle(buttonStyle(0)),
+      .setStyle(ButtonStyle.Primary),
   ];
 
   if (btn2Label) {
@@ -73,13 +109,12 @@ export function buildDmFormPanelPayload({ title, description, btn1Label, btn2Lab
       new ButtonBuilder()
         .setCustomId(`${BTN_PREFIX}pending_1`)
         .setLabel(btn2Label.slice(0, 80))
-        .setStyle(buttonStyle(1)),
+        .setStyle(ButtonStyle.Success),
     );
   }
 
   return {
-    content,
-    embeds: [],
+    embeds: [embed],
     components: [new ActionRowBuilder().addComponents(...buttons)],
     allowedMentions: { parse: [] },
   };
