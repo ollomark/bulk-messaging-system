@@ -13,7 +13,10 @@ export default {
           description: brand.tagline,
           color: brand.colors.gold,
           fields: [
-            { name: "⚙️ Ayarlar", value: "`/ayarlar` `/panel` `/embed` `/istatistik`" },
+            {
+              name: "⚙️ Ayarlar",
+              value: "`/ayarlar` `/panel` `/embed` `/form` `/istatistik`",
+            },
             {
               name: "🛡️ Moderasyon",
               value:

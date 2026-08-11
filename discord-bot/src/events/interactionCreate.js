@@ -10,6 +10,7 @@ import { getSettings } from "../database/settings.js";
 import { getInviteLeaderboard } from "../systems/invites.js";
 import { buildApplyModal, submitApplication } from "../systems/applications.js";
 import { submitReport } from "../systems/reports.js";
+import { handleDmFormButton, handleDmFormModal } from "../systems/dmForm.js";
 
 async function handleHqSelect(interaction) {
   const value = interaction.values[0];
@@ -93,6 +94,9 @@ export default {
           await submitApplication(interaction);
           return;
         }
+        if (await handleDmFormModal(interaction, client)) {
+          return;
+        }
       }
 
       if (interaction.isStringSelectMenu()) {
@@ -103,6 +107,9 @@ export default {
       }
 
       if (interaction.isButton()) {
+        if (await handleDmFormButton(interaction)) {
+          return;
+        }
         if (interaction.customId === "hq_refresh") {
           return interaction.update(hqPanelPayload(interaction.guild));
         }

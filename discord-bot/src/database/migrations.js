@@ -101,5 +101,19 @@ export function runMigrations() {
       content TEXT NOT NULL,
       last_message_id TEXT
     );
+
+    CREATE TABLE IF NOT EXISTS dm_form_panels (
+      message_id TEXT PRIMARY KEY,
+      guild_id TEXT NOT NULL,
+      channel_id TEXT NOT NULL,
+      owner_id TEXT NOT NULL,
+      panel_title TEXT,
+      panel_description TEXT,
+      btn1_label TEXT NOT NULL,
+      btn2_label TEXT,
+      field_label TEXT NOT NULL,
+      modal_title TEXT,
+      created_at INTEGER NOT NULL
+    );
   `);
 }
