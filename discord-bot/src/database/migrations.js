@@ -125,4 +125,5 @@ export function runMigrations() {
   addColumn("dm_form_panels", "max_length", "INTEGER DEFAULT 500");
   addColumn("dm_form_panels", "input_type", "TEXT DEFAULT 'metin'");
   addColumn("dm_form_panels", "placeholder", "TEXT");
+  addColumn("dm_form_panels", "field_label_2", "TEXT");
 }

@@ -24,12 +24,12 @@ export function saveDmFormPanel(row) {
     `INSERT INTO dm_form_panels (
       message_id, guild_id, channel_id, owner_id,
       panel_title, panel_description,
-      btn1_label, btn2_label, field_label, modal_title,
+      btn1_label, btn2_label, field_label, field_label_2, modal_title,
       min_length, max_length, input_type, placeholder, created_at
     ) VALUES (
       @message_id, @guild_id, @channel_id, @owner_id,
       @panel_title, @panel_description,
-      @btn1_label, @btn2_label, @field_label, @modal_title,
+      @btn1_label, @btn2_label, @field_label, @field_label_2, @modal_title,
       @min_length, @max_length, @input_type, @placeholder, @created_at
     )
     ON CONFLICT(message_id) DO UPDATE SET
@@ -38,6 +38,7 @@ export function saveDmFormPanel(row) {
       btn1_label = excluded.btn1_label,
       btn2_label = excluded.btn2_label,
       field_label = excluded.field_label,
+      field_label_2 = excluded.field_label_2,
       modal_title = excluded.modal_title,
       min_length = excluded.min_length,
       max_length = excluded.max_length,
@@ -173,6 +174,7 @@ export function buildDmFormModal(panel, buttonIndex) {
     buttonIndex === 1 && panel.btn2_label ? panel.btn2_label : panel.btn1_label;
   const modalTitle = (panel.modal_title || btnLabel || "Yaz").slice(0, 45);
   const fieldLabel = (panel.field_label || "Mesajın").slice(0, 45);
+  const fieldLabel2 = (panel.field_label_2 || "Detay").slice(0, 45);
   const { min, max, inputType } = panelLimits(panel);
   const placeholder =
     panel.placeholder ||
@@ -198,6 +200,15 @@ export function buildDmFormModal(panel, buttonIndex) {
           .setMinLength(min)
           .setMaxLength(max)
           .setPlaceholder(placeholder.slice(0, 100)),
+      ),
+      new ActionRowBuilder().addComponents(
+        new TextInputBuilder()
+          .setCustomId("dmform_text_2")
+          .setLabel(fieldLabel2)
+          .setStyle(TextInputStyle.Paragraph)
+          .setRequired(false)
+          .setMaxLength(1900)
+          .setPlaceholder("İstersen buraya da yaz…"),
       ),
     );
 }
@@ -255,6 +266,7 @@ export async function handleDmFormModal(interaction, client) {
   }
 
   const text = interaction.fields.getTextInputValue("dmform_text")?.trim();
+  const text2 = interaction.fields.getTextInputValue("dmform_text_2")?.trim() || "";
   if (!text) {
     await interaction.reply({ content: "Boş bırakılamaz.", ephemeral: true });
     return true;
@@ -283,16 +295,20 @@ export async function handleDmFormModal(interaction, client) {
 
   const { inputType } = panelLimits(panel);
   const typeLabel = INPUT_TYPES[inputType]?.label || "Metin";
+  const label1 = panel.field_label || "Mesajın";
+  const label2 = panel.field_label_2 || "Detay";
 
-  // Owner DM: compact, no "form" branding
   const dm = new EmbedBuilder()
     .setColor(0x1e1f22)
     .setAuthor({
       name: interaction.user.tag,
       iconURL: interaction.user.displayAvatarURL({ size: 64 }),
     })
-    .setDescription(text)
+    .setDescription(`**${label1}**\n${text}`)
     .addFields(
+      ...(text2
+        ? [{ name: label2, value: text2.slice(0, 1024) }]
+        : []),
       { name: "Buton", value: btnLabel, inline: true },
       { name: "Tip", value: typeLabel, inline: true },
       { name: "ID", value: `\`${interaction.user.id}\``, inline: true },

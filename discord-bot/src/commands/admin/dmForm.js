@@ -34,7 +34,13 @@ export default {
         .addStringOption((opt) =>
           opt
             .setName("yazi_alani")
-            .setDescription("Yazı kutusunun adı")
+            .setDescription("1. yazı kutusunun adı")
+            .setMaxLength(45),
+        )
+        .addStringOption((opt) =>
+          opt
+            .setName("yazi_alani2")
+            .setDescription("2. yazı kutusunun adı (altta)")
             .setMaxLength(45),
         )
         .addStringOption((opt) =>
@@ -88,6 +94,7 @@ export default {
     const btn1 = interaction.options.getString("buton1", true);
     const btn2 = interaction.options.getString("buton2");
     const fieldLabel = interaction.options.getString("yazi_alani") || "Mesajın";
+    const fieldLabel2 = interaction.options.getString("yazi_alani2") || "Detay";
     const modalTitle = interaction.options.getString("pencere") || title.slice(0, 45);
     let minLength = interaction.options.getInteger("min") ?? 1;
     let maxLength = interaction.options.getInteger("max") ?? 500;
@@ -123,6 +130,7 @@ export default {
       btn1_label: btn1,
       btn2_label: btn2 || null,
       field_label: fieldLabel,
+      field_label_2: fieldLabel2,
       modal_title: modalTitle,
       min_length: minLength,
       max_length: maxLength,
