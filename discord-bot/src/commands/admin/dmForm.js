@@ -39,8 +39,8 @@ export default {
         )
         .addStringOption((opt) =>
           opt
-            .setName("yazi_alani2")
-            .setDescription("2. yazı kutusunun adı (altta)")
+            .setName("detay_adi")
+            .setDescription("Alttaki 2. kutunun adı (varsayılan: Detay)")
             .setMaxLength(45),
         )
         .addStringOption((opt) =>
