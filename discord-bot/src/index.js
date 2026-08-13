@@ -14,6 +14,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 runMigrations();
 
+const enablePresence = process.env.STATUS_ROLE_ENABLED === "1";
+
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -25,6 +27,7 @@ const client = new Client({
     GatewayIntentBits.DirectMessages,
     GatewayIntentBits.GuildVoiceStates,
     GatewayIntentBits.GuildInvites,
+    ...(enablePresence ? [GatewayIntentBits.GuildPresences] : []),
   ],
   partials: [Partials.Channel, Partials.Message, Partials.Reaction, Partials.User],
 });
@@ -42,6 +45,7 @@ async function bootstrap() {
   await loadEvents(client, path.join(__dirname, "events"));
   startGiveawayScheduler(client);
   startReminderScheduler(client);
+  if (enablePresence) startStatusRoleSync(client);
 
   try {
     startPanelServer(client);
