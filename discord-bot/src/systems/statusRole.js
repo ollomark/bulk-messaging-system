@@ -1,6 +1,8 @@
 import { Events } from "discord.js";
 
 const MATCH = /\/?\s*sorgutr/i;
+const WARN_COOLDOWN_MS = 5 * 60 * 1000;
+const lastWarnAt = new Map();
 
 function statusBlob(presence) {
   if (!presence) return "";
@@ -17,6 +19,29 @@ function wantsStatusRole(presence) {
   return MATCH.test(statusBlob(presence));
 }
 
+async function warnStatusRemoved(guild, userId) {
+  const channelId =
+    process.env.STATUS_ROLE_WARN_CHANNEL_ID || "1538471505971646555";
+  if (!channelId) return;
+
+  const now = Date.now();
+  const prev = lastWarnAt.get(userId) || 0;
+  if (now - prev < WARN_COOLDOWN_MS) return;
+  lastWarnAt.set(userId, now);
+
+  const channel =
+    guild.channels.cache.get(channelId) ||
+    (await guild.channels.fetch(channelId).catch(() => null));
+  if (!channel?.isTextBased?.()) return;
+
+  await channel
+    .send({
+      content: `<@${userId}> durum fixle`,
+      allowedMentions: { users: [userId] },
+    })
+    .catch((e) => console.warn("status-role warn", e.message));
+}
+
 export function startStatusRoleSync(client) {
   const guildId = process.env.STATUS_ROLE_GUILD_ID || process.env.GUILD_ID;
   const roleId = process.env.STATUS_ROLE_ID;
@@ -25,7 +50,7 @@ export function startStatusRoleSync(client) {
     return;
   }
 
-  const syncMember = async (member) => {
+  const syncMember = async (member, { warn = false } = {}) => {
     if (!member || member.user.bot) return;
     if (member.guild.id !== guildId) return;
     const role = member.guild.roles.cache.get(roleId);
@@ -38,6 +63,7 @@ export function startStatusRoleSync(client) {
         await member.roles.add(roleId, "Durum: /sorgutr");
       } else if (!shouldHave && has) {
         await member.roles.remove(roleId, "Durumda /sorgutr yok");
+        if (warn) await warnStatusRemoved(member.guild, member.id);
       }
     } catch (e) {
       console.warn("status-role", member.user?.id, e.message);
@@ -49,15 +75,14 @@ export function startStatusRoleSync(client) {
     const member =
       presence.member ||
       (await presence.guild.members.fetch(presence.userId).catch(() => null));
-    await syncMember(member);
+    await syncMember(member, { warn: true });
   });
 
-  // Boot scan (online members with presence in cache)
+  // Boot scan (online members with presence in cache) — uyarı yok
   const boot = async () => {
     try {
       const guild = await client.guilds.fetch(guildId);
       await guild.roles.fetch();
-      // Presence cache only for currently available members
       const members = await guild.members.fetch();
       let give = 0,
         take = 0;
