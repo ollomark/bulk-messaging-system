@@ -112,6 +112,7 @@ export function runMigrations() {
       btn1_label TEXT NOT NULL,
       btn2_label TEXT,
       field_label TEXT NOT NULL,
+      field_label_2 TEXT,
       modal_title TEXT,
       min_length INTEGER DEFAULT 1,
       max_length INTEGER DEFAULT 500,
@@ -126,4 +127,6 @@ export function runMigrations() {
   addColumn("dm_form_panels", "input_type", "TEXT DEFAULT 'metin'");
   addColumn("dm_form_panels", "placeholder", "TEXT");
   addColumn("dm_form_panels", "field_label_2", "TEXT");
+
+  addColumn("tickets", "anonymous", "INTEGER DEFAULT 0");
 }

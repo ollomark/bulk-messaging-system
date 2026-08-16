@@ -2,11 +2,22 @@ import { Events } from "discord.js";
 import { handleProtectionMessage } from "../systems/protection.js";
 import { handleLevelMessage } from "../systems/leveling.js";
 import { clearAfkIfTalking, maybeNotifyAfkMention } from "../systems/afk.js";
+import {
+  relayAnonDmToTicket,
+  relayAnonTicketToDm,
+} from "../systems/tickets.js";
 
 export default {
   name: Events.MessageCreate,
-  async execute(message) {
-    if (!message.guild || message.author.bot) return;
+  async execute(message, client) {
+    if (message.author.bot) return;
+
+    if (!message.guild) {
+      await relayAnonDmToTicket(message, client);
+      return;
+    }
+
+    if (await relayAnonTicketToDm(message)) return;
 
     const blocked = await handleProtectionMessage(message);
     if (blocked) return;

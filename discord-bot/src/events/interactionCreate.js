@@ -1,6 +1,13 @@
 import { Events, PermissionFlagsBits } from "discord.js";
 import { errorEmbed, infoEmbed, successEmbed } from "../utils/embeds.js";
-import { openTicket, claimTicket, closeTicket } from "../systems/tickets.js";
+import {
+  openTicket,
+  claimTicket,
+  closeTicket,
+  startAgreementConfirm,
+  confirmAgreement,
+  cancelAgreement,
+} from "../systems/tickets.js";
 import { addEntry, getGiveaway } from "../systems/giveaways.js";
 import { handleVerify } from "../systems/verify.js";
 import { handleSuggestionVote } from "../systems/suggestions.js";
@@ -184,13 +191,25 @@ export default {
 
         switch (interaction.customId) {
           case "ticket_open":
-            await openTicket(interaction);
+            await openTicket(interaction, { anonymous: false });
+            return;
+          case "ticket_open_anon":
+            await openTicket(interaction, { anonymous: true });
             return;
           case "ticket_claim":
             await claimTicket(interaction);
             return;
           case "ticket_close":
             await closeTicket(interaction);
+            return;
+          case "agreement_start":
+            await startAgreementConfirm(interaction);
+            return;
+          case "agreement_confirm":
+            await confirmAgreement(interaction, client);
+            return;
+          case "agreement_cancel":
+            await cancelAgreement(interaction);
             return;
           case "giveaway_join": {
             const giveaway = getGiveaway(interaction.message.id);

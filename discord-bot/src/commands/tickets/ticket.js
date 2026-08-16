@@ -1,6 +1,7 @@
 import { PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
 import {
   buildTicketPanel,
+  buildAgreementPanel,
   closeTicket,
   saveTicketPanelText,
 } from "../../systems/tickets.js";
@@ -15,7 +16,7 @@ export default {
     .addSubcommand((sub) =>
       sub
         .setName("panel")
-        .setDescription("Ticket panelini gönderir (yazıyı özelleştirebilirsin)")
+        .setDescription("Ticket + anonim ticket panelini gönderir")
         .addStringOption((opt) =>
           opt.setName("baslik").setDescription("Panel başlığı").setMaxLength(256),
         )
@@ -23,12 +24,26 @@ export default {
           opt.setName("aciklama").setDescription("Panel açıklama yazısı").setMaxLength(2000),
         )
         .addStringOption((opt) =>
-          opt.setName("buton").setDescription("Buton yazısı").setMaxLength(80),
+          opt.setName("buton").setDescription("Normal ticket buton yazısı").setMaxLength(80),
         )
         .addBooleanOption((opt) =>
           opt
             .setName("kaydet")
             .setDescription("Bu yazıyı kalıcı ayar olarak kaydet (varsayılan: evet)"),
+        ),
+    )
+    .addSubcommand((sub) =>
+      sub
+        .setName("anlasma")
+        .setDescription("Anlaşma Kur panelini gönderir")
+        .addStringOption((opt) =>
+          opt.setName("baslik").setDescription("Panel başlığı").setMaxLength(256),
+        )
+        .addStringOption((opt) =>
+          opt.setName("aciklama").setDescription("Panel açıklaması").setMaxLength(2000),
+        )
+        .addStringOption((opt) =>
+          opt.setName("buton").setDescription("Buton yazısı").setMaxLength(80),
         ),
     )
     .addSubcommand((sub) =>
@@ -101,10 +116,26 @@ export default {
         embeds: [
           successEmbed(
             shouldSave
-              ? "Ticket paneli gönderildi ve yazı kaydedildi."
-              : "Ticket paneli gönderildi.",
+              ? "Ticket paneli gönderildi (normal + anonim) ve yazı kaydedildi."
+              : "Ticket paneli gönderildi (normal + anonim).",
           ),
         ],
+        ephemeral: true,
+      });
+    }
+
+    if (sub === "anlasma") {
+      const overrides = {};
+      const title = interaction.options.getString("baslik");
+      const description = interaction.options.getString("aciklama");
+      const button = interaction.options.getString("buton");
+      if (title) overrides.title = title;
+      if (description) overrides.description = description;
+      if (button) overrides.button = button;
+
+      await interaction.channel.send(buildAgreementPanel(overrides));
+      return interaction.reply({
+        embeds: [successEmbed("Anlaşma Kur paneli gönderildi.")],
         ephemeral: true,
       });
     }
