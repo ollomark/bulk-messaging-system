@@ -3,6 +3,7 @@ import { handleProtectionMessage } from "../systems/protection.js";
 import { handleLevelMessage } from "../systems/leveling.js";
 import { clearAfkIfTalking, maybeNotifyAfkMention } from "../systems/afk.js";
 import {
+  maskAnonOpenerMessage,
   relayAnonDmToTicket,
   relayAnonTicketToDm,
 } from "../systems/tickets.js";
@@ -17,6 +18,7 @@ export default {
       return;
     }
 
+    if (await maskAnonOpenerMessage(message)) return;
     if (await relayAnonTicketToDm(message)) return;
 
     const blocked = await handleProtectionMessage(message);

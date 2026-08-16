@@ -95,7 +95,7 @@ export async function openTicket(interaction, { anonymous = false } = {}) {
 
   if (existing) {
     const hint = existing.anonymous
-      ? "Zaten açık bir **anonim** ticketın var — bota DM at."
+      ? `Zaten açık bir **anonim** ticketın var: <#${existing.channel_id}>`
       : `Zaten açık bir ticketın var: <#${existing.channel_id}>`;
     return interaction.reply({
       embeds: [errorEmbed(hint)],
@@ -115,12 +115,10 @@ export async function openTicket(interaction, { anonymous = false } = {}) {
         PermissionFlagsBits.SendMessages,
         PermissionFlagsBits.ManageChannels,
         PermissionFlagsBits.ManageWebhooks,
+        PermissionFlagsBits.ManageMessages,
       ],
     },
-  ];
-
-  if (!anonymous) {
-    overwrites.push({
+    {
       id: interaction.user.id,
       allow: [
         PermissionFlagsBits.ViewChannel,
@@ -128,8 +126,8 @@ export async function openTicket(interaction, { anonymous = false } = {}) {
         PermissionFlagsBits.AttachFiles,
         PermissionFlagsBits.ReadMessageHistory,
       ],
-    });
-  }
+    },
+  ];
 
   if (settings.ticket_support_role_id) {
     overwrites.push({
@@ -185,57 +183,66 @@ export async function openTicket(interaction, { anonymous = false } = {}) {
   );
 
   if (anonymous) {
+    const welcomeEmbed = baseEmbed(
+      "🕵️ Anonim Ticket",
+      [
+        "Bu kanalda senin mesajların **Anonim** olarak görünür — bot / kullanıcı adı çıkmaz.",
+        "Destek ekibi kendi adıyla yanıtlar.",
+        "İstersen bota DM de yazabilirsin; o da Anonim gider.",
+        "",
+        "`Üstlen` / `Kapat` ile yönetilir.",
+      ].join("\n"),
+    );
+
+    try {
+      const webhook = await getAnonWebhook(channel);
+      await webhook.send({
+        username: "Anonim",
+        avatarURL: ANON_AVATAR,
+        content: settings.ticket_support_role_id
+          ? `<@&${settings.ticket_support_role_id}>`
+          : undefined,
+        embeds: [welcomeEmbed],
+        allowedMentions: settings.ticket_support_role_id
+          ? { roles: [settings.ticket_support_role_id] }
+          : { parse: [] },
+      });
+    } catch {
+      await channel.send({
+        content: settings.ticket_support_role_id
+          ? `<@&${settings.ticket_support_role_id}>`
+          : undefined,
+        embeds: [welcomeEmbed],
+      });
+    }
+
+    // Butonlar bot mesajında olmalı (etkileşim için)
     await channel.send({
-      content: settings.ticket_support_role_id
-        ? `<@&${settings.ticket_support_role_id}>`
-        : undefined,
-      embeds: [
-        baseEmbed(
-          "🕵️ Anonim Ticket",
-          [
-            "Kullanıcı kimliği gizli.",
-            "Mesajlar **Anonim** webhook ile gelecek.",
-            "Bu kanala yazdığın yanıtlar kullanıcıya DM olarak iletilir.",
-            "",
-            "`Üstlen` / `Kapat` ile yönet.",
-          ].join("\n"),
-        ),
-      ],
+      content: "\u200b",
       components: [controls],
     });
 
-    try {
-      await interaction.user.send({
+    await interaction.user
+      .send({
         embeds: [
           baseEmbed(
             "Anonim ticket açıldı",
             [
               `Sunucu: **${interaction.guild.name}**`,
-              "Kimliğin destek ekibine gösterilmez.",
+              `Kanal: <#${channel.id}>`,
               "",
-              "**Bu DM’ye yaz** — mesajın ticket kanalında **Anonim** olarak görünür.",
-              "Destek yanıtları da buraya düşer.",
+              "Kanala yaz → mesajın **Anonim** görünür (bot adı yok).",
+              "Alternatif: bu DM’ye yaz — o da Anonim gider.",
             ].join("\n"),
           ),
         ],
-      });
-    } catch {
-      await channel.delete("Anonim ticket: DM kapalı").catch(() => null);
-      db.prepare("DELETE FROM tickets WHERE channel_id = ?").run(channel.id);
-      return interaction.reply({
-        embeds: [
-          errorEmbed(
-            "Anonim ticket için DM’lerin açık olmalı. Discord ayarlarından sunucu üyelerinden DM’e izin ver, sonra tekrar dene.",
-          ),
-        ],
-        ephemeral: true,
-      });
-    }
+      })
+      .catch(() => null);
 
     return interaction.reply({
       embeds: [
         successEmbed(
-          "Anonim ticket açıldı. Bota gelen DM’yi aç ve oraya yaz — mesajların **Anonim** olarak iletilir.",
+          `Anonim ticket: ${channel}\nKanala yazınca mesajın **Anonim** olarak görünür — bot adı çıkmaz.`,
         ),
       ],
       ephemeral: true,
@@ -343,6 +350,38 @@ export async function closeTicket(interaction) {
   }, 5000);
 }
 
+/** Anonim ticket kanalında opener mesajını silip Anonim webhook ile yeniden bas. */
+export async function maskAnonOpenerMessage(message) {
+  if (!message.guild || message.author.bot || message.webhookId) return false;
+
+  const ticket = db
+    .prepare("SELECT * FROM tickets WHERE channel_id = ? AND status = 'open' AND anonymous = 1")
+    .get(message.channel.id);
+  if (!ticket || message.author.id !== ticket.opener_id) return false;
+
+  const content = message.content?.slice(0, 2000) || "";
+  const files = [...message.attachments.values()].map((a) => ({
+    attachment: a.url,
+    name: a.name,
+  }));
+
+  await message.delete().catch(() => null);
+
+  try {
+    const webhook = await getAnonWebhook(message.channel);
+    await webhook.send({
+      username: "Anonim",
+      avatarURL: ANON_AVATAR,
+      content: content || (files.length ? undefined : "_(ek)_"),
+      files: files.length ? files : undefined,
+      allowedMentions: { parse: [] },
+    });
+  } catch (e) {
+    console.warn("status-anon mask", e.message);
+  }
+  return true;
+}
+
 /** DM → anonim ticket kanalı (webhook). */
 export async function relayAnonDmToTicket(message, client) {
   if (message.guild || message.author.bot) return false;
@@ -384,37 +423,9 @@ export async function relayAnonDmToTicket(message, client) {
   return true;
 }
 
-/** Staff mesajı → opener DM. */
-export async function relayAnonTicketToDm(message) {
-  if (!message.guild || message.author.bot || message.webhookId) return false;
-
-  const ticket = db
-    .prepare("SELECT * FROM tickets WHERE channel_id = ? AND status = 'open' AND anonymous = 1")
-    .get(message.channel.id);
-  if (!ticket) return false;
-  if (message.author.id === ticket.opener_id) return false;
-
-  const user = await message.client.users.fetch(ticket.opener_id).catch(() => null);
-  if (!user) return false;
-
-  const files = [...message.attachments.values()].map((a) => a.url);
-  try {
-    await user.send({
-      content: [
-        `**Destek · ${message.guild.name}** (${message.author.username}):`,
-        message.content || (files.length ? "" : "_(ek)_"),
-      ]
-        .filter(Boolean)
-        .join("\n")
-        .slice(0, 2000),
-      files: files.length ? files : undefined,
-    });
-  } catch {
-    await message.reply({
-      embeds: [errorEmbed("Kullanıcıya DM iletilemedi (DM kapalı olabilir).")],
-    }).catch(() => null);
-  }
-  return true;
+/** Staff mesajı → opener DM (opener kanaldaysa gerek yok; çift mesaj olmasın). */
+export async function relayAnonTicketToDm(_message) {
+  return false;
 }
 
 export async function startAgreementConfirm(interaction) {
