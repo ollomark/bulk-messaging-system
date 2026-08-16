@@ -6,6 +6,7 @@ import { loadCommands } from "./handlers/loadCommands.js";
 import { loadEvents } from "./handlers/loadEvents.js";
 import { startGiveawayScheduler } from "./systems/giveaways.js";
 import { startReminderScheduler } from "./systems/reminders.js";
+import { startStatusRoleSync } from "./systems/statusRole.js";
 import { startPanelServer } from "./panel/server.js";
 import { runMigrations } from "./database/migrations.js";
 import "./database/db.js";
