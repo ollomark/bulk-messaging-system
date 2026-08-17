@@ -1,11 +1,22 @@
 import db from "../database/db.js";
-import { getSettings } from "../database/settings.js";
+import { getSettings, updateSettings } from "../database/settings.js";
 import { baseEmbed } from "../utils/embeds.js";
 
 const cooldowns = new Map();
 
+/** SORGUTR sohbet-i-muhabbet — varsayılan XP / seviye kanalı */
+const DEFAULT_LEVEL_CHANNEL_ID = "1538505806738104461";
+
 export function xpForLevel(level) {
   return 5 * level * level + 50 * level + 100;
+}
+
+function resolveLevelChannelId(settings) {
+  return (
+    process.env.LEVEL_CHANNEL_ID ||
+    settings.level_channel_id ||
+    DEFAULT_LEVEL_CHANNEL_ID
+  );
 }
 
 export function getLevelRow(guildId, userId) {
@@ -13,10 +24,9 @@ export function getLevelRow(guildId, userId) {
     .prepare("SELECT * FROM levels WHERE guild_id = ? AND user_id = ?")
     .get(guildId, userId);
   if (!row) {
-    db.prepare("INSERT INTO levels (guild_id, user_id, xp, level, total_messages) VALUES (?, ?, 0, 0, 0)").run(
-      guildId,
-      userId,
-    );
+    db.prepare(
+      "INSERT INTO levels (guild_id, user_id, xp, level, total_messages) VALUES (?, ?, 0, 0, 0)",
+    ).run(guildId, userId);
     row = db
       .prepare("SELECT * FROM levels WHERE guild_id = ? AND user_id = ?")
       .get(guildId, userId);
@@ -29,6 +39,14 @@ export async function handleLevelMessage(message) {
 
   const settings = getSettings(message.guild.id);
   if (!settings.level_enabled) return;
+
+  const levelChannelId = resolveLevelChannelId(settings);
+  // XP ve seviye mesajı sadece sohbet kanalında
+  if (message.channel.id !== levelChannelId) return;
+
+  if (!settings.level_channel_id || settings.level_channel_id !== levelChannelId) {
+    updateSettings(message.guild.id, { level_channel_id: levelChannelId });
+  }
 
   const key = `${message.guild.id}:${message.author.id}`;
   const now = Date.now();
@@ -59,13 +77,7 @@ export async function handleLevelMessage(message) {
     `${message.author} tebrikler! Artık **${level}. seviye**sin.`,
   );
 
-  let channel = message.channel;
-  if (settings.level_channel_id) {
-    const configured = await message.guild.channels.fetch(settings.level_channel_id).catch(() => null);
-    if (configured?.isTextBased()) channel = configured;
-  }
-
-  await channel.send({ embeds: [embed] }).catch(() => null);
+  await message.channel.send({ embeds: [embed] }).catch(() => null);
 }
 
 export function getLeaderboard(guildId, limit = 10) {
