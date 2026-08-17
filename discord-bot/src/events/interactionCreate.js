@@ -18,6 +18,7 @@ import { getInviteLeaderboard } from "../systems/invites.js";
 import { buildApplyModal, submitApplication } from "../systems/applications.js";
 import { submitReport } from "../systems/reports.js";
 import { handleDmFormButton, handleDmFormModal } from "../systems/dmForm.js";
+import { buildHelpPayload } from "../commands/utility/help.js";
 
 async function handleHqSelect(interaction) {
   const value = interaction.values[0];
@@ -67,6 +68,29 @@ async function handleHqSelect(interaction) {
       `Log: ${s.apply_channel_id ? `<#${s.apply_channel_id}>` : "Yok"}\n\`/basvuru panel\` · \`/basvuru kanal\``,
       "📋 Applications",
     ),
+    tickets: premiumEmbed({
+      title: "🎫 Tickets",
+      description: [
+        `Kategori: ${s.ticket_category_id ? `<#${s.ticket_category_id}>` : "Yok"}`,
+        `Destek rolü: ${s.ticket_support_role_id ? `<@&${s.ticket_support_role_id}>` : "Yok"}`,
+        `Log: ${s.ticket_log_channel_id ? `<#${s.ticket_log_channel_id}>` : "Yok"}`,
+        "",
+        "`/ticket panel` · `/ticket anlasma` · `/ticket kapat`",
+        "Anonim ticket: mesajlar **Anonim** webhook ile gider.",
+      ].join("\n"),
+      color: brand.colors.primary,
+    }),
+    levels: premiumEmbed({
+      title: "📈 Levels",
+      description: [
+        `Aktif: ${s.level_enabled ? "✅" : "❌"}`,
+        `Kanal: ${s.level_channel_id ? `<#${s.level_channel_id}>` : "sohbet-i-muhabbet"}`,
+        "",
+        "XP sadece sohbet kanalında.",
+        "`/seviye` · `/liderlik` · `/ayarlar seviye-kanal`",
+      ].join("\n"),
+      color: brand.colors.gold,
+    }),
     stats: successEmbed("Detay için `/istatistik`", "📊 Analytics"),
   };
 
@@ -110,6 +134,10 @@ export default {
         if (interaction.customId === "hq_module") {
           await handleHqSelect(interaction);
           return;
+        }
+        if (interaction.customId === "help_category") {
+          const key = interaction.values[0] || "home";
+          return interaction.update(buildHelpPayload(key));
         }
       }
 

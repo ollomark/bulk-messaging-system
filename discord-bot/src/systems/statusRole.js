@@ -36,7 +36,20 @@ async function warnStatusRemoved(guild, userId) {
 
   await channel
     .send({
-      content: `<@${userId}> durum fixle`,
+      content: `<@${userId}>`,
+      embeds: [
+        {
+          title: "⚠️ Durum Uyarısı",
+          description: [
+            "Özel durumundan **`/sorgutr`** kaldırıldı.",
+            "",
+            "**durum fixle** — tekrar yaz, rolün geri gelir.",
+          ].join("\n"),
+          color: 0xf59e0b,
+          footer: { text: "SORGUTR · status-role" },
+          timestamp: new Date().toISOString(),
+        },
+      ],
       allowedMentions: { users: [userId] },
     })
     .catch((e) => console.warn("status-role warn", e.message));

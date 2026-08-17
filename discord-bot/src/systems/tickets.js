@@ -12,9 +12,13 @@ import { config } from "../config.js";
 import { ANON_AVATAR, getAnonWebhook } from "../utils/anonWebhook.js";
 
 const DEFAULT_PANEL = {
-  title: "🎫 Destek Talebi",
-  description:
-    "Yardım veya destek için aşağıdaki butona tıklayarak ticket açabilirsin.\nAnonim ticket’ta kimliğin gizli kalır — mesajların **Anonim** olarak gider.",
+  title: "🎫 SORGUTR Destek",
+  description: [
+    "Yardım için aşağıdaki butonlardan birini seç.",
+    "",
+    "**Ticket Aç** — klasik destek kanalı",
+    "**Anonim Ticket** — mesajların **Anonim** görünür, bot adı çıkmaz",
+  ].join("\n"),
   button: "Ticket Aç",
   anonButton: "Anonim Ticket",
 };
@@ -57,10 +61,14 @@ export function buildTicketPanel(guildIdOrSettings = null, overrides = {}) {
 }
 
 export function buildAgreementPanel(overrides = {}) {
-  const title = (overrides.title || "Anlaşma Kur").slice(0, 256);
+  const title = (overrides.title || "🤝 Anlaşma Kur").slice(0, 256);
   const description = (
     overrides.description ||
-    "Anlaşma kurmak için butona bas.\nOnayladıktan sonra talep sahip kişiye DM olarak iletilir."
+    [
+      "Anlaşma / özel görüşme talebi için butona bas.",
+      "Önce **Emin misin?** onayı istenir.",
+      "Onay sonrası talep **sahibe DM** olarak iletilir.",
+    ].join("\n")
   ).slice(0, 4096);
 
   const embed = baseEmbed(title, description);
@@ -377,7 +385,7 @@ export async function maskAnonOpenerMessage(message) {
       allowedMentions: { parse: [] },
     });
   } catch (e) {
-    console.warn("status-anon mask", e.message);
+    console.warn("anon-ticket mask", e.message);
   }
   return true;
 }

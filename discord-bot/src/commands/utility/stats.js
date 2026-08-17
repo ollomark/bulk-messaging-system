@@ -30,8 +30,8 @@ export default {
       embeds: [
         premiumEmbed({
           title: `📊 ${guild.name} Analitik`,
-          description: "Lexyxzon Professional Suite · canlı özet",
-          color: brand.colors.premium,
+          description: `${brand.tagline}\nUltimate canlı özet`,
+          color: brand.colors.gold,
           thumbnail: guild.iconURL({ size: 256 }),
           fields: [
             { name: "Üyeler", value: `${humans} insan · ${bots} bot`, inline: true },

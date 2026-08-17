@@ -1,6 +1,6 @@
 import db from "../database/db.js";
 import { getSettings, updateSettings } from "../database/settings.js";
-import { baseEmbed } from "../utils/embeds.js";
+import { brand, brandFooter, premiumEmbed, progressBar } from "../utils/brand.js";
 
 const cooldowns = new Map();
 
@@ -34,6 +34,28 @@ export function getLevelRow(guildId, userId) {
   return row;
 }
 
+export function buildRankEmbed(user, row) {
+  const needed = xpForLevel(row.level + 1);
+  const ratio = needed > 0 ? row.xp / needed : 0;
+  const bar = progressBar(ratio, 14);
+  const pct = Math.floor(ratio * 100);
+
+  return premiumEmbed({
+    title: "✦ Seviye Kartı",
+    description: [
+      `**${user.username}**`,
+      "",
+      `Seviye **${row.level}**`,
+      `\`${bar}\` **${pct}%**`,
+      `XP · **${row.xp}** / **${needed}**`,
+      `Mesaj · **${row.total_messages}**`,
+    ].join("\n"),
+    color: brand.colors.gold,
+    thumbnail: user.displayAvatarURL({ size: 256 }),
+    footer: brandFooter("level"),
+  });
+}
+
 export async function handleLevelMessage(message) {
   if (!message.guild || message.author.bot) return;
 
@@ -41,7 +63,6 @@ export async function handleLevelMessage(message) {
   if (!settings.level_enabled) return;
 
   const levelChannelId = resolveLevelChannelId(settings);
-  // XP ve seviye mesajı sadece sohbet kanalında
   if (message.channel.id !== levelChannelId) return;
 
   if (!settings.level_channel_id || settings.level_channel_id !== levelChannelId) {
@@ -72,10 +93,19 @@ export async function handleLevelMessage(message) {
 
   if (!leveledUp) return;
 
-  const embed = baseEmbed(
-    "🎉 Seviye Atladın!",
-    `${message.author} tebrikler! Artık **${level}. seviye**sin.`,
-  );
+  const needed = xpForLevel(level + 1);
+  const embed = premiumEmbed({
+    title: "🎉 Seviye Atladın!",
+    description: [
+      `${message.author} tebrikler — **${level}. seviye**`,
+      "",
+      `\`${progressBar(0, 14)}\` yeni etap`,
+      `Sonraki · **${needed} XP**`,
+    ].join("\n"),
+    color: brand.colors.gold,
+    thumbnail: message.author.displayAvatarURL({ size: 256 }),
+    footer: brandFooter("level-up"),
+  });
 
   await message.channel.send({ embeds: [embed] }).catch(() => null);
 }
@@ -87,4 +117,15 @@ export function getLeaderboard(guildId, limit = 10) {
        ORDER BY level DESC, xp DESC LIMIT ?`,
     )
     .all(guildId, limit);
+}
+
+export function getLeaderboardRank(guildId, userId) {
+  const rows = db
+    .prepare(
+      `SELECT user_id FROM levels WHERE guild_id = ?
+       ORDER BY level DESC, xp DESC`,
+    )
+    .all(guildId);
+  const idx = rows.findIndex((r) => r.user_id === userId);
+  return idx === -1 ? null : idx + 1;
 }

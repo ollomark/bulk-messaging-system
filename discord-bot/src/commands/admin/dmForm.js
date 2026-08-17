@@ -94,7 +94,7 @@ export default {
     const btn1 = interaction.options.getString("buton1", true);
     const btn2 = interaction.options.getString("buton2");
     const fieldLabel = interaction.options.getString("yazi_alani") || "Mesajın";
-    const fieldLabel2 = interaction.options.getString("yazi_alani2") || "Detay";
+    const fieldLabel2 = interaction.options.getString("detay_adi") || "Detay";
     const modalTitle = interaction.options.getString("pencere") || title.slice(0, 45);
     let minLength = interaction.options.getInteger("min") ?? 1;
     let maxLength = interaction.options.getInteger("max") ?? 500;

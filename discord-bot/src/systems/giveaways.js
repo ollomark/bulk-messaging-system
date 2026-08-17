@@ -1,25 +1,22 @@
-import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } from "discord.js";
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js";
 import db from "../database/db.js";
-import { config } from "../config.js";
+import { brand, brandFooter, premiumEmbed } from "../utils/brand.js";
 
 export function buildGiveawayEmbed(prize, winners, endsAt, hostId, ended = false, winnerMentions = null) {
-  const embed = new EmbedBuilder()
-    .setColor(ended ? 0xed4245 : config.embedColor)
-    .setTitle(ended ? "🎉 Çekiliş Sona Erdi" : "🎉 Çekiliş")
-    .setDescription(
-      [
-        `**Ödül:** ${prize}`,
-        `**Kazanan sayısı:** ${winners}`,
-        `**Bitiş:** <t:${Math.floor(endsAt / 1000)}:R>`,
-        `**Başlatan:** <@${hostId}>`,
-        ended
-          ? `**Kazananlar:** ${winnerMentions || "Yeterli katılım yok"}`
-          : "Katılmak için 🎉 butonuna tıkla!",
-      ].join("\n"),
-    )
-    .setTimestamp(endsAt);
-
-  return embed;
+  return premiumEmbed({
+    title: ended ? "🎉 Çekiliş Sona Erdi" : "🎉 SORGUTR Çekiliş",
+    description: [
+      `**Ödül:** ${prize}`,
+      `**Kazanan:** ${winners}`,
+      `**Bitiş:** <t:${Math.floor(endsAt / 1000)}:R> (<t:${Math.floor(endsAt / 1000)}:F>)`,
+      `**Başlatan:** <@${hostId}>`,
+      ended
+        ? `**Kazananlar:** ${winnerMentions || "Yeterli katılım yok"}`
+        : "Katılmak için **Katıl** butonuna bas.",
+    ].join("\n"),
+    color: ended ? brand.colors.danger : brand.colors.gold,
+    footer: brandFooter("çekiliş"),
+  }).setTimestamp(endsAt);
 }
 
 export function buildGiveawayComponents(disabled = false) {

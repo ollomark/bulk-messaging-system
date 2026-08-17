@@ -41,13 +41,28 @@ export default {
           member,
         );
         const embed = premiumEmbed({
-          title: "Hoş Geldin",
-          description: text,
-          thumbnail: member.user.displayAvatarURL(),
+          title: `✦ ${member.guild.name}'e Hoş Geldin`,
+          description: [
+            text,
+            "",
+            `Üye sayısı · **${member.guild.memberCount}**`,
+            brand.invite ? `Davet · \`${brand.invite}\`` : null,
+          ]
+            .filter(Boolean)
+            .join("\n"),
+          thumbnail: member.user.displayAvatarURL({ size: 256 }),
           color: brand.colors.success,
-          fields: inviter
-            ? [{ name: "Davet eden", value: `${inviter}`, inline: true }]
-            : [],
+          fields: [
+            ...(inviter
+              ? [{ name: "Davet eden", value: `${inviter}`, inline: true }]
+              : []),
+            {
+              name: "Hesap",
+              value: `<t:${Math.floor(member.user.createdTimestamp / 1000)}:R>`,
+              inline: true,
+            },
+          ],
+          footer: `${brand.name} · welcome`,
         });
         const sent = await channel.send({ content: `${member}`, embeds: [embed] }).catch(() => null);
 
