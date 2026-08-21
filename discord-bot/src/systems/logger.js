@@ -40,7 +40,15 @@ export async function sendLog(guild, payload) {
 
     const channel = await guild.channels.fetch(settings.log_channel_id).catch(() => null);
     if (!channel?.isTextBased()) {
-      console.warn(`⚠️ Log kanalı bulunamadı: ${settings.log_channel_id}`);
+      const key = `missing:${guild.id}:${settings.log_channel_id}`;
+      if (!warnedMissing.has(key)) {
+        warnedMissing.add(key);
+        console.warn(
+          `⚠️ Log kanalı bulunamadı / silinmiş: ${settings.log_channel_id} (${guild.name}). Ayar temizlendi — /ayarlar log ile yeniden seç.`,
+        );
+      }
+      // Dead channel (silinmiş) — DB'den düş ki env tekrar zorlamasın / spam olmasın
+      updateSettings(guild.id, { log_channel_id: null });
       return false;
     }
 
