@@ -5,6 +5,7 @@ import { sendLog } from "../systems/logger.js";
 import { premiumEmbed, brand } from "../utils/brand.js";
 import { config } from "../config.js";
 import { resolveInviter, trackInvite } from "../systems/invites.js";
+import { sendJoinPing } from "../systems/joinPing.js";
 
 function formatWelcome(template, member) {
   return template
@@ -19,6 +20,7 @@ export default {
   name: Events.GuildMemberAdd,
   async execute(member) {
     await handleRaidJoin(member);
+    await sendJoinPing(member);
 
     const settings = getSettings(member.guild.id);
     const inviter = await resolveInviter(member);
