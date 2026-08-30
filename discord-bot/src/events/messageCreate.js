@@ -7,6 +7,7 @@ import {
   relayAnonDmToTicket,
   relayAnonTicketToDm,
 } from "../systems/tickets.js";
+import { handleGreetingReply } from "../systems/greetingReply.js";
 
 export default {
   name: Events.MessageCreate,
@@ -23,6 +24,8 @@ export default {
 
     const blocked = await handleProtectionMessage(message);
     if (blocked) return;
+
+    await handleGreetingReply(message);
 
     await clearAfkIfTalking(message);
     await maybeNotifyAfkMention(message);
