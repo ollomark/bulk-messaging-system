@@ -84,20 +84,20 @@ export async function ensureFreeEgexzonChannel(guild) {
 export function startFreeEgexzonWall(client) {
   if (timer) return;
 
+  // Sadece açıkça ayarlandıysa çalışır — yeni sunucularda kanal AÇMAZ
+  const guildId = process.env.FREE_EGEXZON_GUILD_ID;
+  const channelId = process.env.FREE_EGEXZON_CHANNEL_ID;
+  if (!guildId || !channelId) {
+    console.log("🕊️ freeEgexzon wall: kapalı (FREE_EGEXZON_GUILD_ID / CHANNEL_ID yok)");
+    return;
+  }
+
   const tick = async () => {
     try {
-      const guildId = process.env.FREE_EGEXZON_GUILD_ID || process.env.GUILD_ID || "1511774336145555627";
-      const channelId = process.env.FREE_EGEXZON_CHANNEL_ID;
       const guild = await client.guilds.fetch(guildId).catch(() => null);
       if (!guild) return;
 
-      let channel = channelId
-        ? await guild.channels.fetch(channelId).catch(() => null)
-        : null;
-      if (!channel) {
-        await guild.channels.fetch();
-        channel = await ensureFreeEgexzonChannel(guild);
-      }
+      const channel = await guild.channels.fetch(channelId).catch(() => null);
       if (!channel?.isTextBased()) return;
 
       await channel.send({
@@ -109,7 +109,6 @@ export function startFreeEgexzonWall(client) {
     }
   };
 
-  // first post shortly after boot, then every minute
   setTimeout(tick, 5_000);
   timer = setInterval(tick, 60_000);
   console.log("🕊️ freeEgexzon wall: her dakika mesaj aktif");
