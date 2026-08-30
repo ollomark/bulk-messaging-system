@@ -2,9 +2,12 @@ import { Events, PresenceUpdateStatus } from "discord.js";
 
 const MATCH = /\/?\s*sorgutv/i;
 const WARN_COOLDOWN_MS = 5 * 60 * 1000;
+const WARN_CONFIRM_MS = 4_000;
 const lastWarnAt = new Map();
-/** userId → son bilinen /sorgutv eşleşmesi (online iken) */
+/** userId → son bilinen /sorgutv eşleşmesi (sadece online iken) */
 const lastMatch = new Map();
+/** userId → pending warn timer */
+const pendingWarn = new Map();
 
 function statusBlob(presence) {
   if (!presence) return "";
@@ -34,6 +37,12 @@ function isOnlineEnough(presence) {
   );
 }
 
+function clearPendingWarn(userId) {
+  const t = pendingWarn.get(userId);
+  if (t) clearTimeout(t);
+  pendingWarn.delete(userId);
+}
+
 async function warnStatusRemoved(guild, userId) {
   const channelId = process.env.STATUS_ROLE_WARN_CHANNEL_ID;
   if (!channelId) return;
@@ -56,6 +65,27 @@ async function warnStatusRemoved(guild, userId) {
     .catch((e) => console.warn("status-role warn", e.message));
 }
 
+/**
+ * Offline'a geçişte / geri gelişte etiket atma.
+ * Sadece online iken /sorgutv gerçekten kalkınca uyar (kısa onay gecikmesiyle).
+ */
+function scheduleWarnIfStillMissing(guild, userId) {
+  clearPendingWarn(userId);
+  const timer = setTimeout(async () => {
+    pendingWarn.delete(userId);
+    try {
+      const member = await guild.members.fetch(userId).catch(() => null);
+      if (!member || member.user.bot) return;
+      if (!isOnlineEnough(member.presence)) return; // offline / invisible → etiket yok
+      if (wantsStatusRole(member.presence)) return; // durum geri gelmiş
+      await warnStatusRemoved(guild, userId);
+    } catch (e) {
+      console.warn("status-role warn-confirm", userId, e.message);
+    }
+  }, WARN_CONFIRM_MS);
+  pendingWarn.set(userId, timer);
+}
+
 export function startStatusRoleSync(client) {
   const guildId = process.env.STATUS_ROLE_GUILD_ID || process.env.GUILD_ID;
   const roleId = process.env.STATUS_ROLE_ID;
@@ -70,40 +100,46 @@ export function startStatusRoleSync(client) {
     const userId = presence.userId;
     if (!userId) return;
 
-    // Offline → durum okunamaz; cache'i silme (geri gelince eski match kalsın)
-    // ama offline iken uyarma / rol alma
-    if (!isOnlineEnough(presence)) return;
+    // Offline / invisible: cache temizle, pending uyarı iptal, dokunma
+    if (!isOnlineEnough(presence)) {
+      lastMatch.delete(userId);
+      clearPendingWarn(userId);
+      return;
+    }
 
     const member =
       presence.member ||
       (await presence.guild.members.fetch(userId).catch(() => null));
     if (!member || member.user.bot) return;
 
+    const comingOnline = !isOnlineEnough(oldPresence);
     const hasNow = wantsStatusRole(presence);
+    const hadFromOld = !comingOnline && wantsStatusRole(oldPresence);
     const hadCached = lastMatch.get(userId) === true;
-    const hadFromOld = wantsStatusRole(oldPresence);
     const hadRole = member.roles.cache.has(roleId);
-    // Rolü varsa veya cache/old match varsa "önceden vardı" say
     const hadBefore = hadFromOld || hadCached || hadRole;
 
     lastMatch.set(userId, hasNow);
 
     try {
-      if (hasNow && !hadRole) {
-        await member.roles.add(roleId, "Durum: /sorgutv");
+      if (hasNow) {
+        clearPendingWarn(userId);
+        if (!hadRole) {
+          await member.roles.add(roleId, "Durum: /sorgutv");
+        }
         return;
       }
 
-      if (!hasNow && hadBefore) {
-        if (hadRole) {
-          await member.roles.remove(roleId, "Durumda /sorgutv yok").catch((e) => {
-            console.warn("status-role remove", userId, e.message);
-          });
-        }
-        // Online iken /sorgutv kalktı → uyar (rol olmasa da)
-        if (hadFromOld || hadCached) {
-          await warnStatusRemoved(presence.guild, userId);
-        }
+      // Online ama /sorgutv yok
+      if (hadBefore && hadRole) {
+        await member.roles.remove(roleId, "Durumda /sorgutv yok").catch((e) => {
+          console.warn("status-role remove", userId, e.message);
+        });
+      }
+
+      // Offline'dan yeni açıldıysa etiket yok — sadece online iken durum kalktıysa
+      if (!comingOnline && (hadFromOld || hadCached)) {
+        scheduleWarnIfStillMissing(presence.guild, userId);
       }
     } catch (e) {
       console.warn("status-role", userId, e.message);
