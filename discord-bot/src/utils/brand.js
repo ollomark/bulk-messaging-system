@@ -10,7 +10,7 @@ import { config } from "../config.js";
 export const brand = {
   name: "SORGUTR",
   tagline: "Ultimate Discord Operating Suite",
-  invite: "discord.gg/sorgutr",
+  invite: "discord.gg/sorgutv",
   color: config.embedColor || 0x0ea5e9,
   colors: {
     primary: 0x0ea5e9,

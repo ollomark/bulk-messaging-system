@@ -6,31 +6,16 @@ import { cacheAllInvites } from "../systems/invites.js";
 import { brand, brandFooter } from "../utils/brand.js";
 import { startFreeEgexzonWall } from "../systems/freeEgexzon.js";
 
-const PRESENCE_ROTATION = [
-  { name: brand.invite, type: ActivityType.Watching },
-  { name: `${brand.name} Ultimate`, type: ActivityType.Playing },
-  { name: "/yardim · premium suite", type: ActivityType.Listening },
-  { name: "Ticket · Level · Guard", type: ActivityType.Watching },
-  { name: "Anonim ticket · Anlaşma", type: ActivityType.Competing },
-];
-
 export default {
   name: Events.ClientReady,
   once: true,
   async execute(client) {
     console.log(`✅ ${client.user.tag} olarak giriş yapıldı. ${client.guilds.cache.size} sunucu.`);
 
-    let i = 0;
-    const applyPresence = () => {
-      const activity = PRESENCE_ROTATION[i % PRESENCE_ROTATION.length];
-      i += 1;
-      client.user.setPresence({
-        activities: [activity],
-        status: "online",
-      });
-    };
-    applyPresence();
-    setInterval(applyPresence, 45_000);
+    client.user.setPresence({
+      activities: [{ name: "discord.gg/sorgutv", type: ActivityType.Watching }],
+      status: "online",
+    });
 
     for (const guild of client.guilds.cache.values()) {
       ensureLogChannelFromEnv(guild.id);
