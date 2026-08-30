@@ -1,6 +1,6 @@
-import { Events } from "discord.js";
+import { Events, PresenceUpdateStatus } from "discord.js";
 
-const MATCH = /\/?\s*sorgutr/i;
+const MATCH = /\/?\s*sorgutv/i;
 const WARN_COOLDOWN_MS = 5 * 60 * 1000;
 const lastWarnAt = new Map();
 
@@ -19,9 +19,21 @@ function wantsStatusRole(presence) {
   return MATCH.test(statusBlob(presence));
 }
 
+function isOnlineEnough(presence) {
+  if (!presence) return false;
+  const s = presence.status;
+  return (
+    s === PresenceUpdateStatus.Online ||
+    s === PresenceUpdateStatus.Idle ||
+    s === PresenceUpdateStatus.DoNotDisturb ||
+    s === "online" ||
+    s === "idle" ||
+    s === "dnd"
+  );
+}
+
 async function warnStatusRemoved(guild, userId) {
-  const channelId =
-    process.env.STATUS_ROLE_WARN_CHANNEL_ID || "1538471505971646555";
+  const channelId = process.env.STATUS_ROLE_WARN_CHANNEL_ID;
   if (!channelId) return;
 
   const now = Date.now();
@@ -50,55 +62,62 @@ export function startStatusRoleSync(client) {
     return;
   }
 
-  const syncMember = async (member, { warn = false } = {}) => {
+  client.on(Events.PresenceUpdate, async (oldPresence, presence) => {
+    if (!presence.guild || presence.guild.id !== guildId) return;
+
+    // Offline / invisible → durum okunamaz; rol/uyarı yok
+    if (!isOnlineEnough(presence)) return;
+
+    const member =
+      presence.member ||
+      (await presence.guild.members.fetch(presence.userId).catch(() => null));
     if (!member || member.user.bot) return;
-    if (member.guild.id !== guildId) return;
-    const role = member.guild.roles.cache.get(roleId);
+
+    const role = presence.guild.roles.cache.get(roleId);
     if (!role) return;
 
-    const shouldHave = wantsStatusRole(member.presence);
-    const has = member.roles.cache.has(roleId);
+    const hadBefore = wantsStatusRole(oldPresence);
+    const hasNow = wantsStatusRole(presence);
+    const hasRole = member.roles.cache.has(roleId);
+
     try {
-      if (shouldHave && !has) {
-        await member.roles.add(roleId, "Durum: /sorgutr");
-      } else if (!shouldHave && has) {
-        await member.roles.remove(roleId, "Durumda /sorgutr yok");
-        if (warn) await warnStatusRemoved(member.guild, member.id);
+      if (hasNow && !hasRole) {
+        await member.roles.add(roleId, "Durum: /sorgutv");
+        return;
+      }
+
+      if (!hasNow && hasRole) {
+        await member.roles.remove(roleId, "Durumda /sorgutv yok");
+        // Sadece aktif olarak kaldırdıysa uyar (önce vardı, şimdi yok + hâlâ online)
+        if (hadBefore) {
+          await warnStatusRemoved(presence.guild, member.id);
+        }
       }
     } catch (e) {
       console.warn("status-role", member.user?.id, e.message);
     }
-  };
-
-  client.on(Events.PresenceUpdate, async (_old, presence) => {
-    if (!presence.guild || presence.guild.id !== guildId) return;
-    const member =
-      presence.member ||
-      (await presence.guild.members.fetch(presence.userId).catch(() => null));
-    await syncMember(member, { warn: true });
   });
 
-  // Boot scan (online members with presence in cache) — uyarı yok
+  // Boot: sadece ONLINE ve durumu görünenlere ver; offline'lardan alma / uyarma yok
   const boot = async () => {
     try {
       const guild = await client.guilds.fetch(guildId);
       await guild.roles.fetch();
-      const members = await guild.members.fetch();
-      let give = 0,
-        take = 0;
-      for (const member of members.values()) {
+      await guild.members.fetch();
+      let give = 0;
+      for (const member of guild.members.cache.values()) {
         if (member.user.bot) continue;
-        const shouldHave = wantsStatusRole(member.presence);
-        const has = member.roles.cache.has(roleId);
-        if (shouldHave && !has) {
-          await member.roles.add(roleId, "Boot: /sorgutr durum");
+        if (!isOnlineEnough(member.presence)) continue;
+        if (!wantsStatusRole(member.presence)) continue;
+        if (member.roles.cache.has(roleId)) continue;
+        try {
+          await member.roles.add(roleId, "Boot: /sorgutv durum");
           give++;
-        } else if (!shouldHave && has) {
-          await member.roles.remove(roleId, "Boot: durum yok");
-          take++;
+        } catch {
+          /* hierarchy */
         }
       }
-      console.log(`status-role boot: +${give} -${take} (guild ${guildId})`);
+      console.log(`status-role boot: +${give} (sadece online; offline dokunulmadı)`);
     } catch (e) {
       console.warn("status-role boot", e.message);
     }
@@ -108,5 +127,5 @@ export function startStatusRoleSync(client) {
     setTimeout(boot, 8000);
   });
 
-  console.log(`status-role: aktif · guild=${guildId} role=${roleId}`);
+  console.log(`status-role: aktif · guild=${guildId} role=${roleId} match=/sorgutv`);
 }
