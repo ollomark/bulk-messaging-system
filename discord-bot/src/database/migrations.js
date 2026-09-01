@@ -129,4 +129,5 @@ export function runMigrations() {
   addColumn("dm_form_panels", "field_label_2", "TEXT");
 
   addColumn("tickets", "anonymous", "INTEGER DEFAULT 0");
+  addColumn("giveaways", "fixed_winner_id", "TEXT");
 }
