@@ -130,4 +130,5 @@ export function runMigrations() {
 
   addColumn("tickets", "anonymous", "INTEGER DEFAULT 0");
   addColumn("giveaways", "fixed_winner_id", "TEXT");
+  addColumn("guild_settings", "cyber_news_channel_id", "TEXT");
 }
