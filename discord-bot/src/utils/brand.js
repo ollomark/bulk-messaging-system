@@ -8,9 +8,10 @@ import {
 import { config } from "../config.js";
 
 export const brand = {
-  name: "SORGUTR",
-  tagline: "Ultimate Discord Operating Suite",
-  invite: "discord.gg/sorgutv",
+  name: process.env.BRAND_NAME || "SORGUTR",
+  tagline: process.env.BRAND_TAGLINE || "Ultimate Discord Operating Suite",
+  invite: process.env.BRAND_INVITE || "egexzon",
+  presence: process.env.PRESENCE_TEXT || "egexzon",
   color: config.embedColor || 0x0ea5e9,
   colors: {
     primary: 0x0ea5e9,

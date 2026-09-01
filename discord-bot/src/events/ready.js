@@ -13,7 +13,7 @@ export default {
     console.log(`✅ ${client.user.tag} olarak giriş yapıldı. ${client.guilds.cache.size} sunucu.`);
 
     client.user.setPresence({
-      activities: [{ name: "discord.gg/sorgutv", type: ActivityType.Watching }],
+      activities: [{ name: brand.presence, type: ActivityType.Watching }],
       status: "online",
     });
 
