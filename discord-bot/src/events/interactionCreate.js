@@ -19,6 +19,10 @@ import { buildApplyModal, submitApplication } from "../systems/applications.js";
 import { submitReport } from "../systems/reports.js";
 import { handleDmFormButton, handleDmFormModal } from "../systems/dmForm.js";
 import { buildHelpPayload } from "../commands/utility/help.js";
+import {
+  confirmGuildReset,
+  cancelGuildReset,
+} from "../systems/guildReset.js";
 
 async function handleHqSelect(interaction) {
   const value = interaction.values[0];
@@ -216,6 +220,10 @@ export default {
           await handleButtonRole(interaction);
           return;
         }
+        if (interaction.customId.startsWith("guild_reset_confirm:")) {
+          await confirmGuildReset(interaction);
+          return;
+        }
 
         switch (interaction.customId) {
           case "ticket_open":
@@ -238,6 +246,9 @@ export default {
             return;
           case "agreement_cancel":
             await cancelAgreement(interaction);
+            return;
+          case "guild_reset_cancel":
+            await cancelGuildReset(interaction);
             return;
           case "giveaway_join": {
             const giveaway = getGiveaway(interaction.message.id);
