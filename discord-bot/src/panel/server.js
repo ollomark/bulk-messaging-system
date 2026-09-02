@@ -5,7 +5,6 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { ChannelType, EmbedBuilder, PermissionFlagsBits } from "discord.js";
 import { config } from "../config.js";
-import { getLiveRadarEvents } from "../systems/threatRadar.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const sessions = new Map();
@@ -49,7 +48,6 @@ export function startPanelServer(client) {
 
   // Discord çakması istemci — public, auth yok
   const xzonDir = path.join(__dirname, "xzon");
-  const radarDir = path.join(__dirname, "radar");
   app.get("/xzon", (_req, res) => {
     res.sendFile(path.join(xzonDir, "index.html"));
   });
@@ -57,18 +55,6 @@ export function startPanelServer(client) {
     res.sendFile(path.join(xzonDir, "index.html"));
   });
   app.use("/xzon", express.static(xzonDir, { index: false, redirect: false }));
-
-  app.get("/radar", (_req, res) => {
-    res.sendFile(path.join(radarDir, "index.html"));
-  });
-  app.get("/radar/", (_req, res) => {
-    res.sendFile(path.join(radarDir, "index.html"));
-  });
-  app.use("/radar", express.static(radarDir, { index: false, redirect: false }));
-
-  app.get("/api/radar/live", (_req, res) => {
-    res.json(getLiveRadarEvents(50));
-  });
 
   app.use(express.static(path.join(__dirname, "public")));
 
@@ -216,7 +202,7 @@ export function startPanelServer(client) {
 
   // Express 5 uyumlu SPA fallback (panel only; /xzon is static above)
   app.use((req, res, next) => {
-    if (req.method !== "GET" || req.path.startsWith("/api/") || req.path.startsWith("/xzon") || req.path.startsWith("/radar")) {
+    if (req.method !== "GET" || req.path.startsWith("/api/") || req.path.startsWith("/xzon")) {
       return next();
     }
     return res.sendFile(path.join(__dirname, "public", "index.html"));
