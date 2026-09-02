@@ -45,6 +45,17 @@ export function startPanelServer(client) {
 
   app.use(express.json({ limit: "1mb" }));
   app.use(cookieParser());
+
+  // Discord çakması istemci — public, auth yok
+  const xzonDir = path.join(__dirname, "xzon");
+  app.get("/xzon", (_req, res) => {
+    res.sendFile(path.join(xzonDir, "index.html"));
+  });
+  app.get("/xzon/", (_req, res) => {
+    res.sendFile(path.join(xzonDir, "index.html"));
+  });
+  app.use("/xzon", express.static(xzonDir, { index: false, redirect: false }));
+
   app.use(express.static(path.join(__dirname, "public")));
 
   app.post("/api/login", (req, res) => {
@@ -189,9 +200,11 @@ export function startPanelServer(client) {
     res.sendFile(path.join(__dirname, "public", "index.html"));
   });
 
-  // Express 5 uyumlu SPA fallback
+  // Express 5 uyumlu SPA fallback (panel only; /xzon is static above)
   app.use((req, res, next) => {
-    if (req.method !== "GET" || req.path.startsWith("/api/")) return next();
+    if (req.method !== "GET" || req.path.startsWith("/api/") || req.path.startsWith("/xzon")) {
+      return next();
+    }
     return res.sendFile(path.join(__dirname, "public", "index.html"));
   });
 

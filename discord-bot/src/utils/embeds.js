@@ -1,25 +1,46 @@
-import { EmbedBuilder } from "discord.js";
-import { config } from "../config.js";
+import { brand, brandFooter, premiumEmbed } from "./brand.js";
 
 export function baseEmbed(title, description) {
-  const embed = new EmbedBuilder().setColor(config.embedColor).setTimestamp();
-  if (title) embed.setTitle(title);
-  if (description) embed.setDescription(description);
-  return embed;
+  return premiumEmbed({
+    title,
+    description,
+    color: brand.color,
+    footer: brandFooter(),
+  });
 }
 
 export function successEmbed(description, title = "Başarılı") {
-  return baseEmbed(title, description).setColor(0x57f287);
+  return premiumEmbed({
+    title,
+    description,
+    color: brand.colors.success,
+    footer: brandFooter(),
+  });
 }
 
 export function errorEmbed(description, title = "Hata") {
-  return baseEmbed(title, description).setColor(0xed4245);
+  return premiumEmbed({
+    title,
+    description,
+    color: brand.colors.danger,
+    footer: brandFooter(),
+  });
 }
 
 export function warnEmbed(description, title = "Uyarı") {
-  return baseEmbed(title, description).setColor(0xfee75c);
+  return premiumEmbed({
+    title,
+    description,
+    color: brand.colors.warn,
+    footer: brandFooter(),
+  });
 }
 
 export function infoEmbed(description, title = "Bilgi") {
-  return baseEmbed(title, description).setColor(0x5865f2);
+  return premiumEmbed({
+    title,
+    description,
+    color: brand.colors.info,
+    footer: brandFooter(),
+  });
 }

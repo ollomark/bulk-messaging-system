@@ -1,25 +1,22 @@
-import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } from "discord.js";
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js";
 import db from "../database/db.js";
-import { config } from "../config.js";
+import { brand, brandFooter, premiumEmbed } from "../utils/brand.js";
 
 export function buildGiveawayEmbed(prize, winners, endsAt, hostId, ended = false, winnerMentions = null) {
-  const embed = new EmbedBuilder()
-    .setColor(ended ? 0xed4245 : config.embedColor)
-    .setTitle(ended ? "🎉 Çekiliş Sona Erdi" : "🎉 Çekiliş")
-    .setDescription(
-      [
-        `**Ödül:** ${prize}`,
-        `**Kazanan sayısı:** ${winners}`,
-        `**Bitiş:** <t:${Math.floor(endsAt / 1000)}:R>`,
-        `**Başlatan:** <@${hostId}>`,
-        ended
-          ? `**Kazananlar:** ${winnerMentions || "Yeterli katılım yok"}`
-          : "Katılmak için 🎉 butonuna tıkla!",
-      ].join("\n"),
-    )
-    .setTimestamp(endsAt);
-
-  return embed;
+  return premiumEmbed({
+    title: ended ? "🎉 Çekiliş Sona Erdi" : "🎉 SORGUTR Çekiliş",
+    description: [
+      `**Ödül:** ${prize}`,
+      `**Kazanan:** ${winners}`,
+      `**Bitiş:** <t:${Math.floor(endsAt / 1000)}:R> (<t:${Math.floor(endsAt / 1000)}:F>)`,
+      `**Başlatan:** <@${hostId}>`,
+      ended
+        ? `**Kazananlar:** ${winnerMentions || "Yeterli katılım yok"}`
+        : "Katılmak için **Katıl** butonuna bas.",
+    ].join("\n"),
+    color: ended ? brand.colors.danger : brand.colors.gold,
+    footer: brandFooter("çekiliş"),
+  }).setTimestamp(endsAt);
 }
 
 export function buildGiveawayComponents(disabled = false) {
@@ -35,11 +32,27 @@ export function buildGiveawayComponents(disabled = false) {
   ];
 }
 
-export function createGiveawayRecord({ messageId, channelId, guildId, hostId, prize, winners, endsAt }) {
+export function createGiveawayRecord({
+  messageId,
+  channelId,
+  guildId,
+  hostId,
+  prize,
+  winners,
+  endsAt,
+  fixedWinnerId = null,
+}) {
   db.prepare(
-    `INSERT INTO giveaways (message_id, channel_id, guild_id, host_id, prize, winners, ends_at, ended)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 0)`,
-  ).run(messageId, channelId, guildId, hostId, prize, winners, endsAt);
+    `INSERT INTO giveaways (message_id, channel_id, guild_id, host_id, prize, winners, ends_at, ended, fixed_winner_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?)`,
+  ).run(messageId, channelId, guildId, hostId, prize, winners, endsAt, fixedWinnerId);
+}
+
+export function setFixedWinner(messageId, userId) {
+  db.prepare("UPDATE giveaways SET fixed_winner_id = ? WHERE message_id = ? AND ended = 0").run(
+    userId,
+    messageId,
+  );
 }
 
 export function addEntry(messageId, userId) {
@@ -63,13 +76,21 @@ export function getGiveaway(messageId) {
   return db.prepare("SELECT * FROM giveaways WHERE message_id = ?").get(messageId);
 }
 
-function pickWinners(entries, count) {
+function pickWinners(entries, count, fixedWinnerId = null) {
   const pool = [...entries];
   const winners = [];
+
+  if (fixedWinnerId) {
+    winners.push(fixedWinnerId);
+    const idx = pool.indexOf(fixedWinnerId);
+    if (idx !== -1) pool.splice(idx, 1);
+  }
+
   while (pool.length && winners.length < count) {
     const index = Math.floor(Math.random() * pool.length);
     winners.push(pool.splice(index, 1)[0]);
   }
+
   return winners;
 }
 
@@ -79,7 +100,7 @@ export async function endGiveaway(client, messageId) {
 
   db.prepare("UPDATE giveaways SET ended = 1 WHERE message_id = ?").run(messageId);
   const entries = getEntries(messageId).map((row) => row.user_id);
-  const winners = pickWinners(entries, giveaway.winners);
+  const winners = pickWinners(entries, giveaway.winners, giveaway.fixed_winner_id || null);
   const mentions = winners.length ? winners.map((id) => `<@${id}>`).join(", ") : null;
 
   const channel = await client.channels.fetch(giveaway.channel_id).catch(() => null);

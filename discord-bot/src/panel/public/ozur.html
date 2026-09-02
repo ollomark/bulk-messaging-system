@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sana bir zarfım var…</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,500&family=Great+Vibes&family=Outfit:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --rose: #e85d75;
+      --rose-deep: #c23a55;
+      --blush: #ffd6e0;
+      --cream: #fff7f9;
+      --ink: #4a2c35;
+      --gold: #d4a574;
+      --paper: #fffaf7;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      min-height: 100%;
+      font-family: "Outfit", system-ui, sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(ellipse 80% 60% at 20% 10%, #ffc4d4 0%, transparent 55%),
+        radial-gradient(ellipse 70% 50% at 90% 80%, #ffb3c6 0%, transparent 50%),
+        radial-gradient(ellipse 50% 40% at 50% 50%, #ffe8ee 0%, transparent 70%),
+        linear-gradient(165deg, #fff0f4 0%, #ffdce6 45%, #f7c5d4 100%);
+      overflow-x: hidden;
+    }
+
+    body {
+      min-height: 100dvh;
+      display: grid;
+      place-items: center;
+      padding: 1.5rem;
+      position: relative;
+    }
+
+    .bg-hearts {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      overflow: hidden;
+      z-index: 0;
+    }
+
+    .bg-hearts span {
+      position: absolute;
+      color: rgba(232, 93, 117, 0.18);
+      font-size: 1.2rem;
+      animation: floatUp linear infinite;
+      bottom: -2rem;
+    }
+
+    @keyframes floatUp {
+      0% { transform: translateY(0) rotate(0deg); opacity: 0; }
+      10% { opacity: 1; }
+      90% { opacity: 0.7; }
+      100% { transform: translateY(-110vh) rotate(25deg); opacity: 0; }
+    }
+
+    .stage {
+      position: relative;
+      z-index: 1;
+      width: min(420px, 100%);
+      text-align: center;
+    }
+
+    .eyebrow {
+      font-family: "Cormorant Garamond", serif;
+      font-size: clamp(1.15rem, 3.5vw, 1.45rem);
+      font-style: italic;
+      letter-spacing: 0.04em;
+      color: var(--rose-deep);
+      margin-bottom: 1.75rem;
+      opacity: 0;
+      animation: fadeIn 1s ease 0.2s forwards;
+    }
+
+    @keyframes fadeIn {
+      to { opacity: 1; }
+    }
+
+    /* —— Envelope —— */
+    .envelope-wrap {
+      perspective: 1000px;
+      margin: 0 auto 1.75rem;
+      width: min(300px, 78vw);
+      height: min(200px, 52vw);
+      position: relative;
+    }
+
+    .envelope {
+      width: 100%;
+      height: 100%;
+      position: relative;
+      transform-style: preserve-3d;
+      transition: transform 0.6s ease;
+    }
+
+    .envelope.shake {
+      animation: shake 0.45s ease;
+    }
+
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      20% { transform: translateX(-8px) rotate(-1deg); }
+      40% { transform: translateX(8px) rotate(1deg); }
+      60% { transform: translateX(-6px); }
+      80% { transform: translateX(6px); }
+    }
+
+    .env-body {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(160deg, #f48aa0 0%, var(--rose) 55%, var(--rose-deep) 100%);
+      border-radius: 8px 8px 14px 14px;
+      box-shadow:
+        0 18px 40px rgba(194, 58, 85, 0.35),
+        inset 0 1px 0 rgba(255, 255, 255, 0.35);
+      overflow: hidden;
+    }
+
+    .env-body::before {
+      content: "♡";
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      font-size: 3.5rem;
+      color: rgba(255, 255, 255, 0.22);
+      pointer-events: none;
+      transition: opacity 0.4s;
+    }
+
+    .envelope.open .env-body::before { opacity: 0; }
+
+    .env-flap {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 55%;
+      background: linear-gradient(180deg, #ff9aaf 0%, #e85d75 100%);
+      clip-path: polygon(0 0, 50% 100%, 100% 0);
+      transform-origin: top center;
+      transition: transform 0.9s cubic-bezier(0.4, 0.05, 0.2, 1);
+      z-index: 3;
+      filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.12));
+    }
+
+    .envelope.open .env-flap {
+      transform: rotateX(180deg);
+      z-index: 0;
+    }
+
+    .env-pocket {
+      position: absolute;
+      left: 0;
+      bottom: 0;
+      width: 100%;
+      height: 62%;
+      background: linear-gradient(180deg, #e45f78 0%, #c23a55 100%);
+      clip-path: polygon(0 35%, 50% 0, 100% 35%, 100% 100%, 0 100%);
+      z-index: 2;
+    }
+
+    .seal {
+      position: absolute;
+      left: 50%;
+      top: 42%;
+      transform: translate(-50%, -50%);
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 30%, #f0c98a, var(--gold) 55%, #b8874e);
+      display: grid;
+      place-items: center;
+      color: #fff;
+      font-size: 1.25rem;
+      z-index: 4;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      transition: opacity 0.4s, transform 0.5s;
+    }
+
+    .envelope.open .seal {
+      opacity: 0;
+      transform: translate(-50%, -50%) scale(0.4);
+      pointer-events: none;
+    }
+
+    /* Letter card */
+    .letter {
+      position: absolute;
+      left: 8%;
+      right: 8%;
+      bottom: 18%;
+      height: 70%;
+      background: var(--paper);
+      border-radius: 6px;
+      z-index: 1;
+      box-shadow: 0 4px 16px rgba(74, 44, 53, 0.15);
+      transform: translateY(20%);
+      opacity: 0;
+      transition: transform 1s cubic-bezier(0.34, 1.2, 0.64, 1) 0.35s, opacity 0.5s 0.3s;
+      overflow: hidden;
+      border: 1px solid rgba(212, 165, 116, 0.35);
+    }
+
+    .envelope.open .letter {
+      transform: translateY(-95%);
+      opacity: 1;
+      z-index: 5;
+    }
+
+    .letter-inner {
+      padding: 1.1rem 1rem 1.25rem;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.35rem;
+      background:
+        radial-gradient(circle at 12% 18%, rgba(255, 182, 193, 0.35), transparent 40%),
+        radial-gradient(circle at 88% 80%, rgba(255, 192, 203, 0.3), transparent 42%),
+        var(--paper);
+      position: relative;
+    }
+
+    .letter-inner::before,
+    .letter-inner::after {
+      content: "♡ ♡ ♡";
+      font-size: 0.7rem;
+      letter-spacing: 0.35em;
+      color: var(--rose);
+      opacity: 0.55;
+    }
+
+    .letter-text {
+      font-family: "Great Vibes", cursive;
+      font-size: clamp(1.15rem, 4.2vw, 1.55rem);
+      line-height: 1.45;
+      color: var(--rose-deep);
+      text-align: center;
+      max-width: 16ch;
+      word-break: break-word;
+    }
+
+    .letter-hearts {
+      font-size: 1rem;
+      letter-spacing: 0.2em;
+      margin-top: 0.25rem;
+    }
+
+    /* Opened letter overlay (full readable) */
+    .letter-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 40;
+      display: grid;
+      place-items: center;
+      padding: 1.25rem;
+      background: rgba(74, 44, 53, 0.35);
+      backdrop-filter: blur(6px);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.45s ease;
+    }
+
+    .letter-modal.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .letter-card {
+      width: min(420px, 100%);
+      background:
+        radial-gradient(circle at 10% 10%, rgba(255, 182, 193, 0.45), transparent 45%),
+        radial-gradient(circle at 90% 90%, rgba(255, 200, 210, 0.4), transparent 45%),
+        linear-gradient(180deg, #fffaf8, #fff0f3);
+      border-radius: 22px;
+      padding: 2rem 1.6rem 1.75rem;
+      box-shadow:
+        0 0 0 3px rgba(232, 93, 117, 0.15),
+        0 0 0 8px rgba(255, 214, 224, 0.5),
+        0 24px 60px rgba(194, 58, 85, 0.3);
+      text-align: center;
+      transform: scale(0.86) translateY(20px);
+      transition: transform 0.55s cubic-bezier(0.34, 1.3, 0.64, 1);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .letter-modal.show .letter-card {
+      transform: scale(1) translateY(0);
+    }
+
+    .letter-card .deco-top,
+    .letter-card .deco-bot {
+      color: var(--rose);
+      letter-spacing: 0.45em;
+      font-size: 0.85rem;
+      opacity: 0.7;
+      margin-bottom: 0.85rem;
+    }
+
+    .letter-card .deco-bot { margin: 1rem 0 0; }
+
+    .letter-card h1 {
+      font-family: "Great Vibes", cursive;
+      font-size: clamp(1.85rem, 6vw, 2.5rem);
+      font-weight: 400;
+      color: var(--rose-deep);
+      line-height: 1.35;
+      margin-bottom: 0.5rem;
+    }
+
+    .letter-card p.msg {
+      font-family: "Cormorant Garamond", serif;
+      font-size: clamp(1.2rem, 3.8vw, 1.45rem);
+      font-style: italic;
+      line-height: 1.55;
+      color: var(--ink);
+    }
+
+    .floating-deco {
+      position: absolute;
+      font-size: 1.1rem;
+      opacity: 0.55;
+      animation: pulse 2.4s ease-in-out infinite;
+    }
+
+    .floating-deco.a { top: 12%; left: 8%; animation-delay: 0s; }
+    .floating-deco.b { top: 18%; right: 10%; animation-delay: 0.4s; }
+    .floating-deco.c { bottom: 14%; left: 12%; animation-delay: 0.8s; }
+    .floating-deco.d { bottom: 16%; right: 9%; animation-delay: 1.2s; }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.2); }
+    }
+
+    /* Buttons */
+    .actions {
+      display: flex;
+      gap: 0.85rem;
+      justify-content: center;
+      flex-wrap: wrap;
+      opacity: 0;
+      animation: fadeIn 0.8s ease 0.5s forwards;
+    }
+
+    .actions.hidden { display: none; }
+
+    .btn {
+      appearance: none;
+      border: none;
+      cursor: pointer;
+      font-family: inherit;
+      font-weight: 600;
+      font-size: 1rem;
+      padding: 0.85rem 1.6rem;
+      border-radius: 999px;
+      transition: transform 0.2s, box-shadow 0.2s, background 0.2s;
+    }
+
+    .btn:active { transform: scale(0.96); }
+
+    .btn-open {
+      background: linear-gradient(135deg, var(--rose), var(--rose-deep));
+      color: #fff;
+      box-shadow: 0 10px 28px rgba(194, 58, 85, 0.4);
+    }
+
+    .btn-open:hover {
+      box-shadow: 0 12px 32px rgba(194, 58, 85, 0.5);
+      transform: translateY(-2px);
+    }
+
+    .btn-no {
+      background: rgba(255, 255, 255, 0.65);
+      color: var(--rose-deep);
+      border: 1.5px solid rgba(232, 93, 117, 0.35);
+      backdrop-filter: blur(4px);
+    }
+
+    .btn-no:hover {
+      background: #fff;
+    }
+
+    .hint {
+      margin-top: 1.1rem;
+      font-size: 0.85rem;
+      color: rgba(74, 44, 53, 0.55);
+      opacity: 0;
+      animation: fadeIn 1s ease 0.9s forwards;
+    }
+
+    /* Warn modal */
+    .warn {
+      position: fixed;
+      inset: 0;
+      z-index: 50;
+      display: grid;
+      place-items: center;
+      padding: 1.25rem;
+      background: rgba(74, 44, 53, 0.45);
+      backdrop-filter: blur(5px);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s;
+    }
+
+    .warn.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .warn-box {
+      background: #fff;
+      border-radius: 20px;
+      padding: 1.75rem 1.5rem 1.4rem;
+      width: min(340px, 100%);
+      text-align: center;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2);
+      transform: scale(0.9);
+      transition: transform 0.35s cubic-bezier(0.34, 1.4, 0.64, 1);
+    }
+
+    .warn.show .warn-box { transform: scale(1); }
+
+    .warn-box .icon {
+      font-size: 2.4rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .warn-box h2 {
+      font-family: "Cormorant Garamond", serif;
+      font-size: 1.55rem;
+      color: var(--rose-deep);
+      margin-bottom: 0.45rem;
+    }
+
+    .warn-box p {
+      font-size: 0.98rem;
+      line-height: 1.45;
+      color: var(--ink);
+      margin-bottom: 1.25rem;
+      opacity: 0.85;
+    }
+
+    .btn-must {
+      width: 100%;
+      background: linear-gradient(135deg, var(--rose), var(--rose-deep));
+      color: #fff;
+      padding: 0.9rem;
+      border-radius: 14px;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+      font-size: 1rem;
+      font-family: inherit;
+      box-shadow: 0 8px 22px rgba(194, 58, 85, 0.35);
+    }
+
+    /* Confetti / hearts canvas */
+    #burst {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 60;
+    }
+
+    @media (max-width: 400px) {
+      .envelope-wrap {
+        width: 260px;
+        height: 172px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="bg-hearts" id="bgHearts" aria-hidden="true"></div>
+  <canvas id="burst"></canvas>
+
+  <main class="stage">
+    <p class="eyebrow">Sana özel bir zarfım var…</p>
+
+    <div class="envelope-wrap">
+      <div class="envelope" id="envelope" aria-label="Zarf">
+        <div class="letter" aria-hidden="true">
+          <div class="letter-inner">
+            <p class="letter-text">Birttaanemmmmmm…</p>
+            <div class="letter-hearts">🤍</div>
+          </div>
+        </div>
+        <div class="env-body"></div>
+        <div class="env-pocket"></div>
+        <div class="env-flap"></div>
+        <div class="seal">♡</div>
+      </div>
+    </div>
+
+    <div class="actions" id="actions">
+      <button type="button" class="btn btn-open" id="btnOpen">Aç</button>
+      <button type="button" class="btn btn-no" id="btnNo">Açma</button>
+    </div>
+    <p class="hint" id="hint">Kalbin hazırsa Aç’a bas 🤍</p>
+  </main>
+
+  <div class="warn" id="warn" role="dialog" aria-modal="true" aria-labelledby="warnTitle">
+    <div class="warn-box">
+      <div class="icon">🥺</div>
+      <h2 id="warnTitle">Bekle…</h2>
+      <p>Açmak zorundasın.<br />Bu zarf senin için.</p>
+      <button type="button" class="btn-must" id="btnMust">Tamam, açıyorum 🤍</button>
+    </div>
+  </div>
+
+  <div class="letter-modal" id="letterModal" role="dialog" aria-modal="true">
+    <div class="letter-card">
+      <span class="floating-deco a">♡</span>
+      <span class="floating-deco b">🤍</span>
+      <span class="floating-deco c">🫶🏻</span>
+      <span class="floating-deco d">♡</span>
+      <div class="deco-top">♡ · ♡ · ♡</div>
+      <h1>Birttaanemmmmmm<br />gülümmm güzelimm</h1>
+      <p class="msg">
+        eşşeğimmm sevgilimmm<br />
+        herşeyimm bebişimmm yavrumm<br /><br />
+        <strong>özirrr yaaa</strong> ☹️🫶🏻🤍
+      </p>
+      <div class="deco-bot">♡ · ♡ · ♡</div>
+    </div>
+  </div>
+
+  <script>
+    const envelope = document.getElementById("envelope");
+    const actions = document.getElementById("actions");
+    const hint = document.getElementById("hint");
+    const warn = document.getElementById("warn");
+    const letterModal = document.getElementById("letterModal");
+    const canvas = document.getElementById("burst");
+    const ctx = canvas.getContext("2d");
+
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    resizeCanvas();
+    window.addEventListener("resize", resizeCanvas);
+
+    /* Background floating hearts */
+    const bg = document.getElementById("bgHearts");
+    const hearts = ["♡", "♥", "🤍", "💗"];
+    for (let i = 0; i < 18; i++) {
+      const s = document.createElement("span");
+      s.textContent = hearts[i % hearts.length];
+      s.style.left = Math.random() * 100 + "%";
+      s.style.fontSize = 0.8 + Math.random() * 1.4 + "rem";
+      s.style.animationDuration = 10 + Math.random() * 14 + "s";
+      s.style.animationDelay = Math.random() * 12 + "s";
+      bg.appendChild(s);
+    }
+
+    /* Confetti + hearts burst */
+    const particles = [];
+    const COLORS = ["#e85d75", "#ff8fa3", "#ffb3c6", "#fff", "#fbbf24", "#fda4af", "#fb7185"];
+
+    function spawnBurst(x, y) {
+      for (let i = 0; i < 90; i++) {
+        const angle = (Math.PI * 2 * i) / 90 + Math.random() * 0.4;
+        const speed = 3 + Math.random() * 9;
+        particles.push({
+          x, y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed - 4,
+          g: 0.12 + Math.random() * 0.08,
+          life: 1,
+          decay: 0.008 + Math.random() * 0.01,
+          size: 4 + Math.random() * 8,
+          color: COLORS[i % COLORS.length],
+          kind: Math.random() > 0.45 ? "heart" : "confetti",
+          rot: Math.random() * Math.PI,
+          vr: (Math.random() - 0.5) * 0.25,
+        });
+      }
+      for (let i = 0; i < 40; i++) {
+        particles.push({
+          x: Math.random() * canvas.width,
+          y: -20,
+          vx: (Math.random() - 0.5) * 2,
+          vy: 2 + Math.random() * 4,
+          g: 0.05,
+          life: 1,
+          decay: 0.004 + Math.random() * 0.004,
+          size: 10 + Math.random() * 14,
+          color: COLORS[i % COLORS.length],
+          kind: "heart",
+          rot: 0,
+          vr: 0,
+        });
+      }
+    }
+
+    function drawHeart(x, y, size, color, rot) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(rot);
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      const s = size / 12;
+      ctx.moveTo(0, 3 * s);
+      ctx.bezierCurveTo(-8 * s, -6 * s, -12 * s, 4 * s, 0, 12 * s);
+      ctx.bezierCurveTo(12 * s, 4 * s, 8 * s, -6 * s, 0, 3 * s);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    let animating = false;
+    function tick() {
+      if (!animating && particles.length === 0) return;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.vy += p.g;
+        p.x += p.vx;
+        p.y += p.vy;
+        p.rot += p.vr;
+        p.life -= p.decay;
+        if (p.life <= 0) {
+          particles.splice(i, 1);
+          continue;
+        }
+        ctx.globalAlpha = Math.max(0, p.life);
+        if (p.kind === "heart") {
+          drawHeart(p.x, p.y, p.size, p.color, p.rot);
+        } else {
+          ctx.save();
+          ctx.translate(p.x, p.y);
+          ctx.rotate(p.rot);
+          ctx.fillStyle = p.color;
+          ctx.fillRect(-p.size / 2, -p.size / 4, p.size, p.size / 2);
+          ctx.restore();
+        }
+        ctx.globalAlpha = 1;
+      }
+      if (particles.length) requestAnimationFrame(tick);
+      else animating = false;
+    }
+
+    function startBurst() {
+      spawnBurst(canvas.width / 2, canvas.height * 0.38);
+      if (!animating) {
+        animating = true;
+        requestAnimationFrame(tick);
+      }
+    }
+
+    let opened = false;
+
+    function openEnvelope() {
+      if (opened) return;
+      opened = true;
+      warn.classList.remove("show");
+      actions.classList.add("hidden");
+      hint.style.display = "none";
+      envelope.classList.add("open");
+      startBurst();
+      setTimeout(() => {
+        letterModal.classList.add("show");
+        startBurst();
+      }, 900);
+    }
+
+    document.getElementById("btnOpen").addEventListener("click", () => {
+      warn.classList.add("show");
+    });
+
+    document.getElementById("btnMust").addEventListener("click", openEnvelope);
+
+    document.getElementById("btnNo").addEventListener("click", () => {
+      envelope.classList.remove("shake");
+      void envelope.offsetWidth;
+      envelope.classList.add("shake");
+      hint.textContent = "Açmadan olmaz… lütfen Aç’a bas ☹️🤍";
+      hint.style.opacity = "1";
+      hint.style.animation = "none";
+    });
+
+    letterModal.addEventListener("click", (e) => {
+      if (e.target === letterModal) letterModal.classList.remove("show");
+    });
+  </script>
+</body>
+</html>

@@ -1,16 +1,20 @@
 import { AuditLogEvent, EmbedBuilder } from "discord.js";
 import { getSettings, updateSettings } from "../database/settings.js";
 import { config } from "../config.js";
+import { brand, brandFooter } from "../utils/brand.js";
 
 let warnedMissing = new Set();
 
+/**
+ * Seed log channel from env ONLY when guild has none set.
+ * Never overwrite `/ayarlar log` — that was breaking logs after set.
+ */
 export function ensureLogChannelFromEnv(guildId) {
   if (!process.env.LOG_CHANNEL_ID || !guildId) return;
+  if (config.guildId && guildId !== config.guildId) return;
+
   const settings = getSettings(guildId);
   if (!settings.log_channel_id) {
-    updateSettings(guildId, { log_channel_id: process.env.LOG_CHANNEL_ID });
-  } else if (settings.log_channel_id !== process.env.LOG_CHANNEL_ID) {
-    // Env her zaman öncelikli (Railway kalıcılığı)
     updateSettings(guildId, { log_channel_id: process.env.LOG_CHANNEL_ID });
   }
 }
@@ -19,7 +23,7 @@ export async function sendLog(guild, payload) {
   try {
     if (!guild) return;
 
-    if (config.guildId === guild.id || process.env.LOG_CHANNEL_ID) {
+    if (config.guildId === guild.id) {
       ensureLogChannelFromEnv(guild.id);
     }
 
@@ -28,7 +32,7 @@ export async function sendLog(guild, payload) {
       if (!warnedMissing.has(guild.id)) {
         warnedMissing.add(guild.id);
         console.warn(
-          `⚠️ Log kanalı ayarlı değil (${guild.name}). /ayarlar log veya LOG_CHANNEL_ID kullan.`,
+          `⚠️ Log kanalı ayarlı değil (${guild.name}). /ayarlar log kullan.`,
         );
       }
       return;
@@ -36,14 +40,30 @@ export async function sendLog(guild, payload) {
 
     const channel = await guild.channels.fetch(settings.log_channel_id).catch(() => null);
     if (!channel?.isTextBased()) {
-      console.warn(`⚠️ Log kanalı bulunamadı: ${settings.log_channel_id}`);
-      return;
+      const key = `missing:${guild.id}:${settings.log_channel_id}`;
+      if (!warnedMissing.has(key)) {
+        warnedMissing.add(key);
+        console.warn(
+          `⚠️ Log kanalı bulunamadı / silinmiş: ${settings.log_channel_id} (${guild.name}). Ayar temizlendi — /ayarlar log ile yeniden seç.`,
+        );
+      }
+      // Dead channel (silinmiş) — DB'den düş ki env tekrar zorlamasın / spam olmasın
+      updateSettings(guild.id, { log_channel_id: null });
+      return false;
+    }
+
+    const me = guild.members.me || (await guild.members.fetchMe().catch(() => null));
+    const perms = me && channel.permissionsFor(me);
+    if (perms && !perms.has(["ViewChannel", "SendMessages", "EmbedLinks"])) {
+      console.warn(`⚠️ Log kanalına yazma izni yok: #${channel.name}`);
+      return false;
     }
 
     const embed = new EmbedBuilder()
-      .setColor(payload.color ?? config.embedColor)
+      .setColor(payload.color ?? brand.color)
       .setTitle(payload.title)
-      .setTimestamp();
+      .setTimestamp()
+      .setFooter({ text: String(payload.footer || brandFooter("log")).slice(0, 2048) });
 
     if (payload.description) embed.setDescription(payload.description);
     if (payload.fields?.length) {
@@ -56,12 +76,13 @@ export async function sendLog(guild, payload) {
       );
     }
     if (payload.thumbnail) embed.setThumbnail(payload.thumbnail);
-    if (payload.footer) embed.setFooter({ text: String(payload.footer).slice(0, 2048) });
     if (payload.image) embed.setImage(payload.image);
 
     await channel.send({ embeds: [embed] });
+    return true;
   } catch (error) {
     console.error("Log gönderilemedi:", error.message);
+    return false;
   }
 }
 

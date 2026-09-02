@@ -1,6 +1,13 @@
 import { Events, PermissionFlagsBits } from "discord.js";
 import { errorEmbed, infoEmbed, successEmbed } from "../utils/embeds.js";
-import { openTicket, claimTicket, closeTicket } from "../systems/tickets.js";
+import {
+  openTicket,
+  claimTicket,
+  closeTicket,
+  startAgreementConfirm,
+  confirmAgreement,
+  cancelAgreement,
+} from "../systems/tickets.js";
 import { addEntry, getGiveaway } from "../systems/giveaways.js";
 import { handleVerify } from "../systems/verify.js";
 import { handleSuggestionVote } from "../systems/suggestions.js";
@@ -10,6 +17,12 @@ import { getSettings } from "../database/settings.js";
 import { getInviteLeaderboard } from "../systems/invites.js";
 import { buildApplyModal, submitApplication } from "../systems/applications.js";
 import { submitReport } from "../systems/reports.js";
+import { handleDmFormButton, handleDmFormModal } from "../systems/dmForm.js";
+import { buildHelpPayload } from "../commands/utility/help.js";
+import {
+  confirmGuildReset,
+  cancelGuildReset,
+} from "../systems/guildReset.js";
 
 async function handleHqSelect(interaction) {
   const value = interaction.values[0];
@@ -59,6 +72,29 @@ async function handleHqSelect(interaction) {
       `Log: ${s.apply_channel_id ? `<#${s.apply_channel_id}>` : "Yok"}\n\`/basvuru panel\` · \`/basvuru kanal\``,
       "📋 Applications",
     ),
+    tickets: premiumEmbed({
+      title: "🎫 Tickets",
+      description: [
+        `Kategori: ${s.ticket_category_id ? `<#${s.ticket_category_id}>` : "Yok"}`,
+        `Destek rolü: ${s.ticket_support_role_id ? `<@&${s.ticket_support_role_id}>` : "Yok"}`,
+        `Log: ${s.ticket_log_channel_id ? `<#${s.ticket_log_channel_id}>` : "Yok"}`,
+        "",
+        "`/ticket panel` · `/ticket anlasma` · `/ticket kapat`",
+        "Anonim ticket: mesajlar **Anonim** webhook ile gider.",
+      ].join("\n"),
+      color: brand.colors.primary,
+    }),
+    levels: premiumEmbed({
+      title: "📈 Levels",
+      description: [
+        `Aktif: ${s.level_enabled ? "✅" : "❌"}`,
+        `Kanal: ${s.level_channel_id ? `<#${s.level_channel_id}>` : "sohbet-i-muhabbet"}`,
+        "",
+        "XP sadece sohbet kanalında.",
+        "`/seviye` · `/liderlik` · `/ayarlar seviye-kanal`",
+      ].join("\n"),
+      color: brand.colors.gold,
+    }),
     stats: successEmbed("Detay için `/istatistik`", "📊 Analytics"),
   };
 
@@ -93,6 +129,9 @@ export default {
           await submitApplication(interaction);
           return;
         }
+        if (await handleDmFormModal(interaction, client)) {
+          return;
+        }
       }
 
       if (interaction.isStringSelectMenu()) {
@@ -100,9 +139,16 @@ export default {
           await handleHqSelect(interaction);
           return;
         }
+        if (interaction.customId === "help_category") {
+          const key = interaction.values[0] || "home";
+          return interaction.update(buildHelpPayload(key));
+        }
       }
 
       if (interaction.isButton()) {
+        if (await handleDmFormButton(interaction)) {
+          return;
+        }
         if (interaction.customId === "hq_refresh") {
           return interaction.update(hqPanelPayload(interaction.guild));
         }
@@ -174,16 +220,35 @@ export default {
           await handleButtonRole(interaction);
           return;
         }
+        if (interaction.customId.startsWith("guild_reset_confirm:")) {
+          await confirmGuildReset(interaction);
+          return;
+        }
 
         switch (interaction.customId) {
           case "ticket_open":
-            await openTicket(interaction);
+            await openTicket(interaction, { anonymous: false });
+            return;
+          case "ticket_open_anon":
+            await openTicket(interaction, { anonymous: true });
             return;
           case "ticket_claim":
             await claimTicket(interaction);
             return;
           case "ticket_close":
             await closeTicket(interaction);
+            return;
+          case "agreement_start":
+            await startAgreementConfirm(interaction);
+            return;
+          case "agreement_confirm":
+            await confirmAgreement(interaction, client);
+            return;
+          case "agreement_cancel":
+            await cancelAgreement(interaction);
+            return;
+          case "guild_reset_cancel":
+            await cancelGuildReset(interaction);
             return;
           case "giveaway_join": {
             const giveaway = getGiveaway(interaction.message.id);
