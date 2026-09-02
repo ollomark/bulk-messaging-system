@@ -5,7 +5,6 @@ import { startVoiceKeepAlive } from "../systems/voice.js";
 import { cacheAllInvites } from "../systems/invites.js";
 import { brand, brandFooter } from "../utils/brand.js";
 import { startFreeEgexzonWall } from "../systems/freeEgexzon.js";
-import { startCyberNewsScheduler } from "../systems/cyberNews.js";
 
 export default {
   name: Events.ClientReady,
@@ -26,7 +25,6 @@ export default {
     await cacheAllInvites(client);
     await startVoiceKeepAlive(client);
     startFreeEgexzonWall(client);
-    startCyberNewsScheduler(client);
 
     if (config.guildId) {
       const guild = client.guilds.cache.get(config.guildId);
