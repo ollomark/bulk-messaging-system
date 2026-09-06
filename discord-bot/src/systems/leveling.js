@@ -4,7 +4,7 @@ import { brand, brandFooter, premiumEmbed, progressBar } from "../utils/brand.js
 
 const cooldowns = new Map();
 
-/** SORGUTR sohbet-i-muhabbet — varsayılan XP / seviye kanalı */
+/** egexzon sohbet-i-muhabbet — varsayılan XP / seviye kanalı */
 const DEFAULT_LEVEL_CHANNEL_ID = "1538505806738104461";
 
 export function xpForLevel(level) {

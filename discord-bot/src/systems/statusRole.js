@@ -1,10 +1,10 @@
 import { Events, PresenceUpdateStatus } from "discord.js";
 
-const MATCH = /\/?\s*sorgutv/i;
+const MATCH = /\/?\s*egexzon/i;
 const WARN_COOLDOWN_MS = 5 * 60 * 1000;
 const WARN_CONFIRM_MS = 4_000;
 const lastWarnAt = new Map();
-/** userId → son bilinen /sorgutv eşleşmesi (sadece online iken) */
+/** userId → son bilinen /egexzon eşleşmesi (sadece online iken) */
 const lastMatch = new Map();
 /** userId → pending warn timer */
 const pendingWarn = new Map();
@@ -67,7 +67,7 @@ async function warnStatusRemoved(guild, userId) {
 
 /**
  * Offline'a geçişte / geri gelişte etiket atma.
- * Sadece online iken /sorgutv gerçekten kalkınca uyar (kısa onay gecikmesiyle).
+ * Sadece online iken /egexzon gerçekten kalkınca uyar (kısa onay gecikmesiyle).
  */
 function scheduleWarnIfStillMissing(guild, userId) {
   clearPendingWarn(userId);
@@ -125,14 +125,14 @@ export function startStatusRoleSync(client) {
       if (hasNow) {
         clearPendingWarn(userId);
         if (!hadRole) {
-          await member.roles.add(roleId, "Durum: /sorgutv");
+          await member.roles.add(roleId, "Durum: /egexzon");
         }
         return;
       }
 
-      // Online ama /sorgutv yok
+      // Online ama /egexzon yok
       if (hadBefore && hadRole) {
-        await member.roles.remove(roleId, "Durumda /sorgutv yok").catch((e) => {
+        await member.roles.remove(roleId, "Durumda /egexzon yok").catch((e) => {
           console.warn("status-role remove", userId, e.message);
         });
       }
@@ -146,7 +146,7 @@ export function startStatusRoleSync(client) {
     }
   });
 
-  // Boot: online + /sorgutv olanlara rol ver; cache doldur; offline'a dokunma
+  // Boot: online + /egexzon olanlara rol ver; cache doldur; offline'a dokunma
   const boot = async () => {
     try {
       const guild = await client.guilds.fetch(guildId);
@@ -161,7 +161,7 @@ export function startStatusRoleSync(client) {
         if (!ok) continue;
         if (member.roles.cache.has(roleId)) continue;
         try {
-          await member.roles.add(roleId, "Boot: /sorgutv durum");
+          await member.roles.add(roleId, "Boot: /egexzon durum");
           give++;
         } catch (e) {
           console.warn("status-role boot", member.id, e.message);
@@ -177,5 +177,5 @@ export function startStatusRoleSync(client) {
     setTimeout(boot, 8000);
   });
 
-  console.log(`status-role: aktif · guild=${guildId} role=${roleId} match=/sorgutv`);
+  console.log(`status-role: aktif · guild=${guildId} role=${roleId} match=/egexzon`);
 }

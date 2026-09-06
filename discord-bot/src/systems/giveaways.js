@@ -4,7 +4,7 @@ import { brand, brandFooter, premiumEmbed } from "../utils/brand.js";
 
 export function buildGiveawayEmbed(prize, winners, endsAt, hostId, ended = false, winnerMentions = null) {
   return premiumEmbed({
-    title: ended ? "🎉 Çekiliş Sona Erdi" : "🎉 SORGUTR Çekiliş",
+    title: ended ? "🎉 Çekiliş Sona Erdi" : "🎉 egexzon Çekiliş",
     description: [
       `**Ödül:** ${prize}`,
       `**Kazanan:** ${winners}`,

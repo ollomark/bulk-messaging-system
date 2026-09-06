@@ -147,7 +147,7 @@ export function buildHelpPayload(category = "home") {
 export default {
   data: new SlashCommandBuilder()
     .setName("yardim")
-    .setDescription("SORGUTR Ultimate komut merkezi"),
+    .setDescription("egexzon Ultimate komut merkezi"),
   async execute(interaction) {
     return interaction.reply({
       ...buildHelpPayload("home"),

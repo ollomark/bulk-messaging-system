@@ -12,7 +12,7 @@ import { config } from "../config.js";
 import { ANON_AVATAR, getAnonWebhook } from "../utils/anonWebhook.js";
 
 const DEFAULT_PANEL = {
-  title: "🎫 SORGUTR Destek",
+  title: "🎫 egexzon Destek",
   description: [
     "Yardım için aşağıdaki butonlardan birini seç.",
     "",

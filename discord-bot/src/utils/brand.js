@@ -8,7 +8,7 @@ import {
 import { config } from "../config.js";
 
 export const brand = {
-  name: process.env.BRAND_NAME || "SORGUTR",
+  name: process.env.BRAND_NAME || "egexzon",
   tagline: process.env.BRAND_TAGLINE || "Ultimate Discord Operating Suite",
   invite: process.env.BRAND_INVITE || "egexzon",
   presence: process.env.PRESENCE_TEXT || "egexzon",
