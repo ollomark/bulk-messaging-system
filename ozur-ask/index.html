@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sadece sen…</title>
+  <meta name="description" content="Sana özel, kalbimden bir sayfa." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Great+Vibes&family=Manrope:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --ink: #3d2430;
+      --rose: #e36b84;
+      --rose-deep: #c44763;
+      --blush: #ffd0dc;
+      --petal: #ffb3c6;
+      --cream: #fff6f8;
+      --paper: #fffafb;
+      --gold: #c9a06a;
+      --soft: rgba(61, 36, 48, 0.62);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      min-height: 100%;
+      color: var(--ink);
+      font-family: "Manrope", system-ui, sans-serif;
+      background:
+        radial-gradient(ellipse 90% 70% at 10% 0%, #ffc9d7 0%, transparent 55%),
+        radial-gradient(ellipse 80% 60% at 100% 100%, #ffb8cb 0%, transparent 50%),
+        radial-gradient(ellipse 50% 40% at 50% 40%, #ffe8ef 0%, transparent 70%),
+        linear-gradient(165deg, #fff1f5 0%, #ffd9e4 50%, #f5c0d0 100%);
+      overflow-x: hidden;
+    }
+
+    body {
+      min-height: 100dvh;
+      display: grid;
+      place-items: center;
+      padding: 1.25rem;
+      position: relative;
+    }
+
+    .sky {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+      overflow: hidden;
+    }
+
+    .sky i {
+      position: absolute;
+      bottom: -2rem;
+      color: rgba(227, 107, 132, 0.22);
+      font-style: normal;
+      animation: drift linear infinite;
+      user-select: none;
+    }
+
+    @keyframes drift {
+      0% { transform: translateY(0) rotate(0deg) scale(1); opacity: 0; }
+      12% { opacity: 1; }
+      100% { transform: translateY(-115vh) rotate(28deg) scale(1.15); opacity: 0; }
+    }
+
+    .shell {
+      position: relative;
+      z-index: 1;
+      width: min(440px, 100%);
+    }
+
+    .screen {
+      display: none;
+      text-align: center;
+      animation: rise 0.7s ease both;
+    }
+
+    .screen.active { display: block; }
+
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(18px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .script {
+      font-family: "Great Vibes", cursive;
+      font-size: clamp(2.4rem, 9vw, 3.4rem);
+      line-height: 1.15;
+      color: var(--rose-deep);
+      text-shadow: 0 10px 30px rgba(194, 71, 99, 0.18);
+      margin-bottom: 0.85rem;
+    }
+
+    .serif {
+      font-family: "Cormorant Garamond", serif;
+      font-size: clamp(1.2rem, 3.8vw, 1.45rem);
+      font-style: italic;
+      font-weight: 500;
+      color: var(--soft);
+      line-height: 1.55;
+      margin: 0 auto 1.6rem;
+      max-width: 28ch;
+    }
+
+    .letter {
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(255, 250, 251, 0.92));
+      border: 1px solid rgba(255, 255, 255, 0.7);
+      border-radius: 28px;
+      padding: 1.6rem 1.35rem 1.45rem;
+      box-shadow:
+        0 24px 60px rgba(194, 71, 99, 0.16),
+        inset 0 1px 0 rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(10px);
+      text-align: left;
+      margin-bottom: 1.35rem;
+    }
+
+    .letter h2 {
+      font-family: "Cormorant Garamond", serif;
+      font-size: 1.55rem;
+      font-weight: 600;
+      margin-bottom: 0.85rem;
+      color: var(--rose-deep);
+    }
+
+    .letter p {
+      font-size: 0.98rem;
+      line-height: 1.7;
+      color: var(--ink);
+      margin-bottom: 0.9rem;
+    }
+
+    .letter p:last-child { margin-bottom: 0; }
+
+    .soft-list {
+      list-style: none;
+      display: grid;
+      gap: 0.7rem;
+      margin: 1rem 0 0;
+    }
+
+    .soft-list li {
+      display: flex;
+      gap: 0.65rem;
+      align-items: flex-start;
+      font-size: 0.95rem;
+      line-height: 1.5;
+    }
+
+    .soft-list li::before {
+      content: "♡";
+      color: var(--rose);
+      flex: 0 0 auto;
+      margin-top: 0.05rem;
+    }
+
+    .cta {
+      appearance: none;
+      border: 0;
+      cursor: pointer;
+      font-family: "Manrope", sans-serif;
+      font-weight: 600;
+      font-size: 1rem;
+      letter-spacing: 0.02em;
+      color: #fff;
+      background: linear-gradient(135deg, var(--rose) 0%, var(--rose-deep) 100%);
+      padding: 0.95rem 1.55rem;
+      border-radius: 999px;
+      box-shadow: 0 14px 34px rgba(194, 71, 99, 0.35);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      min-width: min(260px, 100%);
+    }
+
+    .cta:hover {
+      transform: translateY(-2px) scale(1.02);
+      box-shadow: 0 18px 40px rgba(194, 71, 99, 0.42);
+    }
+
+    .cta:active { transform: translateY(0) scale(0.99); }
+
+    .ghost {
+      margin-top: 0.85rem;
+      background: transparent;
+      color: var(--rose-deep);
+      box-shadow: none;
+      border: 1.5px solid rgba(227, 107, 132, 0.45);
+    }
+
+    .ghost:hover {
+      background: rgba(255, 255, 255, 0.45);
+      box-shadow: none;
+    }
+
+    .heart-orb {
+      width: 118px;
+      height: 118px;
+      margin: 0 auto 1.35rem;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      font-size: 3rem;
+      background:
+        radial-gradient(circle at 35% 30%, #fff 0%, transparent 35%),
+        linear-gradient(160deg, #ff9eb3, var(--rose-deep));
+      box-shadow:
+        0 18px 40px rgba(194, 71, 99, 0.28),
+        inset 0 -8px 18px rgba(0, 0, 0, 0.08);
+      animation: pulse 2.4s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+    }
+
+    .steps {
+      display: flex;
+      justify-content: center;
+      gap: 0.45rem;
+      margin-top: 1.4rem;
+    }
+
+    .steps span {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: rgba(194, 71, 99, 0.25);
+      transition: 0.25s ease;
+    }
+
+    .steps span.on {
+      width: 22px;
+      border-radius: 999px;
+      background: var(--rose);
+    }
+
+    .finale .script {
+      font-size: clamp(2.8rem, 11vw, 4rem);
+      animation: glow 2s ease-in-out infinite alternate;
+    }
+
+    @keyframes glow {
+      from { text-shadow: 0 8px 24px rgba(194, 71, 99, 0.2); }
+      to { text-shadow: 0 12px 40px rgba(194, 71, 99, 0.45); }
+    }
+
+    .burst {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 5;
+      overflow: hidden;
+    }
+
+    .burst b {
+      position: absolute;
+      font-weight: 400;
+      color: var(--rose);
+      animation: pop 1.4s ease-out forwards;
+      font-size: 1.1rem;
+    }
+
+    @keyframes pop {
+      0% { transform: translate(0, 0) scale(0.4); opacity: 0; }
+      20% { opacity: 1; }
+      100% { transform: translate(var(--x), var(--y)) scale(1.2); opacity: 0; }
+    }
+
+    .tiny {
+      margin-top: 1rem;
+      font-size: 0.82rem;
+      color: rgba(61, 36, 48, 0.5);
+    }
+
+    @media (max-width: 380px) {
+      .letter { padding: 1.35rem 1.1rem; border-radius: 22px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="sky" id="sky" aria-hidden="true"></div>
+  <div class="burst" id="burst" aria-hidden="true"></div>
+
+  <main class="shell">
+    <!-- 1 -->
+    <section class="screen active" data-screen="0">
+      <div class="heart-orb" aria-hidden="true">💗</div>
+      <h1 class="script">Sadece sen…</h1>
+      <p class="serif">Kalbimin en yumuşak yerinden, sana özel bir şey bıraktım.</p>
+      <button class="cta" type="button" data-next>Aç bakayım</button>
+      <div class="steps" data-steps></div>
+    </section>
+
+    <!-- 2 -->
+    <section class="screen" data-screen="1">
+      <h1 class="script">Sen benim için…</h1>
+      <div class="letter">
+        <h2>Dünyamın en güzel hali</h2>
+        <p>Bazen kelimeler yetmiyor. Ama şunu bilmeni istiyorum: sen yanımdayken her şey daha sıcak, daha kolay, daha doğru geliyor.</p>
+        <ul class="soft-list">
+          <li>Gülüşün aklımda kalan en güzel yer</li>
+          <li>Sesin, kötü günümün ilacı</li>
+          <li>Seninle olmak, evimde hissetmek gibi</li>
+        </ul>
+      </div>
+      <button class="cta" type="button" data-next>Devam et</button>
+      <div class="steps" data-steps></div>
+    </section>
+
+    <!-- 3 -->
+    <section class="screen" data-screen="2">
+      <h1 class="script">Üzgünüm…</h1>
+      <div class="letter">
+        <h2>Gönlünü kırmak istemedim</h2>
+        <p>Kalbini kırdıysam, bu sayfayı sana “haklıyım” diye değil; <strong>seni önemsediğim</strong> için açıyorum.</p>
+        <p>Hatalarımın ardında seni kaybetme korkusu var. Seni üzmek, bana da ağır geliyor.</p>
+        <p>Lütfen… bir kez daha gönlünü bana aç. Seni kırmadan, daha dikkatli, daha tatlı seveceğim.</p>
+      </div>
+      <button class="cta" type="button" data-next>Sonuna bak</button>
+      <div class="steps" data-steps></div>
+    </section>
+
+    <!-- 4 -->
+    <section class="screen finale" data-screen="3">
+      <div class="heart-orb" aria-hidden="true">💞</div>
+      <h1 class="script">Affeder misin?</h1>
+      <p class="serif">Senin gülüşün yeter bana. Bir şans daha… kalbim sende.</p>
+      <button class="cta" type="button" id="forgive">Evet, affediyorum 💗</button>
+      <button class="cta ghost" type="button" id="almost">Biraz daha yumuşat</button>
+      <p class="tiny" id="after" hidden>Teşekkür ederim… Seni çok seviyorum. 🌙</p>
+      <div class="steps" data-steps></div>
+    </section>
+  </main>
+
+  <script>
+    const screens = [...document.querySelectorAll(".screen")];
+    const total = screens.length;
+    let index = 0;
+
+    function paintSteps() {
+      document.querySelectorAll("[data-steps]").forEach((el) => {
+        el.innerHTML = Array.from({ length: total }, (_, i) =>
+          `<span class="${i === index ? "on" : ""}"></span>`,
+        ).join("");
+      });
+    }
+
+    function show(i) {
+      index = i;
+      screens.forEach((s, n) => s.classList.toggle("active", n === index));
+      paintSteps();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    document.querySelectorAll("[data-next]").forEach((btn) => {
+      btn.addEventListener("click", () => show(Math.min(index + 1, total - 1)));
+    });
+
+    const sky = document.getElementById("sky");
+    for (let n = 0; n < 22; n += 1) {
+      const el = document.createElement("i");
+      el.textContent = Math.random() > 0.45 ? "♡" : "✦";
+      el.style.left = `${Math.random() * 100}%`;
+      el.style.fontSize = `${0.7 + Math.random() * 1.2}rem`;
+      el.style.animationDuration = `${9 + Math.random() * 14}s`;
+      el.style.animationDelay = `${Math.random() * 8}s`;
+      sky.appendChild(el);
+    }
+
+    function burstHearts() {
+      const layer = document.getElementById("burst");
+      const glyphs = ["💗", "💞", "✨", "🌸", "💕"];
+      for (let n = 0; n < 28; n += 1) {
+        const b = document.createElement("b");
+        b.textContent = glyphs[n % glyphs.length];
+        b.style.left = "50%";
+        b.style.top = "55%";
+        const angle = (Math.PI * 2 * n) / 28;
+        const dist = 80 + Math.random() * 160;
+        b.style.setProperty("--x", `${Math.cos(angle) * dist}px`);
+        b.style.setProperty("--y", `${Math.sin(angle) * dist - 40}px`);
+        b.style.animationDelay = `${Math.random() * 0.2}s`;
+        layer.appendChild(b);
+        setTimeout(() => b.remove(), 1500);
+      }
+    }
+
+    const after = document.getElementById("after");
+    document.getElementById("forgive").addEventListener("click", () => {
+      burstHearts();
+      after.hidden = false;
+      after.textContent = "Teşekkür ederim… Seni çok seviyorum. 🌙";
+      document.getElementById("almost").hidden = true;
+      document.getElementById("forgive").textContent = "Seni seviyorum 💗";
+    });
+
+    document.getElementById("almost").addEventListener("click", () => {
+      burstHearts();
+      after.hidden = false;
+      after.textContent = "Tamam… Daha da yumuşak olacağım. Kalbim sende. 🌷";
+    });
+
+    // Optional: ?ad=İsim
+    const name = new URLSearchParams(location.search).get("ad");
+    if (name) {
+      const safe = name.trim().slice(0, 24);
+      if (safe) {
+        document.querySelector('[data-screen="0"] .script').textContent = `${safe}…`;
+        document.title = `${safe} için…`;
+      }
+    }
+
+    paintSteps();
+  </script>
+</body>
+</html>
