@@ -66,7 +66,8 @@ db.exec(`
     opener_id TEXT NOT NULL,
     claimed_by TEXT,
     status TEXT DEFAULT 'open',
-    created_at INTEGER NOT NULL
+    created_at INTEGER NOT NULL,
+    anonymous INTEGER DEFAULT 0
   );
 
   CREATE TABLE IF NOT EXISTS giveaways (

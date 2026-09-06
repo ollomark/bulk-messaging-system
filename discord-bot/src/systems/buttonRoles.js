@@ -4,7 +4,7 @@ import {
   ButtonStyle,
 } from "discord.js";
 import db from "../database/db.js";
-import { premiumEmbed, brand } from "../utils/brand.js";
+import { brand, systemPanelEmbed } from "../utils/brand.js";
 
 const styleMap = {
   Primary: ButtonStyle.Primary,
@@ -25,12 +25,22 @@ export async function createButtonRolePanel(channel, title, description, roles) 
       .setStyle(styleMap[item.style] || ButtonStyle.Primary);
   });
 
-  const embed = premiumEmbed({
-    title: title || "🎭 Rol Menüsü",
-    description:
+  const cleanTitle = (title || "Rol Menüsü").replace(/^📢\s*/, "").slice(0, 200);
+  const embed = systemPanelEmbed({
+    title: `📢 ${brand.name} — ${cleanTitle}`.slice(0, 256),
+    status: "Hazır / Güvenli",
+    infra: "Button Role Aktif",
+    aboutTitle: "Rol Menüsü Nedir?",
+    aboutBody:
       description ||
-      "Aşağıdaki butonlara tıklayarak rol al / bırak.\nModern buton-rol sistemi · Lexyxzon",
-    color: brand.colors.premium,
+      "Aşağıdaki butonlara tıklayarak rol al / bırak. İstediğin zaman tekrar basarak kaldırabilirsin.",
+    features: roles.slice(0, 5).map((r) => ({
+      name: r.label,
+      detail: "Tek tıkla al / bırak",
+    })),
+    panelTitle: "Kontrol Paneli",
+    panelBody: "Aşağıdaki butonları kullanarak rollerini yönetebilirsin.",
+    color: 0x2b2d31,
   });
 
   const message = await channel.send({

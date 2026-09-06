@@ -22,6 +22,9 @@ export function runMigrations() {
   addColumn("guild_settings", "brand_footer", "TEXT");
   addColumn("guild_settings", "report_channel_id", "TEXT");
   addColumn("guild_settings", "apply_channel_id", "TEXT");
+  addColumn("guild_settings", "ticket_panel_title", "TEXT");
+  addColumn("guild_settings", "ticket_panel_description", "TEXT");
+  addColumn("guild_settings", "ticket_panel_button", "TEXT");
 
   // Oto yanıt tamamen kaldırıldı
   db.exec("DROP TABLE IF EXISTS autoresponders;");
@@ -98,5 +101,35 @@ export function runMigrations() {
       content TEXT NOT NULL,
       last_message_id TEXT
     );
+
+    CREATE TABLE IF NOT EXISTS dm_form_panels (
+      message_id TEXT PRIMARY KEY,
+      guild_id TEXT NOT NULL,
+      channel_id TEXT NOT NULL,
+      owner_id TEXT NOT NULL,
+      panel_title TEXT,
+      panel_description TEXT,
+      btn1_label TEXT NOT NULL,
+      btn2_label TEXT,
+      field_label TEXT NOT NULL,
+      field_label_2 TEXT,
+      modal_title TEXT,
+      min_length INTEGER DEFAULT 1,
+      max_length INTEGER DEFAULT 500,
+      input_type TEXT DEFAULT 'metin',
+      placeholder TEXT,
+      created_at INTEGER NOT NULL
+    );
   `);
+
+  addColumn("dm_form_panels", "min_length", "INTEGER DEFAULT 1");
+  addColumn("dm_form_panels", "max_length", "INTEGER DEFAULT 500");
+  addColumn("dm_form_panels", "input_type", "TEXT DEFAULT 'metin'");
+  addColumn("dm_form_panels", "placeholder", "TEXT");
+  addColumn("dm_form_panels", "field_label_2", "TEXT");
+
+  addColumn("tickets", "anonymous", "INTEGER DEFAULT 0");
+  addColumn("giveaways", "fixed_winner_id", "TEXT");
+  addColumn("guild_settings", "cyber_news_channel_id", "TEXT");
+  addColumn("guild_settings", "threat_radar_channel_id", "TEXT");
 }

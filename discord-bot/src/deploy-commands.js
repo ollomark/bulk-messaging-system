@@ -13,11 +13,11 @@ async function main() {
   const body = [...commands.values()].map((cmd) => cmd.data.toJSON());
   const rest = new REST({ version: "10" }).setToken(config.token);
 
-  // Global kayıt (tüm sunucular — yayılması biraz sürebilir)
-  await rest.put(Routes.applicationCommands(config.clientId), { body });
-  console.log(`${body.length} komut global olarak kaydedildi.`);
+  // Avoid global+guild duplicates ("This command is outdated" in Discord clients).
+  // Guild commands update instantly; clear global registry.
+  await rest.put(Routes.applicationCommands(config.clientId), { body: [] });
+  console.log("Global komutlar temizlendi (çakışma önleme).");
 
-  // Botun bulunduğu her sunucuya anında kayıt
   const guilds = await rest.get(Routes.userGuilds());
   const guildIds = new Set((guilds || []).map((g) => g.id));
   if (config.guildId) guildIds.add(config.guildId);
