@@ -270,8 +270,24 @@ export default {
       }
     } catch (error) {
       console.error("Interaction hatası:", error);
+      let msg = "Komut çalıştırılırken bir hata oluştu.";
+      if (error?.code === 50001 || error?.rawError?.code === 50001) {
+        msg =
+          "Bu kanala **erişimim yok** (Missing Access).\n\n" +
+          "Çözüm: Bot rolüne bu kanalda **Kanalı Görüntüle + Mesaj Gönder** ver\n" +
+          "veya bota **Yönetici** yetkisi ver / üst role koy.";
+      } else if (error?.code === 50013 || error?.rawError?.code === 50013) {
+        msg =
+          "Bu işlem için **yetkim yok** (Missing Permissions).\n\n" +
+          "Bot rolünü hedef rolün **üstüne** çek ve gerekli izinleri aç.";
+      } else if (error?.code === 10008 || error?.rawError?.code === 10008) {
+        msg = "Mesaj bulunamadı veya silinmiş.";
+      } else if (error?.message) {
+        msg = `Hata: ${error.message}`;
+      }
+
       const payload = {
-        embeds: [errorEmbed("Komut çalıştırılırken bir hata oluştu.")],
+        embeds: [errorEmbed(msg)],
         ephemeral: true,
       };
       if (interaction.replied || interaction.deferred) {

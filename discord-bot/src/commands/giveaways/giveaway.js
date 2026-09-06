@@ -79,6 +79,19 @@ export default {
         });
       }
 
+      const me = interaction.guild.members.me;
+      const perms = interaction.channel.permissionsFor(me);
+      if (!perms?.has(PermissionFlagsBits.ViewChannel) || !perms?.has(PermissionFlagsBits.SendMessages)) {
+        return interaction.reply({
+          embeds: [
+            errorEmbed(
+              "Bu kanala yazamıyorum.\nBot rolüne **Kanalı Görüntüle + Mesaj Gönder** ver veya başka kanalda dene.",
+            ),
+          ],
+          ephemeral: true,
+        });
+      }
+
       const endsAt = Date.now() + duration;
       const message = await interaction.channel.send({
         embeds: [buildGiveawayEmbed(prize, winners, endsAt, interaction.user.id)],
