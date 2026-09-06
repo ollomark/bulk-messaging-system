@@ -8,17 +8,14 @@ import {
 import db from "../database/db.js";
 import { getSettings, updateSettings } from "../database/settings.js";
 import { baseEmbed, errorEmbed, successEmbed, warnEmbed } from "../utils/embeds.js";
+import { brand, systemPanelEmbed } from "../utils/brand.js";
 import { config } from "../config.js";
 import { ANON_AVATAR, getAnonWebhook } from "../utils/anonWebhook.js";
 
 const DEFAULT_PANEL = {
-  title: "🎫 egexzon Destek",
-  description: [
-    "Yardım için aşağıdaki butonlardan birini seç.",
-    "",
-    "**Ticket Aç** — klasik destek kanalı",
-    "**Anonim Ticket** — mesajların **Anonim** görünür, bot adı çıkmaz",
-  ].join("\n"),
+  title: `📢 ${brand.name} — Destek Sistemi`,
+  about:
+    "Yardım, şikayet veya özel talep için ticket aç. Destek ekibi kanaldan yanıtlar.",
   button: "Ticket Aç",
   anonButton: "Anonim Ticket",
 };
@@ -32,9 +29,16 @@ export function buildTicketPanel(guildIdOrSettings = null, overrides = {}) {
         ? guildIdOrSettings
         : {};
 
-  const title = overrides.title || settings.ticket_panel_title || DEFAULT_PANEL.title;
-  const description =
-    overrides.description || settings.ticket_panel_description || DEFAULT_PANEL.description;
+  const rawTitle = overrides.title || settings.ticket_panel_title || DEFAULT_PANEL.title;
+  const title = (rawTitle.startsWith("📢") ? rawTitle : `📢 ${brand.name} — ${rawTitle}`).slice(
+    0,
+    256,
+  );
+  const aboutBody = (
+    overrides.description ||
+    settings.ticket_panel_description ||
+    DEFAULT_PANEL.about
+  ).slice(0, 1800);
   const buttonLabel = (
     overrides.button ||
     settings.ticket_panel_button ||
@@ -42,7 +46,21 @@ export function buildTicketPanel(guildIdOrSettings = null, overrides = {}) {
   ).slice(0, 80);
   const anonLabel = (overrides.anonButton || DEFAULT_PANEL.anonButton).slice(0, 80);
 
-  const embed = baseEmbed(title.slice(0, 256), description.slice(0, 4096));
+  const embed = systemPanelEmbed({
+    title,
+    status: "Hazır / Güvenli",
+    infra: "Ticket Altyapısı",
+    aboutTitle: "Destek Sistemi Nedir?",
+    aboutBody,
+    features: [
+      { name: "Klasik Ticket", detail: "İsimli destek kanalı açılır" },
+      { name: "Anonim Ticket", detail: "Mesajların **Anonim** görünür, bot adı çıkmaz" },
+      { name: "Yetkili yönetimi", detail: "`Üstlen` / `Kapat` ile kontrol" },
+    ],
+    panelTitle: "Kontrol Paneli",
+    panelBody: "Aşağıdaki butonu kullanarak ticket açabilir ve destek talebini iletebilirsin.",
+    color: 0x2b2d31,
+  });
 
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
@@ -54,24 +72,39 @@ export function buildTicketPanel(guildIdOrSettings = null, overrides = {}) {
       .setCustomId("ticket_open_anon")
       .setLabel(anonLabel)
       .setEmoji("🕵️")
-      .setStyle(ButtonStyle.Secondary),
+      .setStyle(ButtonStyle.Primary),
   );
 
   return { embeds: [embed], components: [row] };
 }
 
 export function buildAgreementPanel(overrides = {}) {
-  const title = (overrides.title || "🤝 Anlaşma Kur").slice(0, 256);
-  const description = (
+  const rawTitle = (overrides.title || "Anlaşma Sistemi").slice(0, 200);
+  const title = (rawTitle.startsWith("📢") ? rawTitle : `📢 ${brand.name} — ${rawTitle}`).slice(
+    0,
+    256,
+  );
+  const aboutBody = (
     overrides.description ||
-    [
-      "Anlaşma / özel görüşme talebi için butona bas.",
-      "Önce **Emin misin?** onayı istenir.",
-      "Onay sonrası talep **sahibe DM** olarak iletilir.",
-    ].join("\n")
-  ).slice(0, 4096);
+    "Anlaşma / özel görüşme talebi oluştur. Onay sonrası talep sahibe DM olarak iletilir."
+  ).slice(0, 1800);
 
-  const embed = baseEmbed(title, description);
+  const embed = systemPanelEmbed({
+    title,
+    status: "Hazır / Güvenli",
+    infra: "Onaylı İletim",
+    aboutTitle: "Anlaşma Nedir?",
+    aboutBody,
+    features: [
+      { name: "Emin misin?", detail: "Yanlışlıkla gönderimi önleyen onay adımı" },
+      { name: "Sahibe DM", detail: "Onay sonrası talep doğrudan iletilir" },
+      { name: "Gizli akış", detail: "Kanal kalabalığı olmadan net iletişim" },
+    ],
+    panelTitle: "Kontrol Paneli",
+    panelBody: "Aşağıdaki butonu kullanarak anlaşma talebini başlatabilirsin.",
+    color: 0x2b2d31,
+  });
+
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId("agreement_start")

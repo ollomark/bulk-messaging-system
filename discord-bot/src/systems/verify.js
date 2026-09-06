@@ -1,19 +1,24 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js";
 import { getSettings, updateSettings } from "../database/settings.js";
-import { premiumEmbed, brand } from "../utils/brand.js";
+import { brand, systemPanelEmbed } from "../utils/brand.js";
 
 export function buildVerifyPanel(guild) {
-  const embed = premiumEmbed({
-    title: "✅ Doğrulama Kapısı",
-    description: [
-      `**${guild.name}** sunucusuna hoş geldin.`,
-      "",
-      "Erişim için aşağıdaki butona tıkla.",
+  const embed = systemPanelEmbed({
+    title: `📢 ${brand.name} — Doğrulama Sistemi`,
+    status: "Hazır / Güvenli",
+    infra: "Anti-Raid Kapısı",
+    aboutTitle: "Doğrulama Nedir?",
+    aboutBody:
+      `**${guild.name}** sunucusuna erişmek için doğrulama gerekir. ` +
       "Bu adım bot, raid ve sahte hesaplara karşı koruma sağlar.",
-      "",
-      "Doğrulandıktan sonra kanallar açılır.",
-    ].join("\n"),
-    color: brand.colors.success,
+    features: [
+      { name: "Tek tıkla geçiş", detail: "Butona bas, rol otomatik gelir" },
+      { name: "Kanal kilidi", detail: "Doğrulanmayanlar içerikleri göremez" },
+      { name: "Güvenli giriş", detail: "Raid ve sahte hesap bariyeri" },
+    ],
+    panelTitle: "Kontrol Paneli",
+    panelBody: "Aşağıdaki butonu kullanarak doğrulamayı tamamlayabilirsin.",
+    color: 0x2b2d31,
     thumbnail: guild.iconURL({ size: 256 }),
   });
 
@@ -22,7 +27,7 @@ export function buildVerifyPanel(guild) {
       .setCustomId("verify_pass")
       .setLabel("Doğrula / Verify")
       .setEmoji("✅")
-      .setStyle(ButtonStyle.Success),
+      .setStyle(ButtonStyle.Primary),
   );
 
   return { embeds: [embed], components: [row] };
@@ -68,7 +73,6 @@ export async function setupVerify(guild, channel, role) {
     verify_enabled: 1,
   });
 
-  // everyone için view kısıtı önerilmez otomatik; sadece panel at
   const message = await channel.send(buildVerifyPanel(guild));
   return message;
 }

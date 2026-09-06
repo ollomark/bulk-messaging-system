@@ -31,6 +31,72 @@ export function brandFooter(extra = "") {
   return extra ? `${base} · ${extra}` : base;
 }
 
+/** SQL Systems tarzı: durum pill'leri + » maddeler + bölüm başlıkları */
+export function formatSystemPanelDescription({
+  status = "Hazır / Güvenli",
+  infra = "Aktif",
+  aboutTitle = "Nedir?",
+  aboutBody = "",
+  featuresTitle = "Özellikler",
+  features = [],
+  panelTitle = "Kontrol Paneli",
+  panelBody = "Aşağıdaki butonu kullanarak işlemi başlatabilirsin.",
+} = {}) {
+  const lines = [
+    `🌐 **Sistem Durumu:** \`${status}\``,
+    `🛡 **Altyapı:** \`${infra}\``,
+    "",
+    `🧐 **${aboutTitle}**`,
+    aboutBody,
+  ];
+
+  if (features.length) {
+    lines.push("", `🌙 **${featuresTitle}**`);
+    for (const item of features) {
+      if (typeof item === "string") lines.push(`» ${item}`);
+      else {
+        const detail = item.detail || item.desc || "";
+        lines.push(`» **${item.name}** — ${detail}`);
+      }
+    }
+  }
+
+  lines.push("", `➕ **${panelTitle}**`, panelBody);
+  return lines.filter((l) => l != null).join("\n").slice(0, 4096);
+}
+
+export function systemPanelEmbed({
+  title,
+  status,
+  infra,
+  aboutTitle,
+  aboutBody,
+  featuresTitle,
+  features,
+  panelTitle,
+  panelBody,
+  color = 0x2b2d31,
+  footer = brandFooter(),
+  thumbnail,
+} = {}) {
+  return premiumEmbed({
+    title,
+    description: formatSystemPanelDescription({
+      status,
+      infra,
+      aboutTitle,
+      aboutBody,
+      featuresTitle,
+      features,
+      panelTitle,
+      panelBody,
+    }),
+    color,
+    footer,
+    thumbnail,
+  });
+}
+
 export function premiumEmbed({
   title,
   description,
@@ -60,21 +126,23 @@ export function progressBar(ratio, size = 12) {
 }
 
 export function hqPanelPayload(guild) {
-  const embed = premiumEmbed({
-    title: `${brand.name} Control Deck`,
-    description: [
-      `✦ **${guild.name}** · ultra operasyon merkezi`,
-      "",
-      "Tek panel · tüm sistemler · son seviye kalite",
-      "",
-      "**Suite**",
-      "🛡️ Guard · ✅ Verify · 📨 Invites · ⭐ Starboard",
-      "💡 Suggestions · 🔊 Temp Voice · 📋 Apply · 🚨 Reports",
-      "🎫 Tickets · 📈 Levels · 🕵️ Status Role · 📊 Analytics",
-    ].join("\n"),
-    color: brand.colors.gold,
+  const embed = systemPanelEmbed({
+    title: `📢 ${brand.name} — Kontrol Merkezi`,
+    status: "Hazır / Güvenli",
+    infra: "Ultimate Suite",
+    aboutTitle: "Kontrol Merkezi Nedir?",
+    aboutBody:
+      `**${guild.name}** sunucusu için tek panelden tüm sistemleri yönet. ` +
+      "Guard, ticket, seviye, başvuru ve daha fazlası burada.",
+    features: [
+      { name: "Smart Guard", detail: "Spam · invite · raid koruması" },
+      { name: "Ticket & Form", detail: "Destek + anonim + DM form panelleri" },
+      { name: "Seviye & Davet", detail: "XP, liderlik ve invite motoru" },
+    ],
+    panelTitle: "Kontrol Paneli",
+    panelBody: "Aşağıdaki menüden modül seç, durum butonuyla sistemi kontrol et.",
+    color: 0x2b2d31,
     thumbnail: guild.iconURL({ size: 256 }),
-    author: { name: brand.tagline },
   });
 
   const menu = new StringSelectMenuBuilder()
@@ -109,3 +177,4 @@ export function hqPanelPayload(guild) {
     components: [new ActionRowBuilder().addComponents(menu), buttons],
   };
 }
+

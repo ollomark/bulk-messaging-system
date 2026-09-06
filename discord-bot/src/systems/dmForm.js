@@ -9,6 +9,7 @@ import {
 } from "discord.js";
 import db from "../database/db.js";
 import { config } from "../config.js";
+import { brand, systemPanelEmbed } from "../utils/brand.js";
 
 const BTN_PREFIX = "dmform_btn_";
 const MODAL_PREFIX = "dmform_modal_";
@@ -56,47 +57,29 @@ function buttonStyle(index) {
 }
 
 export function buildDmFormPanelPayload({ title, description, btn1Label, btn2Label }) {
-  const embed = new EmbedBuilder()
-    .setColor(0x111214)
-    .setAuthor({ name: "PANEL" })
-    .setTitle(title.slice(0, 256))
-    .setDescription(
-      [
-        "",
-        description,
-        "",
-        "",
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
-        "",
-        "**Nasıl çalışır?**",
-        "1️⃣ Alttaki butona tıkla",
-        "2️⃣ Açılan kutuya yaz",
-        "3️⃣ Gönder",
-        "",
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
-        "",
-      ].join("\n"),
-    )
-    .addFields(
+  const cleanTitle = title.replace(/^📢\s*/, "").slice(0, 200);
+  const embed = systemPanelEmbed({
+    title: `📢 ${brand.name} — ${cleanTitle}`.slice(0, 256),
+    status: "Hazır / Güvenli",
+    infra: "DM Form Aktif",
+    aboutTitle: "Form Nedir?",
+    aboutBody: description.slice(0, 1800),
+    features: [
+      { name: "Tek tıkla açılır", detail: "Butona bas, kutuya yaz, gönder" },
+      {
+        name: "Gizli iletim",
+        detail: "Yanıtlar sadece yetkiliye DM olarak gider",
+      },
       {
         name: "Butonlar",
-        value: btn2Label
-          ? `**${btn1Label}**\n**${btn2Label}**`
-          : `**${btn1Label}**`,
-        inline: true,
+        detail: btn2Label ? `${btn1Label} · ${btn2Label}` : btn1Label,
       },
-      {
-        name: "\u200b",
-        value: "\u200b",
-        inline: true,
-      },
-      {
-        name: "Durum",
-        value: "🟢 Aktif",
-        inline: true,
-      },
-    )
-    .setTimestamp();
+    ],
+    panelTitle: "Kontrol Paneli",
+    panelBody:
+      "Aşağıdaki butonu kullanarak formu açabilir ve yanıtını iletebilirsin.",
+    color: 0x2b2d31,
+  });
 
   const buttons = [
     new ButtonBuilder()
@@ -110,7 +93,7 @@ export function buildDmFormPanelPayload({ title, description, btn1Label, btn2Lab
       new ButtonBuilder()
         .setCustomId(`${BTN_PREFIX}pending_1`)
         .setLabel(btn2Label.slice(0, 80))
-        .setStyle(ButtonStyle.Success),
+        .setStyle(ButtonStyle.Primary),
     );
   }
 
@@ -298,26 +281,27 @@ export async function handleDmFormModal(interaction, client) {
   const label1 = panel.field_label || "Mesajın";
   const label2 = panel.field_label_2 || "Detay";
 
-  const dm = new EmbedBuilder()
-    .setColor(0x1e1f22)
-    .setAuthor({
-      name: interaction.user.tag,
-      iconURL: interaction.user.displayAvatarURL({ size: 64 }),
-    })
-    .setDescription(`**${label1}**\n${text}`)
-    .addFields(
-      ...(text2
-        ? [{ name: label2, value: text2.slice(0, 1024) }]
-        : []),
-      { name: "Buton", value: btnLabel, inline: true },
-      { name: "Tip", value: typeLabel, inline: true },
-      { name: "ID", value: `\`${interaction.user.id}\``, inline: true },
-    )
-    .setTimestamp();
-
-  if (interaction.guild) {
-    dm.setFooter({ text: interaction.guild.name });
-  }
+  const dm = systemPanelEmbed({
+    title: `📢 ${brand.name} — Form Yanıtı`,
+    status: "Yeni Yanıt",
+    infra: btnLabel,
+    aboutTitle: label1,
+    aboutBody: text.slice(0, 1800),
+    features: [
+      ...(text2 ? [{ name: label2, detail: text2.slice(0, 200) }] : []),
+      { name: "Kullanıcı", detail: `${interaction.user.tag}` },
+      { name: "ID", detail: `\`${interaction.user.id}\`` },
+      { name: "Tip", detail: typeLabel },
+    ],
+    panelTitle: "Kaynak",
+    panelBody: interaction.guild
+      ? `Sunucu: **${interaction.guild.name}**`
+      : "DM üzerinden geldi",
+    color: 0x2b2d31,
+  }).setAuthor({
+    name: interaction.user.tag,
+    iconURL: interaction.user.displayAvatarURL({ size: 64 }),
+  });
 
   try {
     await owner.send({ embeds: [dm] });

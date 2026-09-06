@@ -7,18 +7,24 @@ import {
   TextInputStyle,
 } from "discord.js";
 import { getSettings, updateSettings } from "../database/settings.js";
-import { premiumEmbed, brand } from "../utils/brand.js";
+import { premiumEmbed, brand, systemPanelEmbed } from "../utils/brand.js";
 
 export function buildApplyPanel() {
-  const embed = premiumEmbed({
-    title: "📋 Staff Başvuru",
-    description: [
-      "Ekibimize katılmak ister misin?",
-      "Aşağıdaki butona tıkla ve formu doldur.",
-      "",
-      "Başvurular yetkili ekibe iletilir.",
-    ].join("\n"),
-    color: brand.colors.gold,
+  const embed = systemPanelEmbed({
+    title: `📢 ${brand.name} — Staff Başvuru Sistemi`,
+    status: "Hazır / Güvenli",
+    infra: "Başvuru Kuyruğu",
+    aboutTitle: "Başvuru Nedir?",
+    aboutBody:
+      "Ekibimize katılmak için formu doldur. Başvurular yetkili kanala iletilir ve incelenir.",
+    features: [
+      { name: "Hızlı form", detail: "Yaş · deneyim · neden sen — tek pencerede" },
+      { name: "Yetkili inceleme", detail: "Kabul / Red butonlarıyla yönetilir" },
+      { name: "Şeffaf süreç", detail: "Sonuç sana DM ile bildirilebilir" },
+    ],
+    panelTitle: "Kontrol Paneli",
+    panelBody: "Aşağıdaki butonu kullanarak başvuru formunu açabilirsin.",
+    color: 0x2b2d31,
   });
 
   const row = new ActionRowBuilder().addComponents(
