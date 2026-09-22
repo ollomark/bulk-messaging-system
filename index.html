@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Sadece sen…</title>
+  <meta name="description" content="Sana özel, kalbimden bir sayfa." />
+  <meta name="theme-color" content="#ffb3c6" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Great+Vibes&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --ink: #3d2430;
+      --rose: #e36b84;
+      --rose-deep: #c44763;
+      --soft: rgba(61, 36, 48, 0.68);
+      --paper: rgba(255, 250, 251, 0.88);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      min-height: 100dvh;
+      color: var(--ink);
+      font-family: "Manrope", system-ui, sans-serif;
+      background:
+        radial-gradient(ellipse 90% 70% at 8% 0%, #ffc9d7 0%, transparent 55%),
+        radial-gradient(ellipse 80% 60% at 100% 100%, #ffb8cb 0%, transparent 50%),
+        linear-gradient(165deg, #fff1f5 0%, #ffd9e4 48%, #f5c0d0 100%);
+      overflow-x: hidden;
+    }
+
+    .sky, .burst {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+      overflow: hidden;
+    }
+    .burst { z-index: 40; }
+    .sky i {
+      position: absolute;
+      bottom: -2rem;
+      color: rgba(227, 107, 132, 0.28);
+      font-style: normal;
+      animation: drift linear infinite;
+      user-select: none;
+    }
+    @keyframes drift {
+      0% { transform: translateY(0) rotate(0) scale(1); opacity: 0; }
+      10% { opacity: 1; }
+      100% { transform: translateY(-120vh) rotate(30deg) scale(1.2); opacity: 0; }
+    }
+
+    .wrap {
+      position: relative;
+      z-index: 1;
+      width: min(520px, 100%);
+      margin: 0 auto;
+      padding: 0 0 3.5rem;
+    }
+
+    /* HERO — full-bleed photo */
+    .hero {
+      position: relative;
+      min-height: 100dvh;
+      display: grid;
+      align-items: end;
+      overflow: hidden;
+    }
+    .hero-photo {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center 28%;
+      animation: ken 18s ease-in-out infinite alternate;
+    }
+    @keyframes ken {
+      from { transform: scale(1); }
+      to { transform: scale(1.06); }
+    }
+    .hero::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(180deg, rgba(61, 36, 48, 0.15) 0%, rgba(61, 36, 48, 0.15) 35%, rgba(61, 36, 48, 0.78) 100%);
+      z-index: 1;
+    }
+    .hero-copy {
+      position: relative;
+      z-index: 2;
+      padding: 2rem 1.35rem 2.4rem;
+      color: #fff;
+      text-align: center;
+      animation: rise 0.9s ease both;
+    }
+    .script {
+      font-family: "Great Vibes", cursive;
+      font-size: clamp(2.6rem, 11vw, 3.8rem);
+      line-height: 1.1;
+      text-shadow: 0 12px 36px rgba(0, 0, 0, 0.35);
+    }
+    .hero .serif {
+      margin: 0.7rem auto 1.35rem;
+      max-width: 22rem;
+      color: rgba(255, 255, 255, 0.92);
+      font-size: clamp(1.15rem, 3.8vw, 1.35rem);
+    }
+    .serif {
+      font-family: "Cormorant Garamond", serif;
+      font-style: italic;
+      line-height: 1.45;
+    }
+
+    .cta {
+      appearance: none;
+      border: 0;
+      cursor: pointer;
+      font: inherit;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+      color: #fff;
+      background: linear-gradient(135deg, var(--rose) 0%, var(--rose-deep) 100%);
+      padding: 0.95rem 1.4rem;
+      border-radius: 999px;
+      width: min(100%, 280px);
+      box-shadow: 0 14px 34px rgba(196, 71, 99, 0.35);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .cta:hover { transform: translateY(-2px); }
+    .cta:active { transform: translateY(1px); }
+    .cta.ghost {
+      background: transparent;
+      color: var(--rose-deep);
+      border: 1.5px solid rgba(196, 71, 99, 0.45);
+      box-shadow: none;
+      margin-top: 0.65rem;
+    }
+    .hero .cta {
+      background: rgba(255, 255, 255, 0.18);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.35);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    }
+
+    section.block {
+      padding: 2.6rem 1.25rem 0.5rem;
+      text-align: center;
+      animation: rise 0.7s ease both;
+    }
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(18px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .block h2.script {
+      color: var(--rose-deep);
+      font-size: clamp(2.2rem, 9vw, 3rem);
+      margin-bottom: 0.55rem;
+      text-shadow: none;
+    }
+    .lead {
+      color: var(--soft);
+      max-width: 28rem;
+      margin: 0 auto 1.4rem;
+      font-size: 1rem;
+      line-height: 1.55;
+    }
+
+    .compliment {
+      position: relative;
+      margin: 0 auto 1rem;
+      max-width: 28rem;
+      padding: 1.15rem 1.2rem;
+      border-radius: 22px;
+      background: var(--paper);
+      border: 1px solid rgba(227, 107, 132, 0.18);
+      box-shadow: 0 10px 30px rgba(196, 71, 99, 0.08);
+      text-align: left;
+      opacity: 0;
+      transform: translateY(16px);
+      transition: opacity 0.5s ease, transform 0.5s ease;
+    }
+    .compliment.on { opacity: 1; transform: none; }
+    .compliment .heart {
+      color: var(--rose);
+      font-size: 1.05rem;
+      margin-bottom: 0.35rem;
+    }
+    .compliment p {
+      font-family: "Cormorant Garamond", serif;
+      font-size: 1.28rem;
+      font-style: italic;
+      line-height: 1.4;
+      color: var(--ink);
+    }
+
+    .gallery {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.55rem;
+      margin-top: 0.4rem;
+    }
+    .gallery figure {
+      position: relative;
+      margin: 0;
+      overflow: hidden;
+      border-radius: 18px;
+      aspect-ratio: 3 / 4;
+      background: #ffd0dc;
+    }
+    .gallery figure.wide {
+      grid-column: 1 / -1;
+      aspect-ratio: 16 / 11;
+    }
+    .gallery img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      transition: transform 0.6s ease;
+    }
+    .gallery figure:hover img { transform: scale(1.04); }
+    .gallery figcaption {
+      position: absolute;
+      left: 0; right: 0; bottom: 0;
+      padding: 1.4rem 0.75rem 0.7rem;
+      background: linear-gradient(transparent, rgba(61, 36, 48, 0.72));
+      color: #fff;
+      font-size: 0.78rem;
+      font-weight: 500;
+      text-align: left;
+    }
+
+    .finale {
+      padding-bottom: 1rem;
+    }
+    .finale .orb {
+      width: 88px;
+      height: 88px;
+      margin: 0 auto 0.9rem;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      font-size: 2rem;
+      background: radial-gradient(circle at 30% 25%, #fff 0%, #ffd0dc 45%, #ff9fb8 100%);
+      box-shadow: 0 16px 40px rgba(196, 71, 99, 0.25);
+      animation: pulse 2.4s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+    }
+    .tiny {
+      margin-top: 1rem;
+      font-size: 0.9rem;
+      color: rgba(61, 36, 48, 0.55);
+      min-height: 1.4em;
+    }
+
+    .burst b {
+      position: absolute;
+      font-weight: 400;
+      color: var(--rose);
+      animation: pop 1.45s ease-out forwards;
+      font-size: 1.15rem;
+    }
+    @keyframes pop {
+      0% { transform: translate(0, 0) scale(0.4); opacity: 0; }
+      18% { opacity: 1; }
+      100% { transform: translate(var(--x), var(--y)) scale(1.25); opacity: 0; }
+    }
+
+    @media (max-width: 380px) {
+      .gallery { gap: 0.4rem; }
+      .gallery figure { border-radius: 14px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="sky" id="sky" aria-hidden="true"></div>
+  <div class="burst" id="burst" aria-hidden="true"></div>
+
+  <main class="wrap">
+    <header class="hero">
+      <img class="hero-photo" src="photos/07.jpg" alt="Biz" fetchpriority="high" />
+      <div class="hero-copy">
+        <h1 class="script" id="title">Sadece sen…</h1>
+        <p class="serif">Kalbimin en yumuşak yerinden, sana özel bir şey bıraktım.</p>
+        <a class="cta" href="#iltifatlar">Aç bakayım 💗</a>
+      </div>
+    </header>
+
+    <section class="block" id="iltifatlar">
+      <h2 class="script">Sen…</h2>
+      <p class="lead">Kelimeler yetmez ama yine de deniyorum. Çünkü gönlünü ısıtmak istiyorum.</p>
+      <div id="compliments"></div>
+    </section>
+
+    <section class="block" id="anilar">
+      <h2 class="script">Bizim anılar</h2>
+      <p class="lead">Her karede aynı şey var: sen, ben, ve kalbimizin güldüğü anlar.</p>
+      <div class="gallery" id="gallery"></div>
+    </section>
+
+    <section class="block finale" id="affet">
+      <div class="orb" aria-hidden="true">💞</div>
+      <h2 class="script">Affeder misin?</h2>
+      <p class="lead serif" style="font-size:1.2rem;color:var(--ink)">
+        Seni üzmek istemedim. Gönlünü kırmak istemedim.
+        Bir şans daha… kalbim sende. Senin gülüşün yeter bana.
+      </p>
+      <button class="cta" type="button" id="forgive">Evet, affediyorum 💗</button>
+      <button class="cta ghost" type="button" id="almost">Biraz daha yumuşat</button>
+      <p class="tiny" id="after"></p>
+    </section>
+  </main>
+
+  <script>
+    const compliments = [
+      "Gülüşün aklımda kalan en güzel yer.",
+      "Sen yanımdayken dünya daha sıcak, daha doğru geliyor.",
+      "Gözlerin… bakışın bile kalbimi yumuşatıyor.",
+      "Sesin, kötü günümün ilacı.",
+      "Seninle olmak, evimde hissetmek gibi.",
+      "En tatlı anılarımın hepsinde sen varsın.",
+      "Sen benim için sıradan değilsin — sen özelin özelisin.",
+      "Kalbim senin adını fısıldıyor, her gün.",
+      "Sen güldüğünde ben de dünyanın en şanslı hali oluyorum.",
+      "Seni kaybetmekten korkuyorum çünkü seni gerçekten seviyorum.",
+    ];
+
+    const photos = [
+      { src: "photos/01.jpg", cap: "Maskeli ama kalbimiz açık" },
+      { src: "photos/02.jpg", cap: "Bizim eğlencemiz" },
+      { src: "photos/03.jpg", cap: "Öpücük yağmuru" },
+      { src: "photos/04.jpg", cap: "Yine biz, yine aşk" },
+      { src: "photos/05.jpg", cap: "Omzunda huzur" },
+      { src: "photos/07.jpg", cap: "Sarıldığımız her an" },
+      { src: "photos/09.jpg", cap: "Pencereden dünyaya" },
+      { src: "photos/10.jpg", cap: "Aynada bir masal" },
+      { src: "photos/11.jpg", cap: "Gözlükler, gülüşler" },
+      { src: "photos/12.jpg", cap: "Yan yana, her zaman" },
+      { src: "photos/06.jpg", cap: "Dostlarla, seninle" },
+      { src: "photos/08.jpg", cap: "Tekrar, çünkü sen varsın" },
+    ];
+
+    const list = document.getElementById("compliments");
+    compliments.forEach((text, i) => {
+      const el = document.createElement("article");
+      el.className = "compliment";
+      el.innerHTML = `<div class="heart">♡</div><p>${text}</p>`;
+      el.style.transitionDelay = `${Math.min(i * 0.05, 0.35)}s`;
+      list.appendChild(el);
+    });
+
+    const gallery = document.getElementById("gallery");
+    photos.forEach((p, i) => {
+      const fig = document.createElement("figure");
+      if (i === 0 || i === 5 || i === 8) fig.classList.add("wide");
+      fig.innerHTML = `<img src="${p.src}" alt="${p.cap}" loading="lazy" /><figcaption>${p.cap}</figcaption>`;
+      gallery.appendChild(fig);
+    });
+
+    const io = new IntersectionObserver(
+      (entries) => entries.forEach((e) => { if (e.isIntersecting) e.target.classList.add("on"); }),
+      { threshold: 0.25 },
+    );
+    document.querySelectorAll(".compliment").forEach((el) => io.observe(el));
+
+    const sky = document.getElementById("sky");
+    for (let n = 0; n < 26; n += 1) {
+      const el = document.createElement("i");
+      el.textContent = Math.random() > 0.4 ? "♡" : "✦";
+      el.style.left = `${Math.random() * 100}%`;
+      el.style.fontSize = `${0.7 + Math.random() * 1.35}rem`;
+      el.style.animationDuration = `${8 + Math.random() * 14}s`;
+      el.style.animationDelay = `${Math.random() * 8}s`;
+      sky.appendChild(el);
+    }
+
+    function burstHearts() {
+      const layer = document.getElementById("burst");
+      const glyphs = ["💗", "💞", "✨", "🌸", "💕", "💘"];
+      for (let n = 0; n < 32; n += 1) {
+        const b = document.createElement("b");
+        b.textContent = glyphs[n % glyphs.length];
+        b.style.left = "50%";
+        b.style.top = "60%";
+        const angle = (Math.PI * 2 * n) / 32;
+        const dist = 90 + Math.random() * 170;
+        b.style.setProperty("--x", `${Math.cos(angle) * dist}px`);
+        b.style.setProperty("--y", `${Math.sin(angle) * dist - 50}px`);
+        b.style.animationDelay = `${Math.random() * 0.2}s`;
+        layer.appendChild(b);
+        setTimeout(() => b.remove(), 1600);
+      }
+    }
+
+    const after = document.getElementById("after");
+    document.getElementById("forgive").addEventListener("click", () => {
+      burstHearts();
+      after.textContent = "Teşekkür ederim… Seni çok seviyorum. 🌙";
+      document.getElementById("almost").hidden = true;
+      document.getElementById("forgive").textContent = "Seni seviyorum 💗";
+    });
+    document.getElementById("almost").addEventListener("click", () => {
+      burstHearts();
+      after.textContent = "Tamam… Daha da yumuşak olacağım. Kalbim sende. 🌷";
+    });
+
+    const name = new URLSearchParams(location.search).get("ad");
+    if (name) {
+      const safe = name.trim().slice(0, 24);
+      if (safe) {
+        document.getElementById("title").textContent = `${safe}…`;
+        document.title = `${safe} için…`;
+      }
+    }
+  </script>
+</body>
+</html>
