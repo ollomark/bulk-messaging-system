@@ -2,407 +2,588 @@
 <html lang="tr">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>sadece sana</title>
-  <meta name="theme-color" content="#1a1214" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+  <title>sadece sen</title>
+  <meta name="theme-color" content="#070507" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <style>
     :root {
-      --bg: #120e10;
-      --paper: #f3e6d8;
-      --ink: #1c1416;
-      --rose: #d45a6a;
-      --muted: rgba(243, 230, 216, 0.55);
+      --bg: #070507;
+      --warm: #ffb4c0;
+      --hot: #ff5d7a;
+      --paper: #f6e8da;
+      --ink: #1a1012;
     }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    html { scroll-behavior: smooth; }
-    body {
-      min-height: 100dvh;
-      background:
-        radial-gradient(ellipse 80% 50% at 20% 0%, #3a1a22 0%, transparent 55%),
-        radial-gradient(ellipse 70% 45% at 100% 100%, #2a1520 0%, transparent 50%),
-        #120e10;
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    html, body {
+      min-height: 100%;
+      background: var(--bg);
       color: var(--paper);
-      font-family: "DM Sans", system-ui, sans-serif;
+      font-family: "Caveat", cursive;
       overflow-x: hidden;
+      touch-action: manipulation;
     }
-
-    .sky {
+    body::before {
+      content: "";
       position: fixed;
       inset: 0;
       pointer-events: none;
-      z-index: 0;
+      z-index: 90;
+      background:
+        repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 3px),
+        radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.45) 100%);
+      mix-blend-mode: multiply;
+      opacity: 0.7;
+    }
+
+    .sky, .burst {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
       overflow: hidden;
     }
+    .sky { z-index: 0; }
+    .burst { z-index: 95; }
     .sky i {
       position: absolute;
-      bottom: -3vh;
+      bottom: -4vh;
       font-style: normal;
-      color: rgba(212, 90, 106, 0.45);
-      animation: up linear infinite;
+      color: rgba(255, 93, 122, 0.35);
+      animation: floatUp linear infinite;
       user-select: none;
-      text-shadow: 0 0 12px rgba(212, 90, 106, 0.25);
     }
-    @keyframes up {
-      0% { transform: translateY(0) rotate(0deg) scale(0.8); opacity: 0; }
-      12% { opacity: 1; }
-      100% { transform: translateY(-110vh) rotate(25deg) scale(1.2); opacity: 0; }
-    }
-
-    .burst {
-      position: fixed;
-      inset: 0;
-      pointer-events: none;
-      z-index: 80;
-      overflow: hidden;
+    @keyframes floatUp {
+      0% { transform: translateY(0) rotate(0) scale(0.7); opacity: 0; }
+      15% { opacity: 1; }
+      100% { transform: translateY(-115vh) rotate(28deg) scale(1.3); opacity: 0; }
     }
     .burst b {
       position: absolute;
       left: 50%;
       top: 50%;
       font-weight: 400;
-      animation: boom 1.35s ease-out forwards;
-      font-size: 1.4rem;
+      animation: boom 1.4s ease-out forwards;
     }
     @keyframes boom {
-      0% { transform: translate(-50%, -50%) scale(0.2); opacity: 0; }
-      12% { opacity: 1; }
-      100% { transform: translate(calc(-50% + var(--x)), calc(-50% + var(--y))) scale(1.4); opacity: 0; }
+      0% { transform: translate(-50%,-50%) scale(0.2); opacity: 0; }
+      15% { opacity: 1; }
+      100% { transform: translate(calc(-50% + var(--x)), calc(-50% + var(--y))) scale(1.5); opacity: 0; }
     }
 
-    .page {
+    .stage {
       position: relative;
       z-index: 1;
-      width: min(440px, 100%);
+      width: min(460px, 100%);
       margin: 0 auto;
-      padding-bottom: 4rem;
+      min-height: 100dvh;
     }
 
-    /* tape / polaroid scrapbook open */
-    .door {
+    /* SCENE 0 — hold to open */
+    .scene {
+      display: none;
       min-height: 100dvh;
+      padding: 1.5rem 1.2rem 2rem;
+    }
+    .scene.on { display: grid; }
+
+    #s0 {
+      place-items: center;
+      text-align: center;
+      background:
+        radial-gradient(circle at 50% 42%, rgba(255, 93, 122, 0.18), transparent 42%),
+        #070507;
+    }
+    .pulse-wrap {
+      position: relative;
+      width: 160px;
+      height: 160px;
       display: grid;
       place-items: center;
-      padding: 1.5rem;
-      text-align: center;
+      margin: 0 auto 1.4rem;
+      user-select: none;
+      touch-action: none;
     }
-    .note {
-      width: min(340px, 100%);
-      background: var(--paper);
-      color: var(--ink);
-      padding: 1.6rem 1.35rem 1.4rem;
-      border-radius: 3px;
-      box-shadow:
-        0 1px 0 rgba(255,255,255,0.4) inset,
-        0 24px 50px rgba(0,0,0,0.45);
-      transform: rotate(-1.5deg);
-      position: relative;
-      animation: floaty 5s ease-in-out infinite;
-    }
-    @keyframes floaty {
-      0%, 100% { transform: rotate(-1.5deg) translateY(0); }
-      50% { transform: rotate(-0.6deg) translateY(-6px); }
-    }
-    .tape {
+    .pulse-ring {
       position: absolute;
-      top: -12px;
-      left: 50%;
-      width: 88px;
-      height: 24px;
-      transform: translateX(-50%) rotate(-2deg);
-      background: rgba(255, 220, 150, 0.55);
-      border: 1px solid rgba(180, 140, 60, 0.25);
-      backdrop-filter: blur(1px);
+      inset: 0;
+      border-radius: 50%;
+      border: 1px solid rgba(255, 180, 192, 0.25);
+      animation: ring 2.2s ease-out infinite;
     }
-    .hand {
-      font-family: "Caveat", cursive;
-      font-weight: 600;
+    .pulse-ring.r2 { animation-delay: 0.7s; }
+    @keyframes ring {
+      0% { transform: scale(0.7); opacity: 0.7; }
+      100% { transform: scale(1.45); opacity: 0; }
+    }
+    .heart-hold {
+      width: 92px;
+      height: 92px;
+      border-radius: 50%;
+      border: 0;
+      cursor: pointer;
+      background: radial-gradient(circle at 35% 30%, #ff8fa3, #ff3d5e 55%, #a01835);
+      color: #fff;
+      font-size: 2.2rem;
+      box-shadow:
+        0 0 0 0 rgba(255, 93, 122, 0.55),
+        0 20px 50px rgba(255, 40, 80, 0.35);
+      animation: beat 1.1s ease-in-out infinite;
+      position: relative;
+      z-index: 2;
+    }
+    @keyframes beat {
+      0%, 100% { transform: scale(1); }
+      14% { transform: scale(1.08); }
+      28% { transform: scale(1); }
+      42% { transform: scale(1.12); }
+      70% { transform: scale(1); }
+    }
+    .heart-hold.holding {
+      animation: none;
+      transform: scale(1.08);
+      box-shadow: 0 0 40px rgba(255, 93, 122, 0.8), 0 20px 50px rgba(255, 40, 80, 0.45);
+    }
+    .charge {
+      position: absolute;
+      inset: -6px;
+      border-radius: 50%;
+      background: conic-gradient(var(--hot) var(--p, 0%), transparent 0);
+      mask: radial-gradient(farthest-side, transparent calc(100% - 6px), #000 calc(100% - 5px));
+      -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 6px), #000 calc(100% - 5px));
+      opacity: 0;
+      transition: opacity 0.2s;
+      z-index: 1;
+    }
+    .charge.show { opacity: 1; }
+    .whisper {
+      font-size: clamp(1.55rem, 6vw, 1.95rem);
+      color: rgba(246, 232, 218, 0.8);
+      line-height: 1.25;
+      max-width: 16rem;
+      margin: 0 auto;
+    }
+    .whisper small {
+      display: block;
+      margin-top: 0.55rem;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 0.68rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: rgba(255, 180, 192, 0.55);
+    }
+
+    /* SCENE 1 — typed messages */
+    #s1 {
+      align-content: start;
+      padding-top: 12vh;
+      gap: 0.85rem;
+    }
+    .msg {
+      max-width: 92%;
+      padding: 0.85rem 1rem;
+      background: rgba(246, 232, 218, 0.08);
+      border: 1px solid rgba(246, 232, 218, 0.12);
+      border-radius: 18px 18px 18px 4px;
+      font-size: clamp(1.55rem, 6.5vw, 1.95rem);
+      line-height: 1.2;
+      color: #ffe7ec;
+      opacity: 0;
+      transform: translateY(12px) scale(0.98);
+      transition: opacity 0.45s ease, transform 0.45s ease;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+    }
+    .msg.on { opacity: 1; transform: none; }
+    .msg.me {
+      margin-left: auto;
+      border-radius: 18px 18px 4px 18px;
+      background: linear-gradient(135deg, rgba(255,93,122,0.35), rgba(255,93,122,0.12));
+      border-color: rgba(255, 93, 122, 0.35);
+      color: #fff;
+    }
+    .cursor-line {
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 0.75rem;
+      color: rgba(255,180,192,0.45);
+      letter-spacing: 0.08em;
+      min-height: 1.2em;
+      margin-top: 0.4rem;
+    }
+
+    /* SCENE 2 — memory cinema */
+    #s2 {
+      padding: 0;
+      min-height: 100dvh;
+      place-items: stretch;
+    }
+    .cinema {
+      position: relative;
+      min-height: 100dvh;
+      overflow: hidden;
+      background: #000;
+    }
+    .cinema img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      opacity: 0;
+      transform: scale(1.08);
+      transition: opacity 1.1s ease, transform 6s ease;
+      filter: saturate(1.05) contrast(1.05);
+    }
+    .cinema img.show {
+      opacity: 1;
+      transform: scale(1);
+    }
+    .cinema .veil {
+      position: absolute;
+      inset: 0;
+      z-index: 2;
+      background:
+        linear-gradient(180deg, rgba(0,0,0,0.35), transparent 30%, transparent 55%, rgba(0,0,0,0.82));
+      display: grid;
+      align-content: end;
+      padding: 2rem 1.3rem 2.4rem;
+      text-align: left;
+    }
+    .cinema .veil p {
+      font-size: clamp(1.7rem, 7vw, 2.2rem);
+      color: #fff;
+      text-shadow: 0 10px 30px rgba(0,0,0,0.6);
+      max-width: 14ch;
       line-height: 1.15;
     }
-    .note h1 {
-      font-family: "Caveat", cursive;
-      font-size: 2.55rem;
-      font-weight: 700;
-      margin-bottom: 0.35rem;
-      color: #2a1618;
+    .dots {
+      display: flex;
+      gap: 0.35rem;
+      margin-top: 1rem;
     }
-    .note p {
-      font-family: "Caveat", cursive;
+    .dots span {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.28);
+    }
+    .dots span.on { background: #ff7a90; width: 16px; border-radius: 99px; }
+
+    /* SCENE 3 — finale */
+    #s3 {
+      place-items: center;
+      text-align: center;
+      background:
+        radial-gradient(circle at 50% 40%, rgba(255, 93, 122, 0.22), transparent 50%),
+        #070507;
+    }
+    .finale-title {
+      font-size: clamp(2.4rem, 11vw, 3.4rem);
+      line-height: 1.05;
+      margin-bottom: 0.6rem;
+      color: #ffe4ea;
+    }
+    .finale-sub {
       font-size: 1.45rem;
-      color: #4a3034;
-      margin-bottom: 1.15rem;
+      color: rgba(246,232,218,0.65);
+      margin-bottom: 1.6rem;
     }
-    .open {
+    .rain {
       appearance: none;
       border: 0;
       cursor: pointer;
-      width: 100%;
-      padding: 0.85rem 1rem;
+      padding: 0.95rem 1.5rem;
       border-radius: 999px;
-      background: #1c1416;
-      color: #f3e6d8;
-      font-family: "Caveat", cursive;
-      font-size: 1.55rem;
-      font-weight: 700;
-      letter-spacing: 0.01em;
-      transition: transform 0.15s ease, background 0.15s ease;
-    }
-    .open:active { transform: scale(0.97); background: #3a1a22; }
-
-    .story { display: none; padding: 1.25rem 1rem 0; }
-    .story.show { display: block; animation: in 0.7s ease both; }
-    @keyframes in {
-      from { opacity: 0; transform: translateY(18px); }
-      to { opacity: 1; transform: none; }
-    }
-
-    .lines {
-      display: grid;
-      gap: 0.85rem;
-      margin: 0.5rem 0 1.75rem;
-    }
-    .line {
-      font-family: "Caveat", cursive;
-      font-size: clamp(1.7rem, 7vw, 2.15rem);
-      font-weight: 600;
-      line-height: 1.1;
-      color: #f7e9dc;
-      opacity: 0;
-      transform: translateY(10px) rotate(var(--r, -1deg));
-      transition: opacity 0.5s ease, transform 0.5s ease;
-      text-shadow: 0 8px 24px rgba(0,0,0,0.35);
-      padding-left: 0.25rem;
-    }
-    .line.on {
-      opacity: 1;
-      transform: translateY(0) rotate(var(--r, -1deg));
-    }
-    .line:nth-child(odd) { --r: -1.2deg; }
-    .line:nth-child(even) { --r: 1deg; text-align: right; padding-right: 0.35rem; }
-    .line em {
-      font-style: normal;
-      color: #ff8ea0;
-    }
-
-    .stack {
-      position: relative;
-      margin: 0.4rem 0 2rem;
-      min-height: 420px;
-    }
-    .polaroid {
-      position: absolute;
-      width: min(78%, 290px);
-      background: #f6eee4;
-      padding: 0.55rem 0.55rem 0.55rem;
-      border-radius: 2px;
-      box-shadow: 0 18px 40px rgba(0,0,0,0.45);
-      left: 50%;
-      top: 0;
-      transform-origin: center center;
-      opacity: 0;
-      transition: opacity 0.4s ease;
-    }
-    .polaroid.show { opacity: 1; }
-    .polaroid img {
-      display: block;
-      width: 100%;
-      aspect-ratio: 3/4;
-      object-fit: cover;
-      background: #d8c6b4;
-    }
-    .polaroid:nth-child(1) { z-index: 12; transform: translate(-52%, 0) rotate(-6deg); }
-    .polaroid:nth-child(2) { z-index: 11; transform: translate(-40%, 18px) rotate(5deg); }
-    .polaroid:nth-child(3) { z-index: 10; transform: translate(-58%, 36px) rotate(-2deg); }
-    .polaroid:nth-child(4) { z-index: 9; transform: translate(-45%, 54px) rotate(7deg); }
-    .polaroid:nth-child(5) { z-index: 8; transform: translate(-55%, 72px) rotate(-5deg); }
-    .polaroid:nth-child(6) { z-index: 7; transform: translate(-42%, 90px) rotate(3deg); }
-    .polaroid:nth-child(7) { z-index: 6; transform: translate(-57%, 108px) rotate(-7deg); }
-    .polaroid:nth-child(8) { z-index: 5; transform: translate(-44%, 126px) rotate(4deg); }
-    .polaroid:nth-child(9) { z-index: 4; transform: translate(-53%, 144px) rotate(-3deg); }
-    .polaroid:nth-child(10) { z-index: 3; transform: translate(-46%, 162px) rotate(6deg); }
-    .polaroid:nth-child(11) { z-index: 2; transform: translate(-56%, 180px) rotate(-4deg); }
-    .polaroid:nth-child(12) { z-index: 1; transform: translate(-48%, 198px) rotate(2deg); }
-
-    .hint {
-      text-align: center;
-      font-family: "Caveat", cursive;
-      font-size: 1.25rem;
-      color: var(--muted);
-      margin: -0.4rem 0 1.6rem;
-    }
-
-    .end {
-      text-align: center;
-      padding: 0.5rem 0 1rem;
-    }
-    .end .big {
-      font-family: "Caveat", cursive;
-      font-size: 2.4rem;
-      margin-bottom: 1rem;
-      color: #ff9aab;
-    }
-    .heart-btn {
-      appearance: none;
-      border: 1px solid rgba(255,158,176,0.35);
-      background: rgba(212, 90, 106, 0.18);
-      color: #ffe0e6;
-      font-family: "Caveat", cursive;
+      font: inherit;
       font-size: 1.7rem;
       font-weight: 700;
-      padding: 0.75rem 1.4rem;
-      border-radius: 999px;
-      cursor: pointer;
-      backdrop-filter: blur(6px);
-      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+      color: #1a1012;
+      background: linear-gradient(135deg, #ffd0d8, #ff8fa3);
+      box-shadow: 0 16px 40px rgba(255, 70, 110, 0.35);
     }
-    .heart-btn:active { transform: scale(0.97); }
+    .rain:active { transform: scale(0.97); }
 
-    .shake {
-      animation: shake 0.45s ease;
+    .flash {
+      position: fixed;
+      inset: 0;
+      z-index: 92;
+      pointer-events: none;
+      background: radial-gradient(circle, rgba(255,180,192,0.55), transparent 55%);
+      opacity: 0;
     }
-    @keyframes shake {
-      0%, 100% { transform: rotate(-1.5deg); }
-      25% { transform: rotate(2deg) scale(1.02); }
-      50% { transform: rotate(-2deg); }
-      75% { transform: rotate(1.5deg); }
+    .flash.on { animation: flash 0.85s ease-out; }
+    @keyframes flash {
+      0% { opacity: 0; }
+      20% { opacity: 1; }
+      100% { opacity: 0; }
+    }
+
+    .fullheart {
+      position: fixed;
+      inset: 0;
+      z-index: 94;
+      display: grid;
+      place-items: center;
+      pointer-events: none;
+      opacity: 0;
+      transform: scale(0.6);
+      font-size: clamp(5rem, 28vw, 9rem);
+      filter: drop-shadow(0 0 40px rgba(255, 70, 110, 0.7));
+    }
+    .fullheart.on {
+      animation: bigHeart 1.2s ease-out;
+    }
+    @keyframes bigHeart {
+      0% { opacity: 0; transform: scale(0.3); }
+      35% { opacity: 1; transform: scale(1.15); }
+      70% { opacity: 1; transform: scale(1); }
+      100% { opacity: 0; transform: scale(1.4); }
     }
   </style>
 </head>
 <body>
   <div class="sky" id="sky" aria-hidden="true"></div>
   <div class="burst" id="burst" aria-hidden="true"></div>
+  <div class="flash" id="flash" aria-hidden="true"></div>
+  <div class="fullheart" id="fullheart" aria-hidden="true">💗</div>
 
-  <main class="page">
-    <section class="door" id="door">
-      <div class="note" id="note">
-        <div class="tape" aria-hidden="true"></div>
-        <h1 id="title">hey sen</h1>
-        <p>bunu sadece senin icin yaptim<br>acil bak</p>
-        <button class="open" type="button" id="openBtn">ac bakayim</button>
+  <main class="stage">
+    <section class="scene on" id="s0">
+      <div>
+        <div class="pulse-wrap" id="holdArea">
+          <div class="pulse-ring"></div>
+          <div class="pulse-ring r2"></div>
+          <div class="charge" id="charge"></div>
+          <button class="heart-hold" id="holdBtn" type="button" aria-label="basili tut">💗</button>
+        </div>
+        <p class="whisper" id="whisper">
+          bunu baska kimse icin yapmadim
+          <small>kalbe basılı tut</small>
+        </p>
       </div>
     </section>
 
-    <section class="story" id="story">
-      <div class="lines" id="lines"></div>
+    <section class="scene" id="s1">
+      <div id="msgs"></div>
+      <div class="cursor-line" id="typing"></div>
+    </section>
 
-      <div class="stack" id="stack"></div>
-      <p class="hint">fotolara dokun bi bak</p>
+    <section class="scene" id="s2">
+      <div class="cinema" id="cinema">
+        <div class="veil">
+          <p id="cap">bizim anilar</p>
+          <div class="dots" id="dots"></div>
+        </div>
+      </div>
+    </section>
 
-      <div class="end">
-        <div class="big">kalbim sende</div>
-        <button class="heart-btn" type="button" id="heartBtn">kalp yagdir</button>
+    <section class="scene" id="s3">
+      <div>
+        <h2 class="finale-title">seni cok<br>seviyorum</h2>
+        <p class="finale-sub">kalbim sadece sende</p>
+        <button class="rain" type="button" id="rainBtn">kalp yagdir</button>
       </div>
     </section>
   </main>
 
   <script>
-    const lines = [
-      "sen benim en degerlimsin",
-      "sevgilim",
-      "herseyim oldun bana",
-      "birtanem",
-      "seni cok seviyorum",
+    const words = [
+      { t: "sen benim en degerlimsin", me: true },
+      { t: "sevgilim", me: true },
+      { t: "herseyim oldun bana", me: true },
+      { t: "birtanem", me: true },
+      { t: "seni cok seviyorum", me: true },
     ];
 
     const photos = [
-      "photos/01.jpg","photos/02.jpg","photos/03.jpg","photos/04.jpg",
-      "photos/05.jpg","photos/07.jpg","photos/09.jpg","photos/10.jpg",
-      "photos/11.jpg","photos/12.jpg","photos/06.jpg","photos/08.jpg",
+      { src: "photos/07.jpg", cap: "bu an aklımdan cikmiyo" },
+      { src: "photos/01.jpg", cap: "seninle her sey guzel" },
+      { src: "photos/03.jpg", cap: "opucukler hep sana" },
+      { src: "photos/10.jpg", cap: "ayna bile bizden guzel" },
+      { src: "photos/05.jpg", cap: "omzunda huzur buluyorum" },
+      { src: "photos/12.jpg", cap: "yan yana olmak yetiyo" },
+      { src: "photos/02.jpg", cap: "gulumsen yeter bana" },
+      { src: "photos/09.jpg", cap: "dunya seninle baska" },
+      { src: "photos/11.jpg", cap: "en tatli deliligim" },
+      { src: "photos/04.jpg", cap: "yine sen yine asik" },
+      { src: "photos/08.jpg", cap: "tekrar tekrar seni" },
+      { src: "photos/06.jpg", cap: "kalabalikta bile gozum sende" },
     ];
 
-    const linesEl = document.getElementById("lines");
-    lines.forEach((t) => {
-      const d = document.createElement("div");
-      d.className = "line";
-      d.innerHTML = t.replace(/(sevgilim|birtanem|cok seviyorum|en degerlimsin)/g, "<em>$1</em>");
-      linesEl.appendChild(d);
-    });
-
-    const stack = document.getElementById("stack");
-    photos.forEach((src, i) => {
-      const el = document.createElement("div");
-      el.className = "polaroid";
-      el.style.zIndex = String(photos.length - i);
-      el.innerHTML = `<img src="${src}" alt="" />`;
-      el.addEventListener("click", () => bringFront(el));
-      stack.appendChild(el);
-    });
-
-    // stack height for absolute polaroids
-    stack.style.minHeight = `${220 + photos.length * 28}px`;
-
-    function bringFront(el) {
-      document.querySelectorAll(".polaroid").forEach((p) => {
-        p.style.zIndex = String(Number(p.style.zIndex || 1));
-      });
-      const max = Math.max(...[...document.querySelectorAll(".polaroid")].map((p) => Number(p.style.zIndex || 1)));
-      el.style.zIndex = String(max + 1);
-      el.style.transform = el.style.transform.replace(/rotate\([^)]+\)/, "rotate(0deg)") || el.style.transform;
-      burst(18, el);
-    }
-
-    // forever hearts
+    // sky hearts forever
     const sky = document.getElementById("sky");
-    for (let n = 0; n < 40; n++) {
+    for (let n = 0; n < 42; n++) {
       const i = document.createElement("i");
-      i.textContent = Math.random() > 0.35 ? "♡" : "💗";
-      i.style.left = `${Math.random() * 100}%`;
-      i.style.fontSize = `${0.7 + Math.random() * 1.6}rem`;
-      i.style.animationDuration = `${6 + Math.random() * 11}s`;
-      i.style.animationDelay = `${Math.random() * 9}s`;
+      i.textContent = Math.random() > 0.3 ? "♡" : "💗";
+      i.style.left = Math.random() * 100 + "%";
+      i.style.fontSize = 0.7 + Math.random() * 1.7 + "rem";
+      i.style.animationDuration = 6 + Math.random() * 12 + "s";
+      i.style.animationDelay = Math.random() * 10 + "s";
       sky.appendChild(i);
     }
 
-    function burst(count = 42, fromEl) {
+    function burst(n = 44) {
       const layer = document.getElementById("burst");
-      const rect = fromEl ? fromEl.getBoundingClientRect() : null;
-      const glyphs = ["💗", "💞", "💕", "💘", "♡", "💖"];
-      for (let n = 0; n < count; n++) {
+      const g = ["💗", "💞", "💕", "💘", "♡", "💖", "✨"];
+      for (let i = 0; i < n; i++) {
         const b = document.createElement("b");
-        b.textContent = glyphs[n % glyphs.length];
-        if (rect) {
-          b.style.left = `${rect.left + rect.width / 2}px`;
-          b.style.top = `${rect.top + rect.height / 2}px`;
-        }
-        const angle = (Math.PI * 2 * n) / count + Math.random() * 0.3;
-        const dist = 60 + Math.random() * 210;
-        b.style.setProperty("--x", `${Math.cos(angle) * dist}px`);
-        b.style.setProperty("--y", `${Math.sin(angle) * dist}px`);
-        b.style.fontSize = `${1 + Math.random() * 1.5}rem`;
-        b.style.animationDelay = `${Math.random() * 0.2}s`;
+        b.textContent = g[i % g.length];
+        const a = (Math.PI * 2 * i) / n + Math.random() * 0.25;
+        const d = 70 + Math.random() * 230;
+        b.style.setProperty("--x", Math.cos(a) * d + "px");
+        b.style.setProperty("--y", Math.sin(a) * d + "px");
+        b.style.fontSize = 1 + Math.random() * 1.6 + "rem";
+        b.style.animationDelay = Math.random() * 0.2 + "s";
         layer.appendChild(b);
         setTimeout(() => b.remove(), 1500);
       }
     }
+    function flash() {
+      const el = document.getElementById("flash");
+      el.classList.remove("on");
+      void el.offsetWidth;
+      el.classList.add("on");
+    }
+    function bigHeart() {
+      const el = document.getElementById("fullheart");
+      el.classList.remove("on");
+      void el.offsetWidth;
+      el.classList.add("on");
+    }
+    function go(id) {
+      document.querySelectorAll(".scene").forEach((s) => s.classList.remove("on"));
+      document.getElementById(id).classList.add("on");
+      window.scrollTo(0, 0);
+    }
 
-    document.getElementById("openBtn").addEventListener("click", () => {
-      const note = document.getElementById("note");
-      note.classList.add("shake");
-      burst(55);
-      setTimeout(() => {
-        document.getElementById("door").style.display = "none";
-        const story = document.getElementById("story");
-        story.classList.add("show");
-        document.querySelectorAll(".line").forEach((el, i) => {
-          setTimeout(() => el.classList.add("on"), 180 + i * 220);
-        });
-        document.querySelectorAll(".polaroid").forEach((el, i) => {
-          setTimeout(() => el.classList.add("show"), 900 + i * 70);
-        });
-        window.scrollTo({ top: 0, behavior: "smooth" });
-      }, 280);
+    // HOLD TO OPEN
+    const holdBtn = document.getElementById("holdBtn");
+    const charge = document.getElementById("charge");
+    let holding = false, p = 0, raf = null;
+
+    function setP(v) {
+      p = Math.max(0, Math.min(100, v));
+      charge.style.setProperty("--p", p + "%");
+    }
+    function tick() {
+      if (!holding) return;
+      setP(p + 1.7);
+      if (p >= 100) {
+        holding = false;
+        holdBtn.classList.remove("holding");
+        charge.classList.remove("show");
+        unlock();
+        return;
+      }
+      raf = requestAnimationFrame(tick);
+    }
+    function startHold(e) {
+      e.preventDefault();
+      holding = true;
+      holdBtn.classList.add("holding");
+      charge.classList.add("show");
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(tick);
+    }
+    function endHold(e) {
+      e.preventDefault();
+      holding = false;
+      holdBtn.classList.remove("holding");
+      if (p < 100) {
+        charge.classList.remove("show");
+        // soft decay
+        const decay = () => {
+          setP(p - 3.5);
+          if (p > 0) requestAnimationFrame(decay);
+          else charge.classList.remove("show");
+        };
+        requestAnimationFrame(decay);
+      }
+    }
+    holdBtn.addEventListener("pointerdown", startHold);
+    holdBtn.addEventListener("pointerup", endHold);
+    holdBtn.addEventListener("pointerleave", endHold);
+    holdBtn.addEventListener("pointercancel", endHold);
+
+    async function unlock() {
+      burst(60);
+      flash();
+      bigHeart();
+      await wait(500);
+      go("s1");
+      await playMessages();
+      await wait(700);
+      go("s2");
+      await playCinema();
+      await wait(400);
+      go("s3");
+      burst(36);
+    }
+
+    function wait(ms) { return new Promise((r) => setTimeout(r, ms)); }
+
+    async function playMessages() {
+      const box = document.getElementById("msgs");
+      const typing = document.getElementById("typing");
+      box.innerHTML = "";
+      for (const w of words) {
+        typing.textContent = "yaziyor...";
+        await wait(550 + Math.random() * 400);
+        typing.textContent = "";
+        const el = document.createElement("div");
+        el.className = "msg" + (w.me ? " me" : "");
+        el.textContent = w.t;
+        box.appendChild(el);
+        await wait(40);
+        el.classList.add("on");
+        burst(10);
+        await wait(700);
+      }
+      typing.textContent = "";
+    }
+
+    async function playCinema() {
+      const cinema = document.getElementById("cinema");
+      const cap = document.getElementById("cap");
+      const dots = document.getElementById("dots");
+      // clear old imgs except veil
+      [...cinema.querySelectorAll("img")].forEach((i) => i.remove());
+      dots.innerHTML = "";
+      photos.forEach((_, i) => {
+        const s = document.createElement("span");
+        if (i === 0) s.classList.add("on");
+        dots.appendChild(s);
+      });
+      const imgs = photos.map((p, i) => {
+        const img = document.createElement("img");
+        img.src = p.src;
+        img.alt = "";
+        cinema.insertBefore(img, cinema.firstChild);
+        return img;
+      });
+      for (let i = 0; i < photos.length; i++) {
+        imgs.forEach((im) => im.classList.remove("show"));
+        imgs[i].classList.add("show");
+        cap.textContent = photos[i].cap;
+        [...dots.children].forEach((d, di) => d.classList.toggle("on", di === i));
+        await wait(i === 0 ? 1600 : 1350);
+      }
+    }
+
+    document.getElementById("rainBtn").addEventListener("click", () => {
+      burst(72);
+      flash();
+      bigHeart();
     });
-
-    document.getElementById("heartBtn").addEventListener("click", () => burst(64));
 
     const name = new URLSearchParams(location.search).get("ad");
     if (name) {
-      const safe = name.trim().slice(0, 20);
+      const safe = name.trim().slice(0, 18).toLowerCase();
       if (safe) {
-        document.getElementById("title").textContent = `hey ${safe.toLowerCase()}`;
-        document.title = `${safe.toLowerCase()} icin`;
+        document.getElementById("whisper").childNodes[0].textContent =
+          safe + " bunu sadece senin icin yaptim ";
+        document.title = safe + " icin";
       }
     }
   </script>
